@@ -8,7 +8,7 @@ import type {
     MultisigRequestActionInput,
     MultisigRotationDraft,
     MultisigGroupStatus,
-} from '../features/multisig/multisigTypes';
+} from '../domain/multisig/multisigTypes';
 import {
     startMultisigInceptionService,
     acceptMultisigInceptionService,
@@ -16,10 +16,13 @@ import {
     acceptMultisigInteractionService,
     acceptMultisigRotationService,
     authorizeMultisigAgentsService,
+    getMultisigGroupDetailsService,
     joinMultisigRotationService,
     startMultisigInteractionService,
     startMultisigRotationService,
 } from '../services/multisig.service';
+import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
+import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import { isSyntheticExchangeNotificationId } from '../services/notifications.service';
 import { listIdentifiersService } from '../services/identifiers.service';
 import { identifierListLoaded } from '../state/identifiers.slice';
@@ -27,9 +30,7 @@ import {
     multisigGroupRecorded,
     multisigGroupStatusChanged,
 } from '../state/multisig.slice';
-import {
-    multisigRequestNotificationApproved,
-} from '../state/notifications.slice';
+import { multisigRequestNotificationApproved } from '../state/notifications.slice';
 import { operationPhaseChanged } from '../state/operations.slice';
 import { syncSessionInventoryOp } from './contacts.op';
 
@@ -45,7 +46,10 @@ const markNotificationHandled = function* (
     const updatedAt = new Date().toISOString();
     if (!isSyntheticExchangeNotificationId(notificationId)) {
         yield* callPromise(() =>
-            services.runtime.requireConnectedClient().notifications().mark(notificationId)
+            services.runtime
+                .requireConnectedClient()
+                .notifications()
+                .mark(notificationId)
         );
     }
 
@@ -58,20 +62,21 @@ const markNotificationHandled = function* (
     );
 };
 
-const refreshIdentifiersAndNotifications = function* (): EffectionOperation<void> {
-    const services = yield* AppServicesContext.expect();
-    const identifiers = yield* listIdentifiersService({
-        client: services.runtime.requireConnectedClient(),
-    });
+const refreshIdentifiersAndNotifications =
+    function* (): EffectionOperation<void> {
+        const services = yield* AppServicesContext.expect();
+        const identifiers = yield* listIdentifiersService({
+            client: services.runtime.requireConnectedClient(),
+        });
 
-    services.store.dispatch(
-        identifierListLoaded({
-            identifiers,
-            loadedAt: new Date().toISOString(),
-        })
-    );
-    yield* syncSessionInventoryOp();
-};
+        services.store.dispatch(
+            identifierListLoaded({
+                identifiers,
+                loadedAt: new Date().toISOString(),
+            })
+        );
+        yield* syncSessionInventoryOp();
+    };
 
 const recordGroupResult = function* (
     result: MultisigOperationResult,
@@ -105,6 +110,16 @@ const recordGroupResult = function* (
         })
     );
 };
+
+export function* getMultisigGroupDetailsOp(
+    identifier: IdentifierSummary
+): EffectionOperation<MultisigGroupDetails> {
+    const services = yield* AppServicesContext.expect();
+    return yield* getMultisigGroupDetailsService({
+        client: services.runtime.requireConnectedClient(),
+        identifier,
+    });
+}
 
 /**
  * Create a multisig group proposal and wait for KERIA completion.

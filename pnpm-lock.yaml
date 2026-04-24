@@ -35,15 +35,6 @@ importers:
       effection:
         specifier: 4.0.2
         version: 4.0.2
-      puppeteer:
-        specifier: ^24.42.0
-        version: 24.42.0(typescript@6.0.3)
-      puppeteer-extra:
-        specifier: ^3.3.6
-        version: 3.3.6(puppeteer-core@24.42.0)(puppeteer@24.42.0(typescript@6.0.3))
-      puppeteer-extra-plugin-stealth:
-        specifier: ^2.11.2
-        version: 2.11.2(puppeteer-extra@3.3.6(puppeteer-core@24.42.0)(puppeteer@24.42.0(typescript@6.0.3)))
       react:
         specifier: ^19.2.5
         version: 19.2.5
@@ -87,6 +78,15 @@ importers:
       prettier:
         specifier: ^3.8.3
         version: 3.8.3
+      puppeteer:
+        specifier: ^24.42.0
+        version: 24.42.0(typescript@6.0.3)
+      puppeteer-extra:
+        specifier: ^3.3.6
+        version: 3.3.6(puppeteer-core@24.42.0)(puppeteer@24.42.0(typescript@6.0.3))
+      puppeteer-extra-plugin-stealth:
+        specifier: ^2.11.2
+        version: 2.11.2(puppeteer-extra@3.3.6(puppeteer-core@24.42.0)(puppeteer@24.42.0(typescript@6.0.3)))
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

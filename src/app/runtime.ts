@@ -15,6 +15,7 @@ import type {
     MultisigRequestActionInput,
     MultisigRotationDraft,
 } from '../features/multisig/multisigTypes';
+import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import type { ResolveContactInput } from '../services/contacts.service';
 import type { GeneratedOobiRecord } from '../state/contacts.slice';
 import {
@@ -133,6 +134,7 @@ import {
     acceptMultisigRotationOp,
     authorizeMultisigAgentsOp,
     createMultisigGroupOp,
+    getMultisigGroupDetailsOp,
     interactMultisigGroupOp,
     joinMultisigRotationOp,
     rotateMultisigGroupOp,
@@ -782,6 +784,20 @@ export class AppRuntime {
         options: WorkflowRunOptions = {}
     ): Promise<IdentifierDelegationChainNode[]> =>
         this.runWorkflow(() => getIdentifierDelegationChainOp(aid), {
+            ...options,
+            label: options.label,
+            kind: options.kind ?? 'listIdentifiers',
+            track: options.track ?? false,
+        });
+
+    /**
+     * Load multisig group member details behind the runtime/workflow boundary.
+     */
+    getMultisigGroupDetails = async (
+        identifier: IdentifierSummary,
+        options: WorkflowRunOptions = {}
+    ): Promise<MultisigGroupDetails> =>
+        this.runWorkflow(() => getMultisigGroupDetailsOp(identifier), {
             ...options,
             label: options.label,
             kind: options.kind ?? 'listIdentifiers',

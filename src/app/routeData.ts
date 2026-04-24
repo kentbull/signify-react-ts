@@ -13,9 +13,9 @@ import type {
 import {
     isMultisigThresholdSpec,
     thresholdSpecForMembers,
-    type MultisigThresholdSith,
     type MultisigThresholdSpec,
 } from '../features/multisig/multisigThresholds';
+import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import { isIdentifierCreateDraft } from '../features/identifiers/identifierHelpers';
 import type {
     OobiRole,
@@ -95,16 +95,7 @@ export type NotificationsLoaderData =
     | { status: 'error'; identifiers: IdentifierSummary[]; message: string }
     | BlockedRouteData;
 
-export interface MultisigGroupDetails {
-    groupAlias: string;
-    groupAid: string;
-    signingMemberAids: string[];
-    rotationMemberAids: string[];
-    signingThreshold: MultisigThresholdSith | null;
-    rotationThreshold: MultisigThresholdSith | null;
-    sequence: string | null;
-    digest: string | null;
-}
+export type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 
 /**
  * Loader data for `/multisig`.
@@ -292,10 +283,6 @@ export type MultisigActionData =
 interface RouteClient {
     /** KERIA admin URL shown in identifier-loader failure guidance. */
     url?: string;
-    /** Optional live Signify identifier API used for group member detail hydration. */
-    identifiers?: () => {
-        members: (name: string) => Promise<unknown>;
-    };
 }
 
 /**
@@ -325,6 +312,11 @@ export interface RouteDataRuntime {
     listIdentifiers(options?: {
         signal?: AbortSignal;
     }): Promise<IdentifierSummary[]>;
+    /** Load member and threshold details for one multisig group identifier. */
+    getMultisigGroupDetails(
+        identifier: IdentifierSummary,
+        options?: { signal?: AbortSignal }
+    ): Promise<MultisigGroupDetails>;
     /** Load live contact, challenge, and protocol notification facts. */
     syncSessionInventory(options?: { signal?: AbortSignal }): Promise<unknown>;
     /** Load holder-side credential inventory. */
@@ -522,82 +514,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isStringArray = (value: unknown): value is string[] =>
     Array.isArray(value) && value.every((item) => typeof item === 'string');
-
-const isNestedStringArray = (value: unknown): value is string[][] =>
-    Array.isArray(value) && value.every(isStringArray);
-
-const isSithValue = (value: unknown): value is MultisigThresholdSith =>
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    isStringArray(value) ||
-    isNestedStringArray(value);
-
-const aidValue = (entry: unknown): string | null => {
-    if (!isRecord(entry)) {
-        return null;
-    }
-
-    const state = isRecord(entry.state) ? entry.state : {};
-    const candidates = [entry.prefix, entry.aid, state.i];
-    for (const candidate of candidates) {
-        if (typeof candidate === 'string' && candidate.trim().length > 0) {
-            return candidate.trim();
-        }
-    }
-
-    return null;
-};
-
-const groupMembersFromResponse = (
-    response: unknown,
-    role: 'signing' | 'rotation'
-): string[] => {
-    const record = isRecord(response) ? response : {};
-    const entries = Array.isArray(record[role]) ? record[role] : [];
-    const seen = new Set<string>();
-    const aids: string[] = [];
-    for (const entry of entries) {
-        const aid = aidValue(entry);
-        if (aid !== null && !seen.has(aid)) {
-            seen.add(aid);
-            aids.push(aid);
-        }
-    }
-    return aids;
-};
-
-const groupDetailsFromIdentifier = async (
-    runtime: RouteDataRuntime,
-    identifier: IdentifierSummary
-): Promise<MultisigGroupDetails> => {
-    const state: Record<string, unknown> = isRecord(identifier.state)
-        ? (identifier.state as Record<string, unknown>)
-        : {};
-    let signingMemberAids: string[] = [];
-    let rotationMemberAids: string[] = [];
-    try {
-        const response = await runtime
-            .getClient()
-            ?.identifiers?.()
-            .members(identifier.name);
-        signingMemberAids = groupMembersFromResponse(response, 'signing');
-        rotationMemberAids = groupMembersFromResponse(response, 'rotation');
-    } catch {
-        // Missing member details should not block rendering the multisig page.
-    }
-
-    return {
-        groupAlias: identifier.name,
-        groupAid: identifier.prefix,
-        signingMemberAids,
-        rotationMemberAids:
-            rotationMemberAids.length > 0 ? rotationMemberAids : signingMemberAids,
-        signingThreshold: isSithValue(state.kt) ? state.kt : null,
-        rotationThreshold: isSithValue(state.nt) ? state.nt : null,
-        sequence: typeof state.s === 'string' ? state.s : null,
-        digest: typeof state.d === 'string' ? state.d : null,
-    };
-};
 
 const isThresholdSpec = (value: unknown): value is MultisigThresholdSpec =>
     isMultisigThresholdSpec(value);
@@ -918,7 +834,11 @@ export const loadMultisig = async (
         const groupDetails = await Promise.all(
             identifiers
                 .filter((identifier) => 'group' in identifier)
-                .map((identifier) => groupDetailsFromIdentifier(runtime, identifier))
+                .map((identifier) =>
+                    runtime.getMultisigGroupDetails(identifier, {
+                        signal: request?.signal,
+                    })
+                )
         );
         return { status: 'ready', identifiers, groupDetails };
     } catch (error) {
@@ -1314,8 +1234,7 @@ export const multisigAction = async (
         ) {
             const groupAlias = formString(formData, 'groupAlias').trim();
             if (
-                (intent === 'acceptInception' ||
-                    intent === 'joinInception') &&
+                (intent === 'acceptInception' || intent === 'joinInception') &&
                 groupAlias.length === 0
             ) {
                 return {

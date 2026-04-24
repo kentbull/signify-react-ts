@@ -11,12 +11,12 @@ import {
     challengeRecordsFromKeriaContacts,
     contactRecordFromKeriaContact,
     normalizeOobiUrlForResolution,
-} from '../features/contacts/contactHelpers';
+} from '../domain/contacts/contactHelpers';
 import type {
     ContactRecord,
     GeneratedOobiRecord,
-} from '../state/contacts.slice';
-import type { ChallengeRecord } from '../state/challenges.slice';
+} from '../domain/contacts/contactTypes';
+import type { ChallengeRecord } from '../domain/challenges/challengeTypes';
 import type { OperationLogger } from '../signify/client';
 import { waitOperationService } from './signify.service';
 
@@ -56,9 +56,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
 const stringValue = (value: unknown): string | null =>
-    typeof value === 'string' && value.trim().length > 0
-        ? value.trim()
-        : null;
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
 const completedOperationAid = (operation: unknown): string | null => {
     if (!isRecord(operation) || !isRecord(operation.response)) {
@@ -68,11 +66,7 @@ const completedOperationAid = (operation: unknown): string | null => {
     return stringValue(operation.response.i);
 };
 
-const hasEndRole = (
-    raw: unknown,
-    role: string,
-    eid: string
-): boolean =>
+const hasEndRole = (raw: unknown, role: string, eid: string): boolean =>
     Array.isArray(raw) &&
     raw.some(
         (item) =>
@@ -180,7 +174,9 @@ export function* generateIdentifierOobiService({
         yield* ensureAgentEndRoleService({ client, identifier, logger });
     }
 
-    const result = yield* callPromise(() => client.oobis().get(identifier, role));
+    const result = yield* callPromise(() =>
+        client.oobis().get(identifier, role)
+    );
     const oobis = result.oobis.filter((oobi) => oobi.trim().length > 0);
     if (oobis.length === 0) {
         throw new Error(`KERIA returned no ${role} OOBIs for ${identifier}.`);
@@ -225,7 +221,8 @@ export function* resolveContactOobiService({
         label: alias === null ? 'resolving OOBI' : `resolving ${alias}`,
         logger,
     });
-    const resolvedAid = completedOperationAid(completed) ?? aidFromOobi(sourceOobi);
+    const resolvedAid =
+        completedOperationAid(completed) ?? aidFromOobi(sourceOobi);
 
     if (resolvedAid === null) {
         throw new Error(
@@ -243,9 +240,7 @@ export function* resolveContactOobiService({
     );
 
     const inventory = yield* listContactsService({ client });
-    if (
-        !inventory.contacts.some((contact) => contact.id === resolvedAid)
-    ) {
+    if (!inventory.contacts.some((contact) => contact.id === resolvedAid)) {
         const loadedAt = inventory.loadedAt;
         const contact = contactRecordFromKeriaContact(
             persistedContact,

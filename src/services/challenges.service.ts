@@ -9,7 +9,7 @@ import {
     defaultChallengeStrength,
     validateChallengeWords,
     type ChallengeStrength,
-} from '../features/contacts/challengeWords';
+} from '../domain/challenges/challengeWords';
 import type { OperationLogger } from '../signify/client';
 import { waitOperationService } from './signify.service';
 

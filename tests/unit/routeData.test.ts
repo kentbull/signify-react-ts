@@ -24,6 +24,7 @@ import type {
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../../src/signify/client';
+import { multisigGroupDetailsFromIdentifier } from '../../src/domain/multisig/multisigGroupDetails';
 
 const summary: SignifyStateSummary = {
     controllerPre: 'Econtroller',
@@ -62,6 +63,12 @@ const makeRuntime = (
     listIdentifiers: vi.fn(async () => [
         { name: 'alice', prefix: 'Ealice' } as IdentifierSummary,
     ]),
+    getMultisigGroupDetails: vi.fn(async (identifier: IdentifierSummary) =>
+        multisigGroupDetailsFromIdentifier({
+            identifier,
+            membersResponse: null,
+        })
+    ),
     syncSessionInventory: vi.fn(async () => ({})),
     syncKnownCredentialSchemas: vi.fn(async () => ({})),
     syncCredentialInventory: vi.fn(async () => ({})),
@@ -310,15 +317,15 @@ describe('route loaders', () => {
         ];
         const runtime = makeRuntime({
             listIdentifiers: vi.fn(async () => identifiers),
-            getClient: vi.fn(() => ({
-                url: 'http://keria.example',
-                identifiers: () => ({
-                    members: vi.fn(async () => ({
+            getMultisigGroupDetails: vi.fn(async (identifier) =>
+                multisigGroupDetailsFromIdentifier({
+                    identifier,
+                    membersResponse: {
                         signing: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
                         rotation: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
-                    })),
-                }),
-            })),
+                    },
+                })
+            ),
         });
 
         await expect(loadMultisig(runtime)).resolves.toEqual({
@@ -338,6 +345,10 @@ describe('route loaders', () => {
             ],
         });
         expect(runtime.listIdentifiers).toHaveBeenCalledOnce();
+        expect(runtime.getMultisigGroupDetails).toHaveBeenCalledWith(
+            identifiers[0],
+            { signal: undefined }
+        );
         expect(runtime.syncSessionInventory).toHaveBeenCalledOnce();
     });
 

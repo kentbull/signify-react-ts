@@ -18,7 +18,7 @@ import type { CredentialIpexActivityRecord } from './credentials.slice';
 import {
     knownComponentsFromContacts,
     type KnownComponentRecord,
-} from '../features/contacts/contactHelpers';
+} from '../domain/contacts/contactHelpers';
 import {
     buildIssueableCredentialTypeViews,
     ISSUEABLE_CREDENTIAL_TYPES,

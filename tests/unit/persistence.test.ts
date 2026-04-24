@@ -157,7 +157,7 @@ describe('app state persistence', () => {
         expect(loadPersistedAppState('Econtroller1', storage)).toBeNull();
     });
 
-    it('accepts older persisted buckets without EXN tombstones or stored challenge words', () => {
+    it('accepts older persisted buckets without EXN tombstones', () => {
         const storage = new MemoryStorage();
         storage.setItem(
             persistedAppStateKey('Econtroller1'),
@@ -170,11 +170,10 @@ describe('app state persistence', () => {
 
         expect(loadPersistedAppState('Econtroller1', storage)).toMatchObject({
             exchangeTombstones: [],
-            storedChallengeWords: [],
         });
     });
 
-    it('persists and rehydrates EXN tombstones and stored challenge words', () => {
+    it('persists EXN tombstones but never raw challenge words', () => {
         const source = createAppStore();
         const target = createAppStore();
         const storage = new MemoryStorage();
@@ -205,6 +204,9 @@ describe('app state persistence', () => {
         );
 
         savePersistedAppState(source.getState(), 'Econtroller1', storage);
+        const storedText = storage.getItem(
+            persistedAppStateKey('Econtroller1')
+        );
 
         expect(loadPersistedAppState('Econtroller1', storage)).toMatchObject({
             exchangeTombstones: [
@@ -213,26 +215,56 @@ describe('app state persistence', () => {
                     reason: 'userDismissed',
                 }),
             ],
-            storedChallengeWords: [
-                expect.objectContaining({
-                    challengeId: 'challenge-1',
-                    wordsHash: 'hash-one',
-                    status: 'pending',
-                }),
-            ],
         });
+        expect(
+            loadPersistedAppState('Econtroller1', storage)
+        ).not.toHaveProperty('storedChallengeWords');
+        expect(storedText).not.toContain('word0');
+        expect(storedText).not.toContain('storedChallengeWords');
 
         rehydratePersistedAppState(target, 'Econtroller1', storage);
 
         expect(target.getState().exchangeTombstones.bySaid.Eexn).toMatchObject({
             route: '/challenge/request',
         });
+        expect(target.getState().challenges.storedWordIds).toEqual([]);
+    });
+
+    it('drops legacy stored challenge words during rehydration', () => {
+        const target = createAppStore();
+        const storage = new MemoryStorage();
+
+        storage.setItem(
+            persistedAppStateKey('Econtroller1'),
+            JSON.stringify({
+                version: 1,
+                operations: [],
+                appNotifications: [],
+                exchangeTombstones: [],
+                storedChallengeWords: [
+                    {
+                        challengeId: 'legacy-challenge',
+                        counterpartyAid: 'Econtact',
+                        localIdentifier: 'alice',
+                        words: Array.from(
+                            { length: 12 },
+                            (_, index) => `legacy${index}`
+                        ),
+                        wordsHash: 'legacy-hash',
+                        strength: 128,
+                        generatedAt: '2026-04-21T00:00:00.000Z',
+                        updatedAt: '2026-04-21T00:00:00.000Z',
+                        status: 'pending',
+                    },
+                ],
+            })
+        );
+
+        rehydratePersistedAppState(target, 'Econtroller1', storage);
+
         expect(
-            target.getState().challenges.storedWordsById['challenge-1']
-        ).toMatchObject({
-            counterpartyAid: 'Econtact',
-            status: 'pending',
-        });
+            target.getState().challenges.storedWordsById['legacy-challenge']
+        ).toBeUndefined();
     });
 
     it('clears all controller-scoped persisted buckets without touching other storage', () => {

@@ -1,19 +1,20 @@
 # Workflow And State Architecture
 
-This document explains the app's service, workflow, and Redux state layers. Use
-it when adding KERIA behavior that needs progress tracking, cancellation,
-shared state, or route integration.
+This document explains the app's domain, service, workflow, and Redux state
+layers. Use it when adding KERIA behavior that needs progress tracking,
+cancellation, shared state, or route integration.
 
 ## Mental Model
 
-The architecture has four layers:
+The architecture has five layers:
 
-| Layer | Location | Responsibility |
-| --- | --- | --- |
-| Boundary | `src/signify/client.ts` | Owns `signify-ts` readiness, client construction, KERIA boot/connect, state reads, operation waits, timeouts, and logging hooks. |
-| Services | `src/services/*.service.ts` | Effection service operations for Signify/KERIA use cases. Services compose raw Promise API calls through small `callPromise` edges, but do not dispatch Redux actions. |
-| Workflows | `src/workflows/*.op.ts` | Effection operations that orchestrate services, handle route aborts, and dispatch Redux state changes. |
-| State | `src/state/*.slice.ts` | Serializable Redux projections for session, operations, identifiers, contacts, challenges, credentials, schemas, registries, roles, and notifications. |
+| Layer     | Location                    | Responsibility                                                                                                                                                         |
+| --------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain    | `src/domain/*`              | Framework-free KERI/W3C-facing types and pure helpers shared by services, workflows, state, route data, and features.                                                  |
+| Boundary  | `src/signify/client.ts`     | Owns `signify-ts` readiness, client construction, KERIA boot/connect, state reads, operation waits, timeouts, and logging hooks.                                       |
+| Services  | `src/services/*.service.ts` | Effection service operations for Signify/KERIA use cases. Services compose raw Promise API calls through small `callPromise` edges, but do not dispatch Redux actions. |
+| Workflows | `src/workflows/*.op.ts`     | Effection operations that orchestrate services, handle route aborts, and dispatch Redux state changes.                                                                 |
+| State     | `src/state/*.slice.ts`      | Serializable Redux projections for session, operations, identifiers, contacts, challenges, credentials, schemas, registries, roles, and notifications.                 |
 
 React Router talks to `AppRuntime`. `AppRuntime` launches foreground workflows
 for loaders/actions and background workflows for non-blocking KERIA work.
@@ -25,6 +26,9 @@ flowchart TD
   UI["Route component or shell UI"] --> Router["React Router loader/action"]
   Router --> Runtime["AppRuntime"]
   Runtime --> Workflow["Effection workflow"]
+  Workflow --> Domain["Pure domain helpers"]
+  Service --> Domain
+  Redux --> Domain
   Workflow --> Service["Effection service operation"]
   Service --> PromiseEdge["callPromise raw API edge"]
   PromiseEdge --> Boundary["Signify client boundary / Signify APIs"]
@@ -124,16 +128,13 @@ Current workflow groups:
 - `contacts.op.ts`: OOBI generation, OOBI resolution, contact metadata changes,
   live contact/challenge inventory sync, and KERIA notification publication.
 - `challenges.op.ts`: generate/respond/request/verify challenge-response
-  workflows. Raw challenge words stay in challenge state, not operation payloads
-  or app notification messages.
+  workflows. Raw challenge words stay in session challenge state, not persisted
+  state, operation payloads, or app notification messages.
 - `notifications.op.ts`: app-local dismissal of exchange-backed notifications
   through EXN tombstones plus best-effort KERIA notification cleanup.
-- `domain.op.ts`: documented placeholders for schema, registry, credential, and
-  role workflows that are not live yet.
-
-The placeholder operations in `domain.op.ts` are intentional architecture
-anchors. They define inputs and state transitions that future implementation
-should fill in instead of inventing parallel entry points.
+- Credential and registry flows live in `credentials.op.ts`; delegation and
+  multisig have dedicated workflow modules. Avoid placeholder workflow files:
+  add a real entry point when a domain operation has a caller and lifecycle.
 
 ## Redux State
 
@@ -143,21 +144,21 @@ resources. It is not the owner of raw Signify clients. Raw clients stay in
 
 State slices:
 
-| Slice | Purpose |
-| --- | --- |
-| `session` | Serializable connection state: status, boot flag, controller AID, agent AID, error, connected time. |
-| `operations` | Runtime workflow lifecycle records for foreground diagnostics, background operation history, active conflict guards, cancellation, and persistence. |
-| `appNotifications` | User-facing app notification records for operation completion/failure and shell notification UX. |
-| `identifiers` | Normalized identifier inventory and last identifier mutation. |
-| `contacts` | OOBI/contact resolution records, generated OOBIs, and contact endpoint metadata. |
-| `challenges` | Challenge/response exchange records plus transient stored words for pending verification. |
-| `credentials` | Credential summary records by SAID. |
-| `notifications` | KERIA notification inventory, hydrated challenge requests, and processing status. This is separate from app-level user notifications. |
-| `exchangeTombstones` | App-local EXN tombstones for exchange-backed notifications KERIA may still return. |
-| `uiPreferences` | Global, non-secret interface preferences such as sound mute state. |
-| `schema` | Credential schema resolution records. |
-| `registry` | Issuer registry records. |
-| `roles` | Local issuer/holder/verifier role bindings. |
+| Slice                | Purpose                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session`            | Serializable connection state: status, boot flag, controller AID, agent AID, error, connected time.                                                 |
+| `operations`         | Runtime workflow lifecycle records for foreground diagnostics, background operation history, active conflict guards, cancellation, and persistence. |
+| `appNotifications`   | User-facing app notification records for operation completion/failure and shell notification UX.                                                    |
+| `identifiers`        | Normalized identifier inventory and last identifier mutation.                                                                                       |
+| `contacts`           | OOBI/contact resolution records, generated OOBIs, and contact endpoint metadata.                                                                    |
+| `challenges`         | Challenge/response exchange records plus transient stored words for pending verification.                                                           |
+| `credentials`        | Credential summary records by SAID.                                                                                                                 |
+| `notifications`      | KERIA notification inventory, hydrated challenge requests, and processing status. This is separate from app-level user notifications.               |
+| `exchangeTombstones` | App-local EXN tombstones for exchange-backed notifications KERIA may still return.                                                                  |
+| `uiPreferences`      | Global, non-secret interface preferences such as sound mute state.                                                                                  |
+| `schema`             | Credential schema resolution records.                                                                                                               |
+| `registry`           | Issuer registry records.                                                                                                                            |
+| `roles`              | Local issuer/holder/verifier role bindings.                                                                                                         |
 
 Selectors in `src/state/selectors.ts` are the preferred read API. Add selectors
 when a component or workflow needs a derived view of state; do not duplicate

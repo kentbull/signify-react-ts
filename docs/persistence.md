@@ -1,9 +1,9 @@
 # Local Persistence
 
 This document explains the local storage layer for operation history,
-app-level notifications, exchange tombstones, stored challenge words, and
-global UI preferences. Use it when changing persisted state shape, controller
-switching behavior, or reload/interruption semantics.
+app-level notifications, exchange tombstones, and global UI preferences. Use it
+when changing persisted state shape, controller switching behavior, or
+reload/interruption semantics.
 
 ## Purpose
 
@@ -37,11 +37,10 @@ The stored JSON has this top-level shape:
 
 ```ts
 interface PersistedAppState {
-  version: 1;
-  operations: OperationRecord[];
-  appNotifications: AppNotificationRecord[];
-  exchangeTombstones: ExchangeTombstoneRecord[];
-  storedChallengeWords: StoredChallengeWordsRecord[];
+    version: 1;
+    operations: OperationRecord[];
+    appNotifications: AppNotificationRecord[];
+    exchangeTombstones: ExchangeTombstoneRecord[];
 }
 ```
 
@@ -49,10 +48,11 @@ Only serializable Redux records are persisted. Do not persist raw Signify
 clients, Effection tasks, raw KERIA operation responses, `Error` objects,
 abort controllers, functions, or DOM objects.
 
-Stored challenge words are persisted only as local controller-scoped workflow
-state so a user can continue a pending challenge verification after refresh.
-They must not be copied into operation payload details, app notification
-messages, route URLs, or logs.
+Raw challenge words are never persisted. They may live in Redux while the page
+session is active so a user can complete a pending verification, but refresh,
+tab close, disconnect, or controller switching clears that local session state.
+Only non-secret challenge metadata such as hashes may appear in persisted
+operation or notification facts.
 
 Exchange tombstones are app-local delete markers for EXN-backed notifications.
 They are needed because KERIA may continue returning an exchange through query
@@ -95,7 +95,7 @@ unit tests need to exercise.
 - `operationsRehydrated(...)`
 - `appNotificationsRehydrated(...)`
 - `exchangeTombstonesRehydrated(...)`
-- `storedChallengeWordsRehydrated(...)`
+- `storedChallengeWordsRehydrated({ records: [] })`
 
 Completed operation records rehydrate as they were stored.
 
@@ -125,7 +125,7 @@ Persistence behavior is covered by `tests/unit/persistence.test.ts`:
 - controller-AID bucket isolation,
 - running operations rehydrate as interrupted,
 - empty buckets clear current state,
-- exchange tombstones and stored challenge words survive refresh,
+- exchange tombstones survive refresh while raw challenge words do not,
 - global UI preferences save/load independently from controller buckets,
 - subscribed writes only save under the active controller,
 - invalid stored data is ignored.

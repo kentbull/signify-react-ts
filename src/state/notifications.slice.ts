@@ -1,11 +1,11 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { MultisigThresholdSith } from '../features/multisig/multisigThresholds';
+import type { MultisigThresholdSith } from '../domain/multisig/multisigThresholds';
 import {
     sessionConnectionFailed,
     sessionConnecting,
     sessionDisconnected,
 } from './session.slice';
-import type { DelegationAnchor } from '../features/identifiers/delegationHelpers';
+import type { DelegationAnchor } from '../domain/identifiers/delegationHelpers';
 
 /** Local handling status for a KERIA notification route. */
 export type NotificationStatus =

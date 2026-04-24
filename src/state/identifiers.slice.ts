@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { IdentifierSummary } from '../features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import {
     sessionConnectionFailed,
     sessionConnecting,

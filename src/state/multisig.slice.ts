@@ -4,8 +4,8 @@ import {
     sessionConnecting,
     sessionDisconnected,
 } from './session.slice';
-import type { MultisigGroupStatus } from '../features/multisig/multisigTypes';
-import type { MultisigThresholdSpec } from '../features/multisig/multisigThresholds';
+import type { MultisigGroupStatus } from '../domain/multisig/multisigTypes';
+import type { MultisigThresholdSpec } from '../domain/multisig/multisigThresholds';
 
 export interface MultisigGroupRecord {
     id: string;

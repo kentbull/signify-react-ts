@@ -30,13 +30,18 @@ import type {
     MultisigOperationResult,
     MultisigRequestActionInput,
     MultisigRotationDraft,
-} from '../features/multisig/multisigTypes';
+} from '../domain/multisig/multisigTypes';
+import {
+    multisigGroupDetailsFromIdentifier,
+    type MultisigGroupDetails,
+} from '../domain/multisig/multisigGroupDetails';
 import {
     thresholdSpecMemberAids,
     thresholdSpecToSith,
     validateThresholdSpecForMembers,
     type MultisigThresholdSith,
-} from '../features/multisig/multisigThresholds';
+} from '../domain/multisig/multisigThresholds';
+import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import {
     getIdentifierService,
     listIdentifiersService,
@@ -59,9 +64,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
 const stringValue = (value: unknown): string | null =>
-    typeof value === 'string' && value.trim().length > 0
-        ? value.trim()
-        : null;
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
 const aidValue = (entry: unknown): string | null => {
     if (!isRecord(entry)) {
@@ -145,15 +148,27 @@ const eventEmbeds = (
     const message =
         seal === undefined
             ? d(messagize(result.serder, sigers))
-            : d(messagize(result.serder, sigers, seal, undefined, undefined, false));
+            : d(
+                  messagize(
+                      result.serder,
+                      sigers,
+                      seal,
+                      undefined,
+                      undefined,
+                      false
+                  )
+              );
 
     return {
         [key]: [result.serder, message.substring(result.serder.size)],
     } as Record<string, [Serder, string]>;
 };
 
-const establishmentSeal = (group: HabState): [string, Record<string, string>] => {
-    const ee = (group.state as unknown as { ee?: { s?: string; d?: string } }).ee;
+const establishmentSeal = (
+    group: HabState
+): [string, Record<string, string>] => {
+    const ee = (group.state as unknown as { ee?: { s?: string; d?: string } })
+        .ee;
     if (ee?.s === undefined || ee.d === undefined) {
         throw new Error(`Group ${group.name} is missing establishment state.`);
     }
@@ -215,9 +230,10 @@ function* requireDeliverableMultisigRecipients({
     const localIdentifiers = responseEntries(
         yield* callPromise(() => client.identifiers().list())
     );
-    const localAids = new Set(
-        [localMemberAid, ...localIdentifiers.flatMap((identifier) => aidValue(identifier) ?? [])]
-    );
+    const localAids = new Set([
+        localMemberAid,
+        ...localIdentifiers.flatMap((identifier) => aidValue(identifier) ?? []),
+    ]);
     const remoteAids = unique(memberAids).filter((aid) => !localAids.has(aid));
     if (remoteAids.length === 0) {
         return;
@@ -275,7 +291,9 @@ function* refreshMemberKeyStatesService({
 }): EffectionOperation<void> {
     for (const aid of unique(memberAids)) {
         onPhase?.(`refreshing member key state ${aid}`);
-        const operation = yield* callPromise(() => client.keyStates().query(aid));
+        const operation = yield* callPromise(() =>
+            client.keyStates().query(aid)
+        );
         onPhase?.('waiting for member key state', operationName(operation));
         yield* waitOperationService({
             client,
@@ -343,10 +361,7 @@ const localMemberFromGroup = async ({
           : [];
 
     const local = localAids.find((identifier) =>
-        signing.some(
-            (member) =>
-                aidValue(member) === aidValue(identifier)
-        )
+        signing.some((member) => aidValue(member) === aidValue(identifier))
     );
 
     if (local === undefined) {
@@ -557,14 +572,18 @@ export function* acceptMultisigInceptionService({
     const icp = request.exn.e.icp;
     const smids = unique(request.exn.a.smids);
     const rmids = unique(request.exn.a.rmids ?? smids);
-    const delpre = stringValue((icp as Record<string, unknown>).di) ?? undefined;
+    const delpre =
+        stringValue((icp as Record<string, unknown>).di) ?? undefined;
 
     onPhase?.('loading local member');
     const memberHab = yield* getIdentifierService({
         client,
         aid: input.localMemberName,
     });
-    if (!smids.includes(memberHab.prefix) && !rmids.includes(memberHab.prefix)) {
+    if (
+        !smids.includes(memberHab.prefix) &&
+        !rmids.includes(memberHab.prefix)
+    ) {
         throw new Error('The selected local member is not part of this group.');
     }
 
@@ -594,7 +613,9 @@ export function* acceptMultisigInceptionService({
             MULTISIG_ICP_ROUTE,
             { gid: result.serder.pre, smids, rmids },
             eventEmbeds(result, 'icp'),
-            unique([...smids, ...rmids]).filter((aid) => aid !== memberHab.prefix)
+            unique([...smids, ...rmids]).filter(
+                (aid) => aid !== memberHab.prefix
+            )
         )
     );
 
@@ -746,7 +767,10 @@ export function* acceptMultisigEndRoleService({
         client.identifiers().addEndRole(input.groupAlias, role, eid, stamp)
     );
     const operation = yield* eventResultOperation(result);
-    const group = yield* getIdentifierService({ client, aid: input.groupAlias });
+    const group = yield* getIdentifierService({
+        client,
+        aid: input.groupAlias,
+    });
     const signingMemberAids = yield* callPromise(() =>
         groupMemberAids(client, input.groupAlias, 'signing')
     );
@@ -825,7 +849,9 @@ export function* startMultisigInteractionService({
             MULTISIG_IXN_ROUTE,
             { gid: result.serder.pre, smids, rmids },
             eventEmbeds(result, 'ixn'),
-            unique([...smids, ...rmids]).filter((aid) => aid !== memberHab.prefix)
+            unique([...smids, ...rmids]).filter(
+                (aid) => aid !== memberHab.prefix
+            )
         )
     );
 
@@ -888,7 +914,9 @@ export function* acceptMultisigInteractionService({
             MULTISIG_IXN_ROUTE,
             { gid: result.serder.pre, smids, rmids },
             eventEmbeds(result, 'ixn'),
-            unique([...smids, ...rmids]).filter((aid) => aid !== memberHab.prefix)
+            unique([...smids, ...rmids]).filter(
+                (aid) => aid !== memberHab.prefix
+            )
         )
     );
 
@@ -952,7 +980,9 @@ export function* startMultisigRotationService({
         memberAids: rmids,
     });
     if (thresholdError !== null) {
-        throw new Error(`Next rotation threshold is invalid: ${thresholdError}`);
+        throw new Error(
+            `Next rotation threshold is invalid: ${thresholdError}`
+        );
     }
     const nsith = thresholdSpecToSith(draft.nextThreshold);
     validateThreshold('Next rotation', nsith);
@@ -984,7 +1014,9 @@ export function* startMultisigRotationService({
             MULTISIG_ROT_ROUTE,
             { gid: result.serder.pre, smids, rmids },
             eventEmbeds(result, 'rot'),
-            unique([...smids, ...rmids]).filter((aid) => aid !== memberHab.prefix)
+            unique([...smids, ...rmids]).filter(
+                (aid) => aid !== memberHab.prefix
+            )
         )
     );
 
@@ -1059,7 +1091,9 @@ export function* acceptMultisigRotationService({
             MULTISIG_ROT_ROUTE,
             { gid: result.serder.pre, smids, rmids },
             eventEmbeds(result, 'rot'),
-            unique([...smids, ...rmids]).filter((aid) => aid !== memberHab.prefix)
+            unique([...smids, ...rmids]).filter(
+                (aid) => aid !== memberHab.prefix
+            )
         )
     );
 
@@ -1127,7 +1161,10 @@ export function* joinMultisigRotationService({
         logger,
     });
 
-    const group = yield* getIdentifierService({ client, aid: input.groupAlias });
+    const group = yield* getIdentifierService({
+        client,
+        aid: input.groupAlias,
+    });
     return completionResult({
         groupAlias: input.groupAlias,
         groupAid: group.prefix,
@@ -1172,4 +1209,35 @@ export function* listMultisigGroupsService({
 }): EffectionOperation<HabState[]> {
     const identifiers = yield* listIdentifiersService({ client });
     return identifiers.filter((identifier) => 'group' in identifier);
+}
+
+/**
+ * Load renderable member and threshold facts for one group identifier.
+ *
+ * Missing member details are tolerated so the multisig route can still render
+ * the group state while KERIA/member OOBIs catch up.
+ */
+export function* getMultisigGroupDetailsService({
+    client,
+    identifier,
+}: {
+    client: SignifyClient;
+    identifier: IdentifierSummary;
+}): EffectionOperation<MultisigGroupDetails> {
+    let membersResponse: unknown;
+    try {
+        membersResponse = yield* callPromise(() =>
+            client.identifiers().members(identifier.name)
+        );
+    } catch {
+        return multisigGroupDetailsFromIdentifier({
+            identifier,
+            membersResponse: null,
+        });
+    }
+
+    return multisigGroupDetailsFromIdentifier({
+        identifier,
+        membersResponse,
+    });
 }

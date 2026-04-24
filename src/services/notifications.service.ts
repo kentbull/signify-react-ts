@@ -1,7 +1,7 @@
 import type { Operation as EffectionOperation } from 'effection';
 import type { SignifyClient } from 'signify-ts';
 import { callPromise } from '../effects/promise';
-import { delegationAnchorFromEvent } from '../features/identifiers/delegationHelpers';
+import { delegationAnchorFromEvent } from '../domain/identifiers/delegationHelpers';
 import { CHALLENGE_REQUEST_ROUTE } from './challenges.service';
 import {
     credentialAdmitFromExchange,
@@ -9,7 +9,7 @@ import {
     IPEX_ADMIT_NOTIFICATION_ROUTE,
     IPEX_GRANT_NOTIFICATION_ROUTE,
 } from './credentials.service';
-import type { ContactRecord } from '../state/contacts.slice';
+import type { ContactRecord } from '../domain/contacts/contactTypes';
 import type {
     ChallengeRequestNotification,
     ChallengeRequestNotificationStatus,
@@ -19,7 +19,7 @@ import type {
     MultisigRequestRoute,
     NotificationRecord,
 } from '../state/notifications.slice';
-import type { MultisigThresholdSith } from '../features/multisig/multisigThresholds';
+import type { MultisigThresholdSith } from '../domain/multisig/multisigThresholds';
 import {
     MULTISIG_ICP_ROUTE,
     MULTISIG_IXN_ROUTE,
@@ -134,18 +134,22 @@ const notificationItemsFromResponse = (raw: unknown): unknown[] => {
     return [];
 };
 
-const notificationRawAttrs = new Map<string, Record<string, unknown>>();
+interface NotificationResponseProjection {
+    notifications: NotificationRecord[];
+    attrsById: ReadonlyMap<string, Record<string, unknown>>;
+}
 
 /**
- * Project KERIA's loose notification response into serializable app records.
+ * Project KERIA's loose notification response into serializable app records
+ * plus local-only raw attrs needed by protocol hydrators.
  */
-export const notificationRecordsFromResponse = (
+const notificationResponseProjectionFromResponse = (
     raw: unknown,
     loadedAt: string
-): NotificationRecord[] => {
-    notificationRawAttrs.clear();
+): NotificationResponseProjection => {
+    const attrsById = new Map<string, Record<string, unknown>>();
 
-    return notificationItemsFromResponse(raw).flatMap((item) => {
+    const notifications = notificationItemsFromResponse(raw).flatMap((item) => {
         if (!isRecord(item)) {
             return [];
         }
@@ -156,7 +160,7 @@ export const notificationRecordsFromResponse = (
         }
 
         const attrs = isRecord(item.a) ? item.a : {};
-        notificationRawAttrs.set(id, attrs);
+        attrsById.set(id, attrs);
         const route = stringValue(attrs.r) ?? 'unknown';
         const dt = stringValue(item.dt);
         const read = item.r === true;
@@ -176,10 +180,24 @@ export const notificationRecordsFromResponse = (
                 credentialAdmit: null,
                 delegationRequest: null,
                 updatedAt: dt ?? loadedAt,
-            },
+            } satisfies NotificationRecord,
         ];
     });
+
+    return {
+        notifications,
+        attrsById,
+    };
 };
+
+/**
+ * Project KERIA's loose notification response into serializable app records.
+ */
+export const notificationRecordsFromResponse = (
+    raw: unknown,
+    loadedAt: string
+): NotificationRecord[] =>
+    notificationResponseProjectionFromResponse(raw, loadedAt).notifications;
 
 const contactForAid = (
     contacts: readonly ContactRecord[],
@@ -321,11 +339,13 @@ const delegationRequestFromPayload = ({
 function* hydrateDelegationRequestNotification({
     client,
     notification,
+    attrsById,
     localAids,
     loadedAt,
 }: {
     client: SignifyClient;
     notification: NotificationRecord;
+    attrsById: ReadonlyMap<string, Record<string, unknown>>;
     localAids: ReadonlySet<string>;
     loadedAt: string;
 }): EffectionOperation<NotificationRecord> {
@@ -334,7 +354,7 @@ function* hydrateDelegationRequestNotification({
     }
 
     try {
-        const rawAttrs = notificationRawAttrs.get(notification.id);
+        const rawAttrs = attrsById.get(notification.id);
         const attrs = rawAttrs ?? {};
         const request = delegationRequestFromPayload({
             notification,
@@ -731,8 +751,7 @@ function* hydrateMultisigRequestNotification({
             ? {
                   ...notification,
                   status: 'error',
-                  message:
-                      'Multisig notification is missing its request SAID.',
+                  message: 'Multisig notification is missing its request SAID.',
               }
             : notification;
     }
@@ -768,15 +787,15 @@ function* hydrateMultisigRequestNotification({
             !notification.read &&
             !isSyntheticExchangeNotificationId(notification.id)
         ) {
-            yield* callPromise(() => client.notifications().mark(notification.id));
+            yield* callPromise(() =>
+                client.notifications().mark(notification.id)
+            );
         }
 
         return {
             ...notification,
-            read:
-                notification.read || request.status === 'notForThisWallet',
-            status:
-                request.status === 'actionable' ? 'unread' : 'processed',
+            read: notification.read || request.status === 'notForThisWallet',
+            status: request.status === 'actionable' ? 'unread' : 'processed',
             message:
                 request.status === 'actionable'
                     ? multisigRequestLabel(request.route)
@@ -1256,11 +1275,13 @@ function* hydrateCredentialIpexNotifications({
 function* hydrateDelegationRequestNotifications({
     client,
     notifications,
+    attrsById,
     localAids,
     loadedAt,
 }: {
     client: SignifyClient;
     notifications: NotificationRecord[];
+    attrsById: ReadonlyMap<string, Record<string, unknown>>;
     localAids: ReadonlySet<string>;
     loadedAt: string;
 }): EffectionOperation<NotificationRecord[]> {
@@ -1271,6 +1292,7 @@ function* hydrateDelegationRequestNotifications({
             yield* hydrateDelegationRequestNotification({
                 client,
                 notification,
+                attrsById,
                 localAids,
                 loadedAt,
             })
@@ -1669,7 +1691,11 @@ export function* listNotificationsService({
     const loadedAt = new Date().toISOString();
     const localAidSet = aidSet(localAids);
     const tombstoneSet = aidSet(tombstonedExnSaids);
-    const notifications = notificationRecordsFromResponse(raw, loadedAt).filter(
+    const projection = notificationResponseProjectionFromResponse(
+        raw,
+        loadedAt
+    );
+    const notifications = projection.notifications.filter(
         (notification) =>
             notification.anchorSaid === null ||
             !tombstoneSet.has(notification.anchorSaid)
@@ -1686,6 +1712,7 @@ export function* listNotificationsService({
     const delegationHydrated = yield* hydrateDelegationRequestNotifications({
         client,
         notifications: ipexHydrated,
+        attrsById: projection.attrsById,
         localAids: localAidSet,
         loadedAt,
     });

@@ -4,7 +4,7 @@ import { AppServicesContext } from '../effects/contexts';
 import {
     aliasForOobiResolution,
     pendingContactIdForOobi,
-} from '../features/contacts/contactHelpers';
+} from '../domain/contacts/contactHelpers';
 import {
     deleteContactService,
     generateIdentifierOobiService,
@@ -32,7 +32,7 @@ import {
 } from '../state/contacts.slice';
 import { notificationInventoryLoaded } from '../state/notifications.slice';
 import type { AppDispatch, AppStore } from '../state/store';
-import type { ChallengeRecord } from '../state/challenges.slice';
+import type { ChallengeRecord } from '../domain/challenges/challengeTypes';
 
 /**
  * Workflow command for creating one identifier OOBI by role.
