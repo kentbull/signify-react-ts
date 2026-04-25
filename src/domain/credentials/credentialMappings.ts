@@ -11,10 +11,14 @@ import type {
     CredentialGrantNotification,
     CredentialIpexActivityRecord,
     CredentialSummaryRecord,
+    CredentialSubjectAttributes,
     RegistryRecord,
     SchemaRecord,
-    SediVoterCredentialAttributes,
 } from './credentialTypes';
+import {
+    sediVoterAttributesFromSubject,
+    serializableCredentialSubjectAttributes,
+} from './sediVoterId';
 
 export const IPEX_GRANT_EXN_ROUTE = '/ipex/grant';
 export const IPEX_ADMIT_EXN_ROUTE = '/ipex/admit';
@@ -30,9 +34,6 @@ export const stringValue = (value: unknown): string | null =>
     typeof value === 'string' && value.trim().length > 0
         ? value.trim()
         : null;
-
-const booleanValue = (value: unknown): boolean | null =>
-    typeof value === 'boolean' ? value : null;
 
 export const requireNonEmpty = (value: string, label: string): string => {
     const normalized = value.trim();
@@ -212,89 +213,9 @@ export const statusFromCredentialState = (
     return admitted ? 'admitted' : 'issued';
 };
 
-const normalizeDateTime = (value: string, label: string): string => {
-    const normalized = requireNonEmpty(value, label);
-    const parsed = Date.parse(normalized);
-    if (!Number.isFinite(parsed)) {
-        throw new Error(`${label} must be an ISO date time.`);
-    }
-
-    return normalized;
-};
-
-export const normalizeSediVoterAttributes = (
-    input: SediVoterCredentialAttributes
-): SediVoterCredentialAttributes => ({
-    i: requireNonEmpty(input.i, 'Holder AID'),
-    fullName: requireNonEmpty(input.fullName, 'Full name'),
-    voterId: requireNonEmpty(input.voterId, 'Voter id'),
-    precinctId: requireNonEmpty(input.precinctId, 'Precinct id'),
-    county: requireNonEmpty(input.county, 'County'),
-    jurisdiction: requireNonEmpty(input.jurisdiction, 'Jurisdiction'),
-    electionId: requireNonEmpty(input.electionId, 'Election id'),
-    eligible: input.eligible,
-    expires: normalizeDateTime(input.expires, 'Expires'),
-});
-
-const sediAttributesFromSubject = (
+const credentialAttributesFromSubject = (
     subject: Record<string, unknown> | null
-): SediVoterCredentialAttributes | null => {
-    if (subject === null) {
-        return null;
-    }
-
-    const holderAid = recordString(subject, 'i');
-    const fullName = recordString(subject, 'fullName');
-    const voterId = recordString(subject, 'voterId');
-    const precinctId = recordString(subject, 'precinctId');
-    const county = recordString(subject, 'county');
-    const jurisdiction = recordString(subject, 'jurisdiction');
-    const electionId = recordString(subject, 'electionId');
-    const eligible = booleanValue(subject.eligible);
-    const expires = recordString(subject, 'expires');
-
-    if (
-        holderAid === null ||
-        fullName === null ||
-        voterId === null ||
-        precinctId === null ||
-        county === null ||
-        jurisdiction === null ||
-        electionId === null ||
-        eligible === null ||
-        expires === null
-    ) {
-        return null;
-    }
-
-    return {
-        i: holderAid,
-        fullName,
-        voterId,
-        precinctId,
-        county,
-        jurisdiction,
-        electionId,
-        eligible,
-        expires,
-    };
-};
-
-const serializableAttributes = (
-    subject: Record<string, unknown> | null
-): Record<string, string | boolean> => {
-    if (subject === null) {
-        return {};
-    }
-
-    return Object.fromEntries(
-        Object.entries(subject).flatMap(([key, value]) =>
-            typeof value === 'string' || typeof value === 'boolean'
-                ? [[key, value]]
-                : []
-        )
-    );
-};
+): CredentialSubjectAttributes | null => sediVoterAttributesFromSubject(subject);
 
 export const credentialRecordFromKeriaCredential = ({
     credential,
@@ -341,7 +262,7 @@ export const credentialRecordFromKeriaCredential = ({
         admittedAt,
         revokedAt: status === 'revoked' ? updatedAt : null,
         error,
-        attributes: sediAttributesFromSubject(subject),
+        attributes: credentialAttributesFromSubject(subject),
         updatedAt,
     };
 };
@@ -396,7 +317,7 @@ export const credentialGrantFromExchange = ({
         holderAid,
         credentialSaid,
         schemaSaid: recordString(acdc, 's'),
-        attributes: serializableAttributes(subject),
+        attributes: serializableCredentialSubjectAttributes(subject),
         createdAt: recordString(exn, 'dt') ?? notification.dt ?? loadedAt,
         status: notification.read && inbound === 'actionable' ? 'admitted' : inbound,
     };

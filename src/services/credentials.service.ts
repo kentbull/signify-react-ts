@@ -16,9 +16,9 @@ import type {
     CredentialSummaryRecord,
     RegistryRecord,
     SchemaRecord,
-    SediVoterCredentialAttributes,
 } from '../domain/credentials/credentialTypes';
 import type { IssueableCredentialTypeRecord } from '../domain/credentials/credentialCatalog';
+import type { SediVoterCredentialAttributes } from '../domain/credentials/sediVoterId';
 import {
     credentialGrantFromExchange,
     credentialRecordFromKeriaCredential,
@@ -30,7 +30,6 @@ import {
     ipexActivityDirection,
     IPEX_ADMIT_EXN_ROUTE,
     IPEX_GRANT_EXN_ROUTE,
-    normalizeSediVoterAttributes,
     recordDate,
     recordString,
     registryRecordFromKeriaRegistry,
@@ -42,9 +41,14 @@ import {
     statusFromCredentialState,
     stringValue,
 } from '../domain/credentials/credentialMappings';
+import {
+    normalizeSediVoterAttributes,
+    SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
+    SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS,
+} from '../domain/credentials/sediVoterId';
 import { waitOperationService } from './signify.service';
 
-const DEFAULT_REGISTRY_NAME = 'sedi-voter-registry';
+const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
 const CREDENTIAL_FETCH_RETRIES = 10;
 const CREDENTIAL_FETCH_RETRY_MS = 1000;
 const EXCHANGE_QUERY_LIMIT = 200;
@@ -66,7 +70,7 @@ export function* resolveCredentialSchemaService({
     const said = requireNonEmpty(schemaSaid, 'Schema SAID');
     const oobi = requireNonEmpty(schemaOobiUrl, 'Schema OOBI URL');
     const operation = yield* callPromise(() =>
-        client.oobis().resolve(oobi, 'sedi-voter-id-schema')
+        client.oobis().resolve(oobi, SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS)
     );
 
     yield* waitOperationService({

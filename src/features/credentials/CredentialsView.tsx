@@ -73,10 +73,11 @@ import {
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import {
     hasSediVoterIssueDraftErrors,
+    SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
     SEDI_VOTER_ISSUE_TEXT_FIELDS,
     validateSediVoterIssueDraft,
     type SediVoterIssueFormDraft,
-} from './credentialIssueForm';
+} from '../../domain/credentials/sediVoterId';
 import {
     readyCredentialRegistriesForIssuer,
     resolvedCredentialHolderContacts,
@@ -485,7 +486,9 @@ export const CredentialsView = () => {
     const walletSelectedRegistry = useAppSelector(selectSelectedWalletRegistry);
 
     const [holderAid, setHolderAid] = useState('');
-    const [registryName, setRegistryName] = useState('sedi-voter-registry');
+    const [registryName, setRegistryName] = useState(
+        SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME
+    );
     const [showNewRegistry, setShowNewRegistry] = useState(false);
     const [expandedCredentialSaid, setExpandedCredentialSaid] = useState('');
     const [pendingRegistrySelection, setPendingRegistrySelection] = useState<{

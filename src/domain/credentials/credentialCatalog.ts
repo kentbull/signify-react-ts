@@ -3,12 +3,21 @@ import type {
     SchemaRecord,
     SchemaResolutionStatus,
 } from './credentialTypes';
+import {
+    buildSediVoterIdCredentialType,
+    type SediVoterIdSchemaConfig,
+} from './sediVoterId';
+import type {
+    SEDI_VOTER_ID_CREDENTIAL_TYPE_KEY,
+    SEDI_VOTER_ID_FORM_KIND,
+} from './sediVoterId';
 
 /** Credential forms the app knows how to map into Signify issue payloads. */
-export type IssueableCredentialFormKind = 'sediVoterId';
+export type IssueableCredentialFormKind = typeof SEDI_VOTER_ID_FORM_KIND;
 
 /** Curated credential types this app can issue. */
-export type IssueableCredentialTypeKey = 'sediVoterId';
+export type IssueableCredentialTypeKey =
+    typeof SEDI_VOTER_ID_CREDENTIAL_TYPE_KEY;
 
 /** Static catalog record for one app-supported credential type. */
 export interface IssueableCredentialTypeRecord {
@@ -33,31 +42,20 @@ export interface IssueableCredentialTypeView
 
 export interface IssueableCredentialSchemaConfig {
     schemas: {
-        sediVoterId: {
-            said: string | null;
-            oobiUrl: string | null;
-        };
+        sediVoterId: SediVoterIdSchemaConfig;
     };
 }
 
 export const buildIssueableCredentialTypes = (
     config: IssueableCredentialSchemaConfig
 ): IssueableCredentialTypeRecord[] => {
-    const schema = config.schemas.sediVoterId;
-    if (schema.said === null || schema.oobiUrl === null) {
-        return [];
-    }
-
-    return [
-        {
-            key: 'sediVoterId',
-            label: 'SEDI Voter ID',
-            description: 'Voter eligibility credential for the SEDI demo.',
-            schemaSaid: schema.said,
-            schemaOobiUrl: schema.oobiUrl,
-            formKind: 'sediVoterId',
-        },
+    const credentialTypes = [
+        buildSediVoterIdCredentialType(config.schemas.sediVoterId),
     ];
+
+    return credentialTypes.filter(
+        (type): type is IssueableCredentialTypeRecord => type !== null
+    );
 };
 
 const latestCredentialTimestamp = (

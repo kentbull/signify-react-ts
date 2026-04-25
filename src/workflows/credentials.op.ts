@@ -28,6 +28,7 @@ import type {
     RegistryRecord,
     SchemaRecord,
 } from '../domain/credentials/credentialTypes';
+import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
 import type {
     AdmitCredentialGrantInput,
     CreateCredentialRegistryInput,
@@ -98,7 +99,8 @@ export function* createCredentialRegistryOp(
     input: CreateCredentialRegistryInput
 ): EffectionOperation<RegistryRecord> {
     const services = yield* AppServicesContext.expect();
-    const registryName = input.registryName?.trim() || 'sedi-voter-registry';
+    const registryName =
+        input.registryName?.trim() || SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
     const now = new Date().toISOString();
     services.store.dispatch(
         registryRecorded({

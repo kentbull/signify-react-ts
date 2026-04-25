@@ -1,18 +1,7 @@
-export interface SediVoterIssueFormDraft {
-    fullName: string;
-    voterId: string;
-    precinctId: string;
-    county: string;
-    jurisdiction: string;
-    electionId: string;
-    eligible: boolean;
-    expires: string;
-}
-
-export type SediVoterIssueTextFieldKey = Exclude<
-    keyof SediVoterIssueFormDraft,
-    'eligible'
->;
+import type {
+    SediVoterIssueFormDraft,
+    SediVoterIssueTextFieldKey,
+} from './sediVoterIdTypes';
 
 export const SEDI_VOTER_ISSUE_TEXT_FIELDS: readonly {
     key: SediVoterIssueTextFieldKey;
@@ -65,3 +54,4 @@ export const validateSediVoterIssueDraft = (
 export const hasSediVoterIssueDraftErrors = (
     errors: SediVoterIssueFormErrors
 ): boolean => Object.keys(errors).length > 0;
+

@@ -15,8 +15,8 @@ import {
 import {
     credentialGrantFromExchange,
     IPEX_GRANT_NOTIFICATION_ROUTE,
-    normalizeSediVoterAttributes,
 } from '../../src/domain/credentials/credentialMappings';
+import { normalizeSediVoterAttributes } from '../../src/domain/credentials/sediVoterId';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/state/issueableCredentialTypes';
 import type { NotificationRecord } from '../../src/state/notifications.slice';
 

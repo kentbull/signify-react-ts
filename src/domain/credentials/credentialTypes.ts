@@ -1,17 +1,15 @@
+import type { SediVoterCredentialAttributes } from './sediVoterId';
+
+export type { SediVoterCredentialAttributes } from './sediVoterId';
+
 /**
- * Subject attributes for the demo SEDI voter credential.
+ * Serializable subject attributes projected from a known credential schema.
+ *
+ * Keep this union explicit. Adding a new credential type means adding that
+ * schema's attribute type here and a projector in the schema-specific domain
+ * directory, not widening the app to untyped credential payloads.
  */
-export interface SediVoterCredentialAttributes {
-    i: string;
-    fullName: string;
-    voterId: string;
-    precinctId: string;
-    county: string;
-    jurisdiction: string;
-    electionId: string;
-    eligible: boolean;
-    expires: string;
-}
+export type CredentialSubjectAttributes = SediVoterCredentialAttributes;
 
 /** Local side of a credential known to this connected wallet. */
 export type CredentialDirection = 'issued' | 'held';
@@ -45,7 +43,7 @@ export interface CredentialSummaryRecord {
     admittedAt: string | null;
     revokedAt: string | null;
     error: string | null;
-    attributes: SediVoterCredentialAttributes | null;
+    attributes: CredentialSubjectAttributes | null;
     updatedAt: string;
 }
 

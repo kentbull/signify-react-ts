@@ -1,4 +1,4 @@
-import type { SediVoterCredentialAttributes } from './credentialTypes';
+import type { SediVoterCredentialAttributes } from './sediVoterId';
 
 /** Command data for resolving a credential schema OOBI. */
 export interface ResolveCredentialSchemaInput {

@@ -9,11 +9,14 @@ import {
     credentialAdmitFromExchange,
     credentialGrantFromExchange,
     credentialRecordFromKeriaCredential,
-    normalizeSediVoterAttributes,
     registryRecordFromKeriaRegistry,
     schemaRecordFromKeriaSchema,
     statusFromCredentialState,
 } from '../../src/domain/credentials/credentialMappings';
+import {
+    normalizeSediVoterAttributes,
+    SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
+} from '../../src/domain/credentials/sediVoterId';
 
 const loadedAt = '2026-04-22T00:00:00.000Z';
 
@@ -98,7 +101,7 @@ describe('credential domain mappings', () => {
             registryRecordFromKeriaRegistry({
                 registry: {
                     regk: 'Eregistry',
-                    registryName: 'sedi-voter-registry',
+                    registryName: SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
                 } as unknown as Registry,
                 issuerAlias: 'issuer',
                 issuerAid: 'Eissuer',
@@ -106,7 +109,7 @@ describe('credential domain mappings', () => {
             })
         ).toMatchObject({
             id: 'Eregistry',
-            registryName: 'sedi-voter-registry',
+            registryName: SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
             issuerAlias: 'issuer',
             issuerAid: 'Eissuer',
             status: 'ready',

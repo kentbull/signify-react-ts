@@ -3,7 +3,7 @@ import { appConfig } from '../../src/config';
 import {
     hasSediVoterIssueDraftErrors,
     validateSediVoterIssueDraft,
-} from '../../src/features/credentials/credentialIssueForm';
+} from '../../src/domain/credentials/sediVoterId';
 import {
     readyCredentialRegistriesForIssuer,
     resolvedCredentialHolderContacts,

@@ -1,4 +1,5 @@
 import { appConfig } from '../config';
+import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
 import type {
     AdmitCredentialGrantInput,
     GrantCredentialInput,
@@ -141,7 +142,8 @@ const createCredentialRegistryAction = ({
     const issuerAlias = formString(formData, 'issuerAlias').trim();
     const issuerAid = formString(formData, 'issuerAid').trim();
     const registryName =
-        formString(formData, 'registryName').trim() || 'sedi-voter-registry';
+        formString(formData, 'registryName').trim() ||
+        SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
     if (issuerAlias.length === 0 || issuerAid.length === 0) {
         return {
             intent,
