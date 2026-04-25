@@ -35,15 +35,15 @@ import { useAppSession } from '../../app/runtimeHooks';
 import { formatTimestamp } from '../../app/timeFormat';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
-import { abbreviateMiddle } from '../contacts/contactHelpers';
+import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import { schemaRuleViews } from './schemaRules';
 import type {
     CredentialIpexActivityRecord,
+    CredentialGrantNotification,
     CredentialSummaryRecord,
-} from '../../state/credentials.slice';
-import type { CredentialGrantNotification } from '../../state/notifications.slice';
-import type { RegistryRecord } from '../../state/registry.slice';
-import type { SchemaRecord } from '../../state/schema.slice';
+    RegistryRecord,
+    SchemaRecord,
+} from '../../domain/credentials/credentialTypes';
 import { useAppSelector } from '../../state/hooks';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../state/issueableCredentialTypes';
 import {

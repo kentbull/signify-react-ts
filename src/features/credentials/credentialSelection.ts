@@ -1,6 +1,6 @@
 import type { ContactRecord } from '../../state/contacts.slice';
-import type { RegistryRecord } from '../../state/registry.slice';
-import { isWitnessContact } from '../contacts/contactHelpers';
+import type { RegistryRecord } from '../../domain/credentials/credentialTypes';
+import { isWitnessContact } from '../../domain/contacts/contactHelpers';
 
 /** Contacts that can safely receive issued credentials. */
 export const resolvedCredentialHolderContacts = (

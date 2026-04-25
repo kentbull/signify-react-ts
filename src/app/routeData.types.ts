@@ -1,13 +1,13 @@
 import type {
     IdentifierCreateDraft,
     IdentifierSummary,
-} from '../features/identifiers/identifierTypes';
+} from '../domain/identifiers/identifierTypes';
 import type {
     MultisigCreateDraft,
     MultisigInteractionDraft,
     MultisigRequestActionInput,
     MultisigRotationDraft,
-} from '../features/multisig/multisigTypes';
+} from '../domain/multisig/multisigTypes';
 import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import type {
     OobiRole,
@@ -28,7 +28,7 @@ import type {
     GrantCredentialInput,
     IssueSediCredentialInput,
     ResolveCredentialSchemaInput,
-} from '../workflows/credentials.op';
+} from '../domain/credentials/credentialCommands';
 import type {
     ConnectedSignifyClient,
     SignifyClientConfig,

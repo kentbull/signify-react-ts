@@ -3,18 +3,18 @@ import type { SignifyClient } from 'signify-ts';
 import { appConfig, type AppConfig } from '../config';
 import { toErrorText } from '../effects/promise';
 import { AppEffectionScopes, type RuntimeScopeKind } from '../effects/scope';
-import { aliasForOobiResolution } from '../features/contacts/contactHelpers';
+import { aliasForOobiResolution } from '../domain/contacts/contactHelpers';
 import type {
     IdentifierCreateDraft,
     IdentifierDelegationChainNode,
     IdentifierSummary,
-} from '../features/identifiers/identifierTypes';
+} from '../domain/identifiers/identifierTypes';
 import type {
     MultisigCreateDraft,
     MultisigInteractionDraft,
     MultisigRequestActionInput,
     MultisigRotationDraft,
-} from '../features/multisig/multisigTypes';
+} from '../domain/multisig/multisigTypes';
 import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import type { ResolveContactInput } from '../services/contacts.service';
 import type { GeneratedOobiRecord } from '../state/contacts.slice';
@@ -65,7 +65,7 @@ import { appStore, type AppStore, type RootState } from '../state/store';
 import {
     identifierDelegatorAid,
     isDelegatedIdentifier,
-} from '../features/identifiers/delegationHelpers';
+} from '../domain/identifiers/delegationHelpers';
 import {
     createIdentifierOp,
     createIdentifierBackgroundOp,
@@ -121,12 +121,14 @@ import {
     syncCredentialInventoryOp,
     syncCredentialRegistriesOp,
     syncKnownCredentialSchemasOp,
-    type AdmitCredentialGrantInput,
-    type CreateCredentialRegistryInput,
-    type GrantCredentialInput,
-    type IssueSediCredentialInput,
-    type ResolveCredentialSchemaInput,
 } from '../workflows/credentials.op';
+import type {
+    AdmitCredentialGrantInput,
+    CreateCredentialRegistryInput,
+    GrantCredentialInput,
+    IssueSediCredentialInput,
+    ResolveCredentialSchemaInput,
+} from '../domain/credentials/credentialCommands';
 import {
     acceptMultisigEndRoleOp,
     acceptMultisigInceptionOp,

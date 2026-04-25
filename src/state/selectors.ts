@@ -14,15 +14,13 @@ import type {
     ChallengeRecord,
     StoredChallengeWordsRecord,
 } from './challenges.slice';
-import type { CredentialIpexActivityRecord } from './credentials.slice';
+import type { CredentialIpexActivityRecord } from '../domain/credentials/credentialTypes';
 import {
     knownComponentsFromContacts,
     type KnownComponentRecord,
 } from '../domain/contacts/contactHelpers';
-import {
-    buildIssueableCredentialTypeViews,
-    ISSUEABLE_CREDENTIAL_TYPES,
-} from './issueableCredentialTypes';
+import { buildIssueableCredentialTypeViews } from '../domain/credentials/credentialCatalog';
+import { ISSUEABLE_CREDENTIAL_TYPES } from './issueableCredentialTypes';
 
 /** Select the serializable session connection summary. */
 export const selectSession = (state: RootState) => state.session;

@@ -16,51 +16,34 @@ import {
     credentialInventoryLoaded,
     credentialIpexActivityLoaded,
     credentialRecorded,
-    type CredentialSummaryRecord,
-    type SediVoterCredentialAttributes,
 } from '../state/credentials.slice';
 import {
     registryInventoryLoaded,
     registryRecorded,
-    type RegistryRecord,
 } from '../state/registry.slice';
-import { schemaRecorded, type SchemaRecord } from '../state/schema.slice';
+import { schemaRecorded } from '../state/schema.slice';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../state/issueableCredentialTypes';
+import type {
+    CredentialSummaryRecord,
+    RegistryRecord,
+    SchemaRecord,
+} from '../domain/credentials/credentialTypes';
+import type {
+    AdmitCredentialGrantInput,
+    CreateCredentialRegistryInput,
+    GrantCredentialInput,
+    IssueSediCredentialInput,
+    ResolveCredentialSchemaInput,
+} from '../domain/credentials/credentialCommands';
 import { localIdentifierAids, syncSessionInventoryOp } from './contacts.op';
 
-export interface ResolveCredentialSchemaInput {
-    schemaSaid: string;
-    schemaOobiUrl: string;
-}
-
-export interface CreateCredentialRegistryInput {
-    issuerAlias: string;
-    issuerAid: string;
-    registryName?: string;
-}
-
-export interface IssueSediCredentialInput {
-    issuerAlias: string;
-    issuerAid: string;
-    holderAid: string;
-    registryId: string;
-    schemaSaid: string;
-    attributes: SediVoterCredentialAttributes;
-}
-
-export interface GrantCredentialInput {
-    issuerAlias: string;
-    issuerAid: string;
-    holderAid: string;
-    credentialSaid: string;
-}
-
-export interface AdmitCredentialGrantInput {
-    holderAlias: string;
-    holderAid: string;
-    notificationId: string;
-    grantSaid: string;
-}
+export type {
+    AdmitCredentialGrantInput,
+    CreateCredentialRegistryInput,
+    GrantCredentialInput,
+    IssueSediCredentialInput,
+    ResolveCredentialSchemaInput,
+} from '../domain/credentials/credentialCommands';
 
 const pendingRegistryId = (issuerAid: string, registryName: string): string =>
     `${issuerAid}:${registryName}`;

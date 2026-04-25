@@ -25,7 +25,7 @@ import {
     type IdentifierCreateDraft,
     type IdentifierDelegationChainState,
     type IdentifierSummary,
-} from './identifierTypes';
+} from '../../domain/identifiers/identifierTypes';
 import type { GeneratedOobiRecord } from '../../state/contacts.slice';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
@@ -37,8 +37,8 @@ import { walletAidSelected } from '../../state/walletSelection.slice';
 import {
     identifierAvailableOobiRoles,
     type OobiGenerationRole,
-} from '../contacts/contactHelpers';
-import { identifierDelegatorOptions } from './identifierHelpers';
+} from '../../domain/contacts/contactHelpers';
+import { identifierDelegatorOptions } from '../../domain/identifiers/identifierHelpers';
 
 /**
  * Connected identifiers feature route.

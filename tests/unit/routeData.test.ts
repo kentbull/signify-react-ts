@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
     IdentifierCreateDraft,
     IdentifierSummary,
-} from '../../src/features/identifiers/identifierTypes';
-import { defaultIdentifierCreateDraft } from '../../src/features/identifiers/identifierHelpers';
+} from '../../src/domain/identifiers/identifierTypes';
+import { defaultIdentifierCreateDraft } from '../../src/domain/identifiers/identifierHelpers';
 import {
     contactsAction,
     credentialsAction,

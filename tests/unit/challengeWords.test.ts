@@ -3,7 +3,7 @@ import {
     challengeWordsFingerprint,
     parseChallengeWords,
     validateChallengeWords,
-} from '../../src/features/contacts/challengeWords';
+} from '../../src/domain/challenges/challengeWords';
 
 describe('challenge word helpers', () => {
     it('normalizes pasted challenge words', () => {

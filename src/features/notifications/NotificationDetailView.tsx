@@ -50,7 +50,7 @@ import type {
     MultisigRequestNotification,
 } from '../../state/notifications.slice';
 import { ChallengeRequestResponseForm } from './ChallengeRequestResponseForm';
-import { sithSummary } from '../multisig/multisigThresholds';
+import { sithSummary } from '../../domain/multisig/multisigThresholds';
 import {
     defaultMultisigRequestGroupAlias,
     defaultMultisigRequestLocalMember,

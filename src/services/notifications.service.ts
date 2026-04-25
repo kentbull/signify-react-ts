@@ -8,7 +8,7 @@ import {
     credentialGrantFromExchange,
     IPEX_ADMIT_NOTIFICATION_ROUTE,
     IPEX_GRANT_NOTIFICATION_ROUTE,
-} from './credentials.service';
+} from '../domain/credentials/credentialMappings';
 import type { ContactRecord } from '../domain/contacts/contactTypes';
 import type {
     ChallengeRequestNotification,

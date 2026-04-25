@@ -95,6 +95,31 @@ export default [
         },
     },
     {
+        files: ['src/app/runtime.ts', 'src/app/routeData*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: [
+                                '../features/contacts/challengeWords',
+                                '../features/contacts/contactHelpers',
+                                '../features/identifiers/identifierHelpers',
+                                '../features/identifiers/identifierTypes',
+                                '../features/identifiers/delegationHelpers',
+                                '../features/multisig/multisigTypes',
+                                '../features/multisig/multisigThresholds',
+                            ],
+                            message:
+                                'App runtime and route data must import pure helpers and types from src/domain, not feature compatibility shims.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         files: [
             'tests/**/*.{ts,js,mjs}',
             'scripts/**/*.{ts,js,mjs}',

@@ -2,7 +2,7 @@ import { sleep } from 'effection';
 import { describe, expect, it, vi } from 'vitest';
 import type { SignifyClient } from 'signify-ts';
 import { createAppRuntime, type AppRuntime } from '../../src/app/runtime';
-import type { IdentifierSummary } from '../../src/features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 import { appNotificationRecorded } from '../../src/state/appNotifications.slice';
 import { storedChallengeWordsRecorded } from '../../src/state/challenges.slice';
 import { contactResolved } from '../../src/state/contacts.slice';

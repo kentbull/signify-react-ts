@@ -34,8 +34,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { StatusPill } from '../../app/Console';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
-import { truncateMiddle } from '../identifiers/identifierHelpers';
-import type { MultisigMemberOption } from './multisigTypes';
+import { truncateMiddle } from '../../domain/identifiers/identifierHelpers';
+import type { MultisigMemberOption } from '../../domain/multisig/multisigTypes';
 import {
     equalMemberWeight,
     parseThresholdSpec,
@@ -47,7 +47,7 @@ import {
     validateThresholdSpecForMembers,
     type MultisigThresholdClause,
     type MultisigThresholdSpec,
-} from './multisigThresholds';
+} from '../../domain/multisig/multisigThresholds';
 
 interface ThresholdEditorProps {
     title: string;

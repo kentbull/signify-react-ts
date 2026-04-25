@@ -51,8 +51,8 @@ import type {
     CredentialActionData,
     CredentialsLoaderData,
 } from '../../app/routeData';
-import type { CredentialSummaryRecord } from '../../state/credentials.slice';
-import type { IssueableCredentialTypeView } from '../../state/issueableCredentialTypes';
+import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
@@ -70,7 +70,7 @@ import {
     walletAidSelected,
     walletRegistrySelected,
 } from '../../state/walletSelection.slice';
-import { abbreviateMiddle } from '../contacts/contactHelpers';
+import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import {
     hasSediVoterIssueDraftErrors,
     SEDI_VOTER_ISSUE_TEXT_FIELDS,

@@ -58,7 +58,7 @@ import {
     identifierAvailableOobiRoles,
     isWitnessContact,
     type OobiGenerationRole,
-} from './contactHelpers';
+} from '../../domain/contacts/contactHelpers';
 
 const timestampText = (value: string | null): string =>
     value === null ? 'Not available' : (formatTimestamp(value) ?? value);

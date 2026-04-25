@@ -3,7 +3,7 @@ import type {
     AdmitCredentialGrantInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
-} from '../workflows/credentials.op';
+} from '../domain/credentials/credentialCommands';
 import type { CredentialActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 

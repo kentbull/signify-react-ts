@@ -4,24 +4,12 @@ import {
     sessionConnecting,
     sessionDisconnected,
 } from './session.slice';
+import type { RegistryRecord } from '../domain/credentials/credentialTypes';
 
-/** Lifecycle of a credential registry known to the local issuer role. */
-export type RegistryStatus = 'unknown' | 'creating' | 'ready' | 'error';
-
-/**
- * Local registry projection keyed by registry id/key.
- */
-export interface RegistryRecord {
-    id: string;
-    name: string;
-    registryName: string;
-    regk: string;
-    issuerAlias: string;
-    issuerAid: string;
-    status: RegistryStatus;
-    error: string | null;
-    updatedAt: string | null;
-}
+export type {
+    RegistryRecord,
+    RegistryStatus,
+} from '../domain/credentials/credentialTypes';
 
 /**
  * Registry slice state keyed by registry id.

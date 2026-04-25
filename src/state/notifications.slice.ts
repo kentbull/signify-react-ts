@@ -1,5 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { MultisigThresholdSith } from '../domain/multisig/multisigThresholds';
+import type {
+    CredentialAdmitNotification,
+    CredentialGrantNotification,
+} from '../domain/credentials/credentialTypes';
 import {
     sessionConnectionFailed,
     sessionConnecting,
@@ -19,19 +23,6 @@ export type ChallengeRequestNotificationStatus =
     | 'actionable'
     | 'senderUnknown'
     | 'responded'
-    | 'error';
-
-/** Holder-facing state for inbound credential grant notifications. */
-export type CredentialGrantNotificationStatus =
-    | 'actionable'
-    | 'notForThisWallet'
-    | 'admitted'
-    | 'error';
-
-/** Issuer-facing state for inbound credential admit notifications. */
-export type CredentialAdmitNotificationStatus =
-    | 'received'
-    | 'notForThisWallet'
     | 'error';
 
 /** Delegator-facing state for inbound delegated identifier requests. */
@@ -85,33 +76,12 @@ export interface ChallengeRequestNotification {
     status: ChallengeRequestNotificationStatus;
 }
 
-/**
- * Credential grant metadata hydrated from an IPEX grant EXN.
- */
-export interface CredentialGrantNotification {
-    notificationId: string;
-    grantSaid: string;
-    issuerAid: string;
-    holderAid: string;
-    credentialSaid: string;
-    schemaSaid: string | null;
-    attributes: Record<string, string | boolean>;
-    createdAt: string;
-    status: CredentialGrantNotificationStatus;
-}
-
-/**
- * Credential admit receipt metadata hydrated from an IPEX admit EXN.
- */
-export interface CredentialAdmitNotification {
-    notificationId: string;
-    admitSaid: string;
-    grantSaid: string | null;
-    issuerAid: string | null;
-    holderAid: string;
-    createdAt: string;
-    status: CredentialAdmitNotificationStatus;
-}
+export type {
+    CredentialAdmitNotification,
+    CredentialAdmitNotificationStatus,
+    CredentialGrantNotification,
+    CredentialGrantNotificationStatus,
+} from '../domain/credentials/credentialTypes';
 
 /**
  * Delegation request metadata hydrated from a KERIA `/delegate/request`

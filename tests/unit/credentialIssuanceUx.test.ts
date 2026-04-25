@@ -23,9 +23,11 @@ import {
 } from '../../src/state/selectors';
 import { createAppStore } from '../../src/state/store';
 import type { ContactRecord } from '../../src/state/contacts.slice';
-import type { CredentialSummaryRecord } from '../../src/state/credentials.slice';
-import type { CredentialGrantNotification } from '../../src/state/notifications.slice';
-import type { RegistryRecord } from '../../src/state/registry.slice';
+import type {
+    CredentialGrantNotification,
+    CredentialSummaryRecord,
+    RegistryRecord,
+} from '../../src/domain/credentials/credentialTypes';
 
 const now = '2026-04-22T00:00:00.000Z';
 

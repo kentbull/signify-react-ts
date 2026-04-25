@@ -1,10 +1,10 @@
 import type { SignifyClient } from 'signify-ts';
 import { describe, expect, it } from 'vitest';
-import type { MultisigCreateDraft } from '../../src/features/multisig/multisigTypes';
+import type { MultisigCreateDraft } from '../../src/domain/multisig/multisigTypes';
 import {
     thresholdSpecForMembers,
     type MultisigThresholdSpec,
-} from '../../src/features/multisig/multisigThresholds';
+} from '../../src/domain/multisig/multisigThresholds';
 import {
     acceptMultisigInceptionService,
     startMultisigInceptionService,

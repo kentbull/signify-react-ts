@@ -24,7 +24,7 @@ import type {
     IdentifierDelegationChainNode,
     IdentifierDelegationChainState,
     IdentifierSummary,
-} from './identifierTypes';
+} from '../../domain/identifiers/identifierTypes';
 import {
     formatIdentifierMetadata,
     identifierCurrentKey,
@@ -35,7 +35,7 @@ import {
     identifierTier,
     identifierType,
     identifierUnavailableValue,
-} from './identifierHelpers';
+} from '../../domain/identifiers/identifierHelpers';
 
 /**
  * Props for the identifier detail modal.

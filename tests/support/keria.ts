@@ -12,7 +12,7 @@ import {
 import type { Operation as EffectionOperation } from 'effection';
 import { createAppRuntime } from '../../src/app/runtime';
 import { appConfig } from '../../src/config';
-import { identifiersFromResponse } from '../../src/features/identifiers/identifierHelpers';
+import { identifiersFromResponse } from '../../src/domain/identifiers/identifierHelpers';
 import {
     connectSignifyClient,
     randomSignifyPasscode,

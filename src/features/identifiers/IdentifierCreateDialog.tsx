@@ -26,11 +26,11 @@ import type { SelectChangeEvent } from '@mui/material/Select';
 import {
     defaultIdentifierCreateDraft,
     isIdentifierCreateDraft,
-} from './identifierHelpers';
+} from '../../domain/identifiers/identifierHelpers';
 import type {
     IdentifierCreateDraft,
     IdentifierDelegatorOption,
-} from './identifierTypes';
+} from '../../domain/identifiers/identifierTypes';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 
 /**

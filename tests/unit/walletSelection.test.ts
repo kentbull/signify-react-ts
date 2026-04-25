@@ -13,8 +13,8 @@ import {
     walletAidSelected,
     walletRegistrySelected,
 } from '../../src/state/walletSelection.slice';
-import type { IdentifierSummary } from '../../src/features/identifiers/identifierTypes';
-import type { RegistryRecord } from '../../src/state/registry.slice';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
+import type { RegistryRecord } from '../../src/domain/credentials/credentialTypes';
 
 const now = '2026-04-22T00:00:00.000Z';
 

@@ -51,7 +51,7 @@ import type {
     MultisigRequestNotification,
 } from '../state/notifications.slice';
 import type { OperationRecord } from '../state/operations.slice';
-import type { IdentifierSummary } from '../features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import { allAppNotificationsRead } from '../state/appNotifications.slice';
 import { hoverSoundMutedToggled } from '../state/uiPreferences.slice';
 import {
@@ -68,7 +68,7 @@ import {
     selectSelectedWalletRegistry,
 } from '../state/selectors';
 import { ChallengeRequestResponseForm } from '../features/notifications/ChallengeRequestResponseForm';
-import { abbreviateMiddle } from '../features/contacts/contactHelpers';
+import { abbreviateMiddle } from '../domain/contacts/contactHelpers';
 import {
     defaultMultisigRequestGroupAlias,
     defaultMultisigRequestLocalMember,

@@ -1,5 +1,5 @@
-import { isIdentifierCreateDraft } from '../features/identifiers/identifierHelpers';
-import type { IdentifierCreateDraft } from '../features/identifiers/identifierTypes';
+import { isIdentifierCreateDraft } from '../domain/identifiers/identifierHelpers';
+import type { IdentifierCreateDraft } from '../domain/identifiers/identifierTypes';
 import type { IdentifierActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 

@@ -2,7 +2,7 @@ import type { OobiRole } from '../services/contacts.service';
 import {
     parseChallengeWords,
     validateChallengeWords,
-} from '../features/contacts/challengeWords';
+} from '../domain/challenges/challengeWords';
 import type { ContactActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 

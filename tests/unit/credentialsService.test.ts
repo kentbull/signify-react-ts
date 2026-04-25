@@ -7,14 +7,16 @@ import type {
 import { createAppRuntime } from '../../src/app/runtime';
 import {
     admitCredentialGrantService,
-    credentialGrantFromExchange,
-    IPEX_GRANT_NOTIFICATION_ROUTE,
     listCredentialIpexActivityService,
     listCredentialInventoryService,
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
-    normalizeSediVoterAttributes,
 } from '../../src/services/credentials.service';
+import {
+    credentialGrantFromExchange,
+    IPEX_GRANT_NOTIFICATION_ROUTE,
+    normalizeSediVoterAttributes,
+} from '../../src/domain/credentials/credentialMappings';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/state/issueableCredentialTypes';
 import type { NotificationRecord } from '../../src/state/notifications.slice';
 

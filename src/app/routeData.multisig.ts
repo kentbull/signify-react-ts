@@ -3,12 +3,12 @@ import type {
     MultisigInteractionDraft,
     MultisigRequestActionInput,
     MultisigRotationDraft,
-} from '../features/multisig/multisigTypes';
+} from '../domain/multisig/multisigTypes';
 import {
     isMultisigThresholdSpec,
     thresholdSpecForMembers,
     type MultisigThresholdSpec,
-} from '../features/multisig/multisigThresholds';
+} from '../domain/multisig/multisigThresholds';
 import type { BackgroundWorkflowStartResult } from './runtime';
 import type { MultisigActionData, RouteDataRuntime } from './routeData.types';
 import {

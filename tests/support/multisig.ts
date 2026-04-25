@@ -4,12 +4,12 @@ import { appConfig } from '../../src/config';
 import type {
     MultisigCreateDraft,
     MultisigRequestActionInput,
-} from '../../src/features/multisig/multisigTypes';
+} from '../../src/domain/multisig/multisigTypes';
 import {
     thresholdSpecForMembers,
     type MultisigThresholdSith,
     type MultisigThresholdSpec,
-} from '../../src/features/multisig/multisigThresholds';
+} from '../../src/domain/multisig/multisigThresholds';
 import {
     MULTISIG_ICP_ROUTE,
     MULTISIG_IXN_ROUTE,

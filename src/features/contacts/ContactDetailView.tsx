@@ -54,9 +54,9 @@ import {
     contactChallengeStatus,
     contactOobiGroups,
     contactOobiRoleSummary,
-} from './contactHelpers';
-import type { ContactOobiGroup } from './contactHelpers';
-import { parseChallengeWords, validateChallengeWords } from './challengeWords';
+} from '../../domain/contacts/contactHelpers';
+import type { ContactOobiGroup } from '../../domain/contacts/contactHelpers';
+import { parseChallengeWords, validateChallengeWords } from '../../domain/challenges/challengeWords';
 
 const timestampText = (value: string | null): string =>
     value === null ? 'Not available' : (formatTimestamp(value) ?? value);

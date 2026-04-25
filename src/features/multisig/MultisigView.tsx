@@ -49,9 +49,9 @@ import {
     selectMultisigGroupIdentifiers,
     selectMultisigRequestNotifications,
 } from '../../state/selectors';
-import { isWitnessContact } from '../contacts/contactHelpers';
-import { truncateMiddle } from '../identifiers/identifierHelpers';
-import type { IdentifierSummary } from '../identifiers/identifierTypes';
+import { isWitnessContact } from '../../domain/contacts/contactHelpers';
+import { truncateMiddle } from '../../domain/identifiers/identifierHelpers';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import {
     sithSummary,
     thresholdSpecForMembers,
@@ -59,12 +59,12 @@ import {
     thresholdSummary,
     validateThresholdSpecForMembers,
     type MultisigThresholdSpec,
-} from './multisigThresholds';
+} from '../../domain/multisig/multisigThresholds';
 import type {
     MultisigCreateDraft,
     MultisigMemberDraft,
     MultisigMemberOption,
-} from './multisigTypes';
+} from '../../domain/multisig/multisigTypes';
 import type { MultisigRequestNotification } from '../../state/notifications.slice';
 import { ThresholdEditor } from './ThresholdEditor';
 import {
