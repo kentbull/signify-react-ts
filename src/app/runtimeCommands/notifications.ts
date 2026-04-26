@@ -20,10 +20,17 @@ export interface NotificationRuntimeCommands {
 export const createNotificationRuntimeCommands = (
     context: RuntimeCommandContext
 ): NotificationRuntimeCommands => ({
-    dismissExchange: (input, options = {}) =>
+    dismissExchange: dismissExchangeNotification(context),
+});
+
+const dismissExchangeNotification =
+    (context: RuntimeCommandContext) =>
+    (
+        input: DismissExchangeNotificationInput,
+        options: RequestSignalOptions = {}
+    ): Promise<void> =>
         context.runWorkflow(() => dismissExchangeNotificationOp(input), {
             ...options,
             kind: 'workflow',
             track: false,
-        }),
-});
+        });
