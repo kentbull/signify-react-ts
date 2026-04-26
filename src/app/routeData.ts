@@ -16,17 +16,14 @@ export type {
     MultisigActionData,
     RouteDataRuntime,
 } from './routeData.types';
+export { loadDashboard } from './routeData.dashboard';
+export { loadClient, rootAction } from './routeData.root';
+export { identifiersAction, loadIdentifiers } from './routeData.identifiers';
+export { loadMultisig, multisigAction } from './routeData.multisig';
 export {
-    loadDashboard,
+    contactsAction,
     loadContacts,
     loadNotifications,
-    loadIdentifiers,
-    loadMultisig,
-    loadClient,
-    loadCredentials,
-} from './routeData.loaders';
-export { rootAction } from './routeData.root';
-export { identifiersAction } from './routeData.identifiers';
-export { multisigAction } from './routeData.multisig';
-export { contactsAction, notificationsAction } from './routeData.contacts';
-export { credentialsAction } from './routeData.credentials';
+    notificationsAction,
+} from './routeData.contacts';
+export { credentialsAction, loadCredentials } from './routeData.credentials';

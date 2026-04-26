@@ -1,0 +1,31 @@
+import type { DashboardLoaderData, RouteDataRuntime } from './routeData.types';
+import { toRouteError } from './routeData.shared';
+
+/**
+ * Loader for `/dashboard`.
+ */
+export const loadDashboard = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<DashboardLoaderData> => {
+    if (runtime.getClient() === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        await runtime.identifiers.list({ signal: request?.signal });
+        await Promise.all([
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+            runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
+            runtime.credentials.syncRegistries({ signal: request?.signal }),
+            runtime.credentials.syncInventory({ signal: request?.signal }),
+        ]);
+        await runtime.credentials.syncIpexActivity({ signal: request?.signal });
+        return { status: 'ready' };
+    } catch (error) {
+        return {
+            status: 'error',
+            message: `Unable to refresh dashboard inventory: ${toRouteError(error).message}`,
+        };
+    }
+};

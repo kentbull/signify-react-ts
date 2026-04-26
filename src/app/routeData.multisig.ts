@@ -10,7 +10,11 @@ import {
     type MultisigThresholdSpec,
 } from '../domain/multisig/multisigThresholds';
 import type { BackgroundWorkflowStartResult } from './runtimeCommands';
-import type { MultisigActionData, RouteDataRuntime } from './routeData.types';
+import type {
+    MultisigActionData,
+    MultisigLoaderData,
+    RouteDataRuntime,
+} from './routeData.types';
 import {
     formString,
     isRecord,
@@ -38,6 +42,43 @@ interface MultisigActionContext {
 /** Guard route-submitted threshold data before passing it to workflows. */
 const isThresholdSpec = (value: unknown): value is MultisigThresholdSpec =>
     isMultisigThresholdSpec(value);
+
+/**
+ * Loader for `/multisig`.
+ */
+export const loadMultisig = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<MultisigLoaderData> => {
+    const client = runtime.getClient();
+    if (client === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        const [identifiers] = await Promise.all([
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+        ]);
+        const groupDetails = await Promise.all(
+            identifiers
+                .filter((identifier) => 'group' in identifier)
+                .map((identifier) =>
+                    runtime.multisig.getGroupDetails(identifier, {
+                        signal: request?.signal,
+                    })
+                )
+        );
+        return { status: 'ready', identifiers, groupDetails };
+    } catch (error) {
+        return {
+            status: 'error',
+            identifiers: [],
+            groupDetails: [],
+            message: `Unable to load multisig inventory: ${toRouteError(error).message}`,
+        };
+    }
+};
 
 /** Parse route-submitted JSON objects without accepting arrays/primitives. */
 const parseJsonRecord = (value: string): Record<string, unknown> | null => {

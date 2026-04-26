@@ -2,7 +2,6 @@ import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
 import type { GeneratedContactChallengeResult } from '../workflows/challenges.op';
 import type {
-    ConnectedSignifyClient,
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../signify/client';
@@ -253,6 +252,9 @@ interface RouteClient {
     url?: string;
 }
 
+/** Route actions only need to know whether connection succeeded. */
+type RouteConnectionResult = unknown;
+
 /**
  * Runtime surface consumed by route loaders and actions.
  *
@@ -269,7 +271,7 @@ export interface RouteDataRuntime {
     connect(
         config: SignifyClientConfig,
         options?: { signal?: AbortSignal; requestId?: string }
-    ): Promise<ConnectedSignifyClient | null>;
+    ): Promise<RouteConnectionResult | null>;
     /** Generate a Signify passcode after Signify WASM readiness completes. */
     generatePasscode(options?: { signal?: AbortSignal }): Promise<string>;
     /** Refresh the normalized Signify state through the connected client. */

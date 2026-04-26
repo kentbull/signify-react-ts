@@ -21,7 +21,6 @@ import {
 } from '../../src/app/routeData';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type {
-    ConnectedSignifyClient,
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../../src/signify/client';
@@ -78,9 +77,7 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
     const runtime: RouteDataRuntime = {
         getClient: vi.fn(() => ({ url: 'http://keria.example' })),
         getState: vi.fn(() => summary),
-        connect: vi.fn(
-            async () => ({ state: summary }) as ConnectedSignifyClient
-        ),
+        connect: vi.fn(async () => ({ state: summary })),
         generatePasscode: vi.fn(async () => '0123456789abcdefghijk'),
         refreshState: vi.fn(async () => summary),
         identifiers: {

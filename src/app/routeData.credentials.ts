@@ -5,7 +5,11 @@ import type {
     GrantCredentialInput,
     IssueSediCredentialInput,
 } from '../domain/credentials/credentialCommands';
-import type { CredentialActionData, RouteDataRuntime } from './routeData.types';
+import type {
+    CredentialActionData,
+    CredentialsLoaderData,
+    RouteDataRuntime,
+} from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
 /**
@@ -38,6 +42,38 @@ const credentialIntentFromString = (value: string): CredentialIntent =>
 
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
+
+/**
+ * Loader for `/credentials`.
+ *
+ * The route is a connected placeholder today; keeping the loader explicit sets
+ * the gating contract for future issuer/holder/verifier credential children.
+ */
+export const loadCredentials = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<CredentialsLoaderData> => {
+    if (runtime.getClient() === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        await runtime.identifiers.list({ signal: request?.signal });
+        await Promise.all([
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+            runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
+            runtime.credentials.syncRegistries({ signal: request?.signal }),
+            runtime.credentials.syncInventory({ signal: request?.signal }),
+        ]);
+        await runtime.credentials.syncIpexActivity({ signal: request?.signal });
+        return { status: 'ready' };
+    } catch (error) {
+        return {
+            status: 'error',
+            message: `Unable to refresh credential inventory: ${toRouteError(error).message}`,
+        };
+    }
+};
 
 /** Parse checkbox-style form values without leaking DOM semantics downstream. */
 const formBoolean = (formData: FormData, field: string): boolean => {

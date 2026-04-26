@@ -1,8 +1,35 @@
 import { redirect } from 'react-router-dom';
 import { appConfig } from '../config';
-import type { RootActionData, RouteDataRuntime } from './routeData.types';
+import type {
+    ClientLoaderData,
+    RootActionData,
+    RouteDataRuntime,
+} from './routeData.types';
 import { DEFAULT_APP_PATH } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
+
+/**
+ * Loader for `/client`.
+ *
+ * This refreshes the Signify state snapshot through the shared runtime so the
+ * client summary route shows current controller/agent data after route
+ * navigation and post-action revalidation.
+ */
+export const loadClient = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<ClientLoaderData> => {
+    if (runtime.getClient() === null) {
+        return { status: 'blocked' };
+    }
+
+    const summary =
+        (await runtime.refreshState({ signal: request?.signal })) ??
+        runtime.getState();
+    return summary === null
+        ? { status: 'blocked' }
+        : { status: 'ready', summary };
+};
 
 /**
  * Root route action for shell-level commands.

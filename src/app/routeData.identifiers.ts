@@ -1,6 +1,10 @@
 import { isIdentifierCreateDraft } from '../domain/identifiers/identifierHelpers';
 import type { IdentifierCreateDraft } from '../domain/identifiers/identifierTypes';
-import type { IdentifierActionData, RouteDataRuntime } from './routeData.types';
+import type {
+    IdentifierActionData,
+    IdentifiersLoaderData,
+    RouteDataRuntime,
+} from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
 /**
@@ -37,6 +41,40 @@ const parseIdentifierCreateDraft = (
 
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
+
+/**
+ * Loader for `/identifiers`.
+ *
+ * A disconnected route returns blocked data so direct navigation renders the
+ * connection-required state. Identifier list failures are recoverable and
+ * returned as typed loader data because the user may still be connected and
+ * able to retry after fixing KERIA CORS or network setup.
+ */
+export const loadIdentifiers = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<IdentifiersLoaderData> => {
+    const client = runtime.getClient();
+    if (client === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        return {
+            status: 'ready',
+            identifiers: await runtime.identifiers.list({
+                signal: request?.signal,
+            }),
+        };
+    } catch (error) {
+        const normalized = toRouteError(error);
+        return {
+            status: 'error',
+            identifiers: [],
+            message: `Unable to load identifiers: ${normalized.message}. Connect can succeed even when the browser blocks signed KERIA resource requests; check that ${client.url ?? 'KERIA'} is reachable from this page and allows the Signify signed-request headers.`,
+        };
+    }
+};
 
 /**
  * Starts identifier inception from the typed draft submitted by the view. The

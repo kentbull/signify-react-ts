@@ -3,7 +3,12 @@ import {
     parseChallengeWords,
     validateChallengeWords,
 } from '../domain/challenges/challengeWords';
-import type { ContactActionData, RouteDataRuntime } from './routeData.types';
+import type {
+    ContactActionData,
+    ContactsLoaderData,
+    NotificationsLoaderData,
+    RouteDataRuntime,
+} from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
 /**
@@ -43,6 +48,57 @@ const contactIntentFromString = (value: string): ContactIntent =>
 
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
+
+/**
+ * Loader for `/contacts`.
+ */
+export const loadContacts = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<ContactsLoaderData> => {
+    if (runtime.getClient() === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        await Promise.all([
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+        ]);
+        return { status: 'ready' };
+    } catch (error) {
+        return {
+            status: 'error',
+            message: `Unable to refresh contact inventory: ${toRouteError(error).message}`,
+        };
+    }
+};
+
+/**
+ * Loader for `/notifications`.
+ */
+export const loadNotifications = async (
+    runtime: RouteDataRuntime,
+    request?: Request
+): Promise<NotificationsLoaderData> => {
+    if (runtime.getClient() === null) {
+        return { status: 'blocked' };
+    }
+
+    try {
+        const [identifiers] = await Promise.all([
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+        ]);
+        return { status: 'ready', identifiers };
+    } catch (error) {
+        return {
+            status: 'error',
+            identifiers: [],
+            message: `Unable to refresh notifications: ${toRouteError(error).message}`,
+        };
+    }
+};
 
 /** Convert runtime launch results into typed contact route action data. */
 const contactStartedResult = (
