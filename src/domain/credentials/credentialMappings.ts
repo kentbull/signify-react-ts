@@ -20,6 +20,12 @@ import {
     serializeCredentialSubjectAttributes,
 } from './credentialProjectors';
 
+/**
+ * IPEX route constants used by credential services and notification hydration.
+ *
+ * Keep them in the credential domain so services do not duplicate protocol
+ * strings or import from feature/UI code.
+ */
 export const IPEX_GRANT_EXN_ROUTE = '/ipex/grant';
 export const IPEX_ADMIT_EXN_ROUTE = '/ipex/admit';
 export const IPEX_GRANT_NOTIFICATION_ROUTE = '/exn/ipex/grant';
@@ -27,14 +33,17 @@ export const IPEX_ADMIT_NOTIFICATION_ROUTE = '/exn/ipex/admit';
 
 type SerderSad = ConstructorParameters<typeof Serder>[0];
 
+/** Narrow unknown KERIA payloads to object records at SDK seams. */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
+/** Read a non-empty string from loose KERIA payload data. */
 export const stringValue = (value: unknown): string | null =>
     typeof value === 'string' && value.trim().length > 0
         ? value.trim()
         : null;
 
+/** Require user/protocol text before crossing into Signify calls. */
 export const requireNonEmpty = (value: string, label: string): string => {
     const normalized = value.trim();
     if (normalized.length === 0) {
@@ -44,6 +53,7 @@ export const requireNonEmpty = (value: string, label: string): string => {
     return normalized;
 };
 
+/** Require object payloads from KERIA responses before projecting records. */
 export const requireRecord = (
     value: unknown,
     label: string
@@ -55,19 +65,27 @@ export const requireRecord = (
     return value;
 };
 
+/**
+ * Build a Signify `Serder` input from unknown stored credential event data.
+ */
 export const serderSad = (value: unknown, label: string): SerderSad =>
     requireRecord(value, label) as SerderSad;
 
+/** Read a string field from a loose KERIA record. */
 export const recordString = (
     record: Record<string, unknown>,
     key: string
 ): string | null => stringValue(record[key]);
 
+/** Read a date-like string field from a loose KERIA record. */
 export const recordDate = (
     record: Record<string, unknown>,
     key: string
 ): string | null => stringValue(record[key]);
 
+/**
+ * Normalize the different exchange-query response envelopes KERIA may return.
+ */
 export const exchangeItemsFromResponse = (raw: unknown): unknown[] => {
     if (Array.isArray(raw)) {
         return raw;
@@ -85,20 +103,27 @@ export const exchangeItemsFromResponse = (raw: unknown): unknown[] => {
     return [];
 };
 
+/** Extract the EXN payload from a KERIA exchange resource. */
 export const exchangeExn = (exchange: unknown): Record<string, unknown> =>
     requireRecord(requireRecord(exchange, 'Exchange resource').exn, 'EXN');
 
+/** Read the route from a KERIA exchange resource. */
 export const exchangeRoute = (exchange: unknown): string | null =>
     recordString(exchangeExn(exchange), 'r');
 
+/** Read optional display text from a resolved KERIA schema. */
 export const schemaText = (schema: Schema, key: string): string | null =>
     stringValue((schema as Record<string, unknown>)[key]);
 
+/** Preserve schema rules as data without cloning the full schema payload. */
 export const schemaRules = (schema: Schema): Record<string, unknown> | null => {
     const rules = (schema as Record<string, unknown>).rules;
     return isRecord(rules) ? rules : null;
 };
 
+/**
+ * Project a KERIA schema response into the serializable schema state record.
+ */
 export const schemaRecordFromKeriaSchema = ({
     schema,
     said,
@@ -121,6 +146,7 @@ export const schemaRecordFromKeriaSchema = ({
     updatedAt,
 });
 
+/** Read a string field from KERIA registry records. */
 export const registryString = (
     registry: Registry,
     key: string
@@ -129,6 +155,9 @@ export const registryString = (
 const registryNameFromKeriaRegistry = (registry: Registry): string | null =>
     registryString(registry, 'name') ?? registryString(registry, 'registryName');
 
+/**
+ * Project one KERIA registry into the issuer-owned registry state record.
+ */
 export const registryRecordFromKeriaRegistry = ({
     registry,
     issuerAlias,
@@ -158,6 +187,7 @@ export const registryRecordFromKeriaRegistry = ({
     };
 };
 
+/** Return the raw ACDC/SAD body from a credential result. */
 export const credentialSad = (
     credential: CredentialResult
 ): Record<string, unknown> => requireRecord(credential.sad, 'Credential SAD');
@@ -169,6 +199,7 @@ const credentialSubject = (
     return isRecord(sad.a) ? sad.a : null;
 };
 
+/** Require the credential SAID from a KERIA credential result. */
 export const credentialSaid = (credential: CredentialResult): string => {
     const said = recordString(credentialSad(credential), 'd');
     if (said === null) {
@@ -178,6 +209,9 @@ export const credentialSaid = (credential: CredentialResult): string => {
     return said;
 };
 
+/**
+ * Classify IPEX activity relative to the local wallet AIDs.
+ */
 export const ipexActivityDirection = ({
     localAids,
     senderAid,
@@ -201,6 +235,9 @@ export const ipexActivityDirection = ({
 const stateEventType = (state: CredentialState | null): string | null =>
     state === null ? null : stringValue((state as Record<string, unknown>).et);
 
+/**
+ * Derive local credential lifecycle status from KERIA credential state.
+ */
 export const statusFromCredentialState = (
     state: CredentialState | null,
     admitted: boolean
@@ -213,6 +250,12 @@ export const statusFromCredentialState = (
     return admitted ? 'admitted' : 'issued';
 };
 
+/**
+ * Project a KERIA credential result into the app's credential summary record.
+ *
+ * Schema-specific subject parsing is delegated through the projector boundary
+ * so generic ACDC mapping does not know about individual credential types.
+ */
 export const credentialRecordFromKeriaCredential = ({
     credential,
     credentialTypes,
@@ -269,6 +312,9 @@ export const credentialRecordFromKeriaCredential = ({
     };
 };
 
+/**
+ * Project an IPEX grant exchange into holder-facing notification metadata.
+ */
 export const credentialGrantFromExchange = ({
     notification,
     exchange,
@@ -331,6 +377,9 @@ export const credentialGrantFromExchange = ({
     };
 };
 
+/**
+ * Project an IPEX admit exchange into issuer-facing notification metadata.
+ */
 export const credentialAdmitFromExchange = ({
     notification,
     exchange,

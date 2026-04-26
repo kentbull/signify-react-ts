@@ -8,6 +8,9 @@ import type { SchemaRecord } from '../domain/credentials/credentialTypes';
 
 /**
  * Schema slice state keyed by schema SAID.
+ *
+ * Domain schema record types are imported from `src/domain/credentials`; this
+ * slice owns only storage and reducer behavior.
  */
 export interface SchemaState {
     bySaid: Record<string, SchemaRecord>;

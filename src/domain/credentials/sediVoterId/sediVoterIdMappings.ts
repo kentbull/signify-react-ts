@@ -32,6 +32,9 @@ const normalizeDateTime = (value: string, label: string): string => {
     return normalized;
 };
 
+/**
+ * Normalize SEDI Voter ID attributes before passing them to Signify issuance.
+ */
 export const normalizeSediVoterAttributes = (
     input: SediVoterCredentialAttributes
 ): SediVoterCredentialAttributes => ({
@@ -46,6 +49,9 @@ export const normalizeSediVoterAttributes = (
     expires: normalizeDateTime(input.expires, 'Expires'),
 });
 
+/**
+ * Project an ACDC subject into typed SEDI Voter ID attributes.
+ */
 export const sediVoterAttributesFromSubject = (
     subject: Record<string, unknown> | null
 ): SediVoterCredentialAttributes | null => {
@@ -90,6 +96,9 @@ export const sediVoterAttributesFromSubject = (
     };
 };
 
+/**
+ * Keep only primitive, non-secret subject attributes for notification display.
+ */
 export const serializableCredentialSubjectAttributes = (
     subject: Record<string, unknown> | null
 ): Record<string, string | boolean> => {

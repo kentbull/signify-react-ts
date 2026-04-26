@@ -27,16 +27,19 @@ export type MultisigThresholdSpec =
           value: string | number;
       };
 
+/** One member weight in a flat or nested multisig threshold clause. */
 export interface MultisigThresholdWeight {
     memberAid: string;
     weight: string;
 }
 
+/** One weighted threshold clause for Signify nested threshold values. */
 export interface MultisigThresholdClause {
     id: string;
     weights: MultisigThresholdWeight[];
 }
 
+/** Parsed threshold spec plus Signify-ready `isith/nsith` value. */
 export interface MultisigThresholdParseResult {
     spec: MultisigThresholdSpec;
     sith: MultisigThresholdSith;
@@ -189,6 +192,9 @@ export const thresholdSpecForMembers = (
     memberAids: uniqueAids(memberAids),
 });
 
+/**
+ * Normalize edited threshold clauses into the smallest honest threshold mode.
+ */
 export const thresholdSpecFromClauses = (
     clauses: readonly MultisigThresholdClause[]
 ): MultisigThresholdSpec => {
@@ -236,6 +242,7 @@ export const thresholdSpecToSith = (
     );
 };
 
+/** Count threshold leaves in a Signify `sith` value. */
 export const thresholdLeafCount = (sith: MultisigThresholdSith): number => {
     if (Array.isArray(sith)) {
         return isNestedStringArray(sith)
@@ -246,6 +253,7 @@ export const thresholdLeafCount = (sith: MultisigThresholdSith): number => {
     return 0;
 };
 
+/** Count threshold leaves after serializing an app threshold spec. */
 export const thresholdSpecLeafCount = (spec: MultisigThresholdSpec): number =>
     thresholdLeafCount(thresholdSpecToSith(spec));
 
@@ -274,6 +282,9 @@ export const thresholdSpecMemberAids = (
     );
 };
 
+/**
+ * Rebuild an app threshold spec from Signify `sith` plus ordered member AIDs.
+ */
 export const thresholdSpecFromSith = (
     sith: MultisigThresholdSith,
     memberAids: readonly string[]
@@ -313,6 +324,9 @@ export const thresholdSpecFromSith = (
     };
 };
 
+/**
+ * Parse a user-entered Signify threshold value from JSON or plain text.
+ */
 export const parseThresholdSith = (
     raw: string
 ): MultisigThresholdSith | null => {
@@ -337,6 +351,9 @@ export const parseThresholdSith = (
     }
 };
 
+/**
+ * Parse user-entered threshold text into app and Signify threshold forms.
+ */
 export const parseThresholdSpec = (
     raw: string,
     memberAids: readonly string[]
@@ -418,6 +435,9 @@ export const validateThresholdSpec = (
     }
 };
 
+/**
+ * Validate a threshold spec against the selected member order.
+ */
 export const validateThresholdSpecForMembers = ({
     spec,
     memberAids,
@@ -469,6 +489,7 @@ export const thresholdSummary = (spec: MultisigThresholdSpec): string => {
     return String(sith);
 };
 
+/** Human-readable summary for a raw Signify threshold value. */
 export const sithSummary = (sith: MultisigThresholdSith | null): string =>
     sith === null
         ? 'Unavailable'

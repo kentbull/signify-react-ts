@@ -11,6 +11,9 @@ import type {
 
 /**
  * Credential slice state keyed by credential SAID.
+ *
+ * This slice owns only serializable wallet facts. Domain record definitions
+ * live under `src/domain/credentials` and should not be re-exported from here.
  */
 export interface CredentialsState {
     bySaid: Record<string, CredentialSummaryRecord>;
@@ -33,6 +36,9 @@ const initialState: CredentialsState = createInitialState();
 
 /**
  * Redux slice for credential inventory and lifecycle status.
+ *
+ * Reducers merge late-arriving inventory with workflow facts so IPEX grant and
+ * admit metadata are not lost during background refreshes.
  */
 export const credentialsSlice = createSlice({
     name: 'credentials',

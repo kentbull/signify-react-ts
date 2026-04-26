@@ -3,6 +3,14 @@ import type { IdentifierCreateDraft } from '../domain/identifiers/identifierType
 import type { IdentifierActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
+/**
+ * Identifier route action boundary.
+ *
+ * The route parses serialized UI drafts and starts runtime workflows; domain
+ * helpers own the mapping from draft shape into Signify create args.
+ */
+
+/** Shared context passed to identifier intent handlers. */
 interface IdentifierActionContext {
     runtime: RouteDataRuntime;
     formData: FormData;

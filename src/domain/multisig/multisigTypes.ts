@@ -1,5 +1,6 @@
 import type { MultisigThresholdSpec } from './multisigThresholds';
 
+/** Local lifecycle status for a multisig group workflow. */
 export type MultisigGroupStatus =
     | 'draft'
     | 'proposed'
@@ -11,6 +12,7 @@ export type MultisigGroupStatus =
     | 'rotating'
     | 'failed';
 
+/** One candidate member in a multisig group draft. */
 export interface MultisigMemberDraft {
     aid: string;
     alias: string;
@@ -24,6 +26,7 @@ export interface MultisigMemberDraft {
         | 'missingKeyState';
 }
 
+/** UI-ready member candidate derived from local identifiers and contacts. */
 export interface MultisigMemberOption {
     aid: string;
     alias: string;
@@ -39,6 +42,7 @@ export interface MultisigMemberOption {
         | 'missingKeyState';
 }
 
+/** Route-level draft for creating a multisig group identifier. */
 export interface MultisigCreateDraft {
     groupAlias: string;
     localMemberName: string;
@@ -51,12 +55,14 @@ export interface MultisigCreateDraft {
     witnessMode: 'none' | 'demo';
 }
 
+/** Route-level draft for a multisig interaction event. */
 export interface MultisigInteractionDraft {
     groupAlias: string;
     localMemberName?: string | null;
     data: unknown;
 }
 
+/** Route-level draft for rotating a multisig group. */
 export interface MultisigRotationDraft {
     groupAlias: string;
     localMemberName?: string | null;
@@ -65,6 +71,7 @@ export interface MultisigRotationDraft {
     nextThreshold: MultisigThresholdSpec;
 }
 
+/** Common route input for responding to inbound multisig EXN requests. */
 export interface MultisigRequestActionInput {
     notificationId?: string | null;
     exnSaid: string;
@@ -72,6 +79,7 @@ export interface MultisigRequestActionInput {
     localMemberName: string;
 }
 
+/** Result summary returned by multisig workflows for operation payloads. */
 export interface MultisigOperationResult {
     groupAlias: string;
     groupAid: string | null;

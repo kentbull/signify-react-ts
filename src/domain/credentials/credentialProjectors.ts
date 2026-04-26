@@ -9,11 +9,20 @@ import {
     serializableCredentialSubjectAttributes,
 } from './sediVoterId';
 
+/**
+ * Schema context used to select the right credential-subject projector.
+ *
+ * The projector boundary prevents generic KERIA/ACDC mapping code from
+ * directly importing schema-specific logic such as SEDI Voter ID parsing.
+ */
 export interface CredentialSubjectProjectionContext {
     schemaSaid: string | null;
     credentialTypes: readonly IssueableCredentialTypeRecord[];
 }
 
+/**
+ * Internal adapter contract for one schema-specific credential subject mapper.
+ */
 interface CredentialSubjectProjector {
     formKind: IssueableCredentialFormKind;
     project(
@@ -24,6 +33,12 @@ interface CredentialSubjectProjector {
     ): Record<string, string | boolean>;
 }
 
+/**
+ * Registry of schema-specific ACDC subject projectors known by the app.
+ *
+ * Adding another credential type should add a schema-specific domain package
+ * and register its projector here, not widen generic credential mappings.
+ */
 const credentialSubjectProjectors: readonly CredentialSubjectProjector[] = [
     {
         formKind: SEDI_VOTER_ID_FORM_KIND,
@@ -32,6 +47,9 @@ const credentialSubjectProjectors: readonly CredentialSubjectProjector[] = [
     },
 ];
 
+/**
+ * Resolve the schema-specific projector for a credential catalog entry.
+ */
 const projectorForContext = ({
     schemaSaid,
     credentialTypes,

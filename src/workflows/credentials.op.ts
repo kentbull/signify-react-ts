@@ -46,9 +46,15 @@ export type {
     ResolveCredentialSchemaInput,
 } from '../domain/credentials/credentialCommands';
 
+/**
+ * Synthetic registry id used while registry creation is still pending.
+ */
 const pendingRegistryId = (issuerAid: string, registryName: string): string =>
     `${issuerAid}:${registryName}`;
 
+/**
+ * Workflow for resolving a credential schema and recording progress in Redux.
+ */
 export function* resolveCredentialSchemaOp(
     input: ResolveCredentialSchemaInput
 ): EffectionOperation<SchemaRecord> {
@@ -95,6 +101,10 @@ export function* resolveCredentialSchemaOp(
     }
 }
 
+/**
+ * Workflow for creating or rediscovering an issuer registry with optimistic
+ * state so the UI can explain pending registry work.
+ */
 export function* createCredentialRegistryOp(
     input: CreateCredentialRegistryInput
 ): EffectionOperation<RegistryRecord> {
@@ -144,6 +154,9 @@ export function* createCredentialRegistryOp(
     }
 }
 
+/**
+ * Workflow for the schema-specific SEDI Voter ID issue command.
+ */
 export function* issueSediCredentialOp(
     input: IssueSediCredentialInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -162,6 +175,9 @@ export function* issueSediCredentialOp(
     return credential;
 }
 
+/**
+ * Workflow for sending an IPEX grant and refreshing wallet inventory facts.
+ */
 export function* grantCredentialOp(
     input: GrantCredentialInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -179,6 +195,9 @@ export function* grantCredentialOp(
     return credential;
 }
 
+/**
+ * Workflow for holder-side IPEX admit and post-admit inventory refresh.
+ */
 export function* admitCredentialGrantOp(
     input: AdmitCredentialGrantInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -197,6 +216,9 @@ export function* admitCredentialGrantOp(
     return credential;
 }
 
+/**
+ * Synchronize issued and held credential inventory for local identifiers.
+ */
 export function* syncCredentialInventoryOp(): EffectionOperation<
     CredentialSummaryRecord[]
 > {
@@ -210,6 +232,9 @@ export function* syncCredentialInventoryOp(): EffectionOperation<
     return credentials;
 }
 
+/**
+ * Synchronize IPEX grant/admit activity for credentials already in state.
+ */
 export function* syncCredentialIpexActivityOp(): EffectionOperation<unknown[]> {
     const services = yield* AppServicesContext.expect();
     const state = services.store.getState();
@@ -231,6 +256,9 @@ export function* syncCredentialIpexActivityOp(): EffectionOperation<unknown[]> {
     return activities;
 }
 
+/**
+ * Synchronize credential registries owned by local issuer identifiers.
+ */
 export function* syncCredentialRegistriesOp(): EffectionOperation<
     RegistryRecord[]
 > {
@@ -263,6 +291,9 @@ export function* syncCredentialRegistriesOp(): EffectionOperation<
     return inventory.registries;
 }
 
+/**
+ * Synchronize configured credential schemas already known to the agent.
+ */
 export function* syncKnownCredentialSchemasOp(): EffectionOperation<
     SchemaRecord[]
 > {

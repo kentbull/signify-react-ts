@@ -8,8 +8,16 @@ import type {
 import type { CredentialActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
+/**
+ * Credential route action boundary.
+ *
+ * This module parses form intent into domain command inputs. Signify/KERIA
+ * work remains behind `AppRuntime`, workflows, and services.
+ */
+
 type CredentialIntent = Exclude<CredentialActionData['intent'], 'unsupported'>;
 
+/** Shared context passed to credential intent handlers. */
 interface CredentialActionContext {
     runtime: RouteDataRuntime;
     request: Request;
@@ -18,6 +26,7 @@ interface CredentialActionContext {
     requestId: string;
 }
 
+/** Normalize submitted credential intent strings to the supported action set. */
 const credentialIntentFromString = (value: string): CredentialIntent =>
     value === 'createRegistry' ||
     value === 'issueCredential' ||
@@ -30,11 +39,18 @@ const credentialIntentFromString = (value: string): CredentialIntent =>
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
 
+/** Parse checkbox-style form values without leaking DOM semantics downstream. */
 const formBoolean = (formData: FormData, field: string): boolean => {
     const value = formString(formData, field).trim().toLowerCase();
     return value === 'true' || value === 'on' || value === '1';
 };
 
+/**
+ * Resolve the selected issueable credential type from the app catalog.
+ *
+ * The route may use catalog defaults for convenience, but workflows still
+ * receive explicit schema SAID/OOBI input.
+ */
 const issueableCredentialTypeFromForm = (formData: FormData) => {
     const credentialTypeKey = formString(formData, 'credentialTypeKey').trim();
     return (
@@ -46,6 +62,7 @@ const issueableCredentialTypeFromForm = (formData: FormData) => {
     );
 };
 
+/** Convert runtime background launch results into typed route action data. */
 const credentialStartedResult = (
     intent: Exclude<CredentialIntent, 'refreshCredentials'>,
     started: ReturnType<RouteDataRuntime['startResolveCredentialSchema']>,
@@ -344,6 +361,9 @@ const runCredentialIntentAction = (
 
 /**
  * Route action for credential workflow commands.
+ *
+ * Expected failures return typed action data for forms and notifications.
+ * Unexpected programming failures are normalized only to a safe route message.
  */
 export const credentialsAction = async (
     runtime: RouteDataRuntime,

@@ -8,6 +8,9 @@ import type { RegistryRecord } from '../domain/credentials/credentialTypes';
 
 /**
  * Registry slice state keyed by registry id.
+ *
+ * Registry domain records live under `src/domain/credentials`; this slice owns
+ * only Redux persistence of local issuer registry facts.
  */
 export interface RegistryState {
     byId: Record<string, RegistryRecord>;
@@ -25,6 +28,9 @@ const initialState: RegistryState = createInitialState();
 
 /**
  * Redux slice for credential registry creation/discovery state.
+ *
+ * Pending synthetic ids are replaced by KERIA registry keys when inventory
+ * refresh discovers the actual registry record.
  */
 export const registrySlice = createSlice({
     name: 'registry',

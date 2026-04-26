@@ -4,11 +4,20 @@ import {
     SEDI_VOTER_ID_FORM_KIND,
 } from './sediVoterIdTypes';
 
+/**
+ * App config subset required to enable the SEDI Voter ID credential type.
+ */
 export interface SediVoterIdSchemaConfig {
     said: string | null;
     oobiUrl: string | null;
 }
 
+/**
+ * Build the catalog record for the SEDI Voter ID schema when configured.
+ *
+ * Returning null keeps incomplete schema config out of the issueable catalog
+ * without forcing the pure domain layer to know where config came from.
+ */
 export const buildSediVoterIdCredentialType = (
     schema: SediVoterIdSchemaConfig
 ): IssueableCredentialTypeRecord | null => {
@@ -25,4 +34,3 @@ export const buildSediVoterIdCredentialType = (
         formKind: SEDI_VOTER_ID_FORM_KIND,
     };
 };
-

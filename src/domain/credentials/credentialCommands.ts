@@ -1,5 +1,11 @@
 import type { SediVoterCredentialAttributes } from './sediVoterId';
 
+/**
+ * Pure command contracts shared by route data, runtime, workflows, and
+ * services. They intentionally contain no Redux, React, or Signify client
+ * capabilities, only serializable user intent.
+ */
+
 /** Command data for resolving a credential schema OOBI. */
 export interface ResolveCredentialSchemaInput {
     schemaSaid: string;

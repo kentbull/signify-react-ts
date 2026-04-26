@@ -18,8 +18,16 @@ import {
     toRouteError,
 } from './routeData.shared';
 
+/**
+ * Multisig route action boundary.
+ *
+ * This module validates serialized route drafts for group inception,
+ * interaction, rotation, and EXN responses before starting runtime workflows.
+ */
+
 type MultisigIntent = Exclude<MultisigActionData['intent'], 'unsupported'>;
 
+/** Shared context passed to multisig intent handlers. */
 interface MultisigActionContext {
     runtime: RouteDataRuntime;
     formData: FormData;
@@ -27,9 +35,11 @@ interface MultisigActionContext {
     requestId: string;
 }
 
+/** Guard route-submitted threshold data before passing it to workflows. */
 const isThresholdSpec = (value: unknown): value is MultisigThresholdSpec =>
     isMultisigThresholdSpec(value);
 
+/** Parse route-submitted JSON objects without accepting arrays/primitives. */
 const parseJsonRecord = (value: string): Record<string, unknown> | null => {
     if (value.trim().length === 0) {
         return null;
@@ -43,6 +53,7 @@ const parseJsonRecord = (value: string): Record<string, unknown> | null => {
     }
 };
 
+/** Parse the multisig inception draft produced by the route view. */
 const parseMultisigCreateDraft = (
     value: string
 ): MultisigCreateDraft | null => {
@@ -101,6 +112,7 @@ const parseMultisigCreateDraft = (
     };
 };
 
+/** Parse optional interaction data while preserving JSON values when possible. */
 const parseMultisigInteractionDraft = (
     formData: FormData
 ): MultisigInteractionDraft | null => {
@@ -126,6 +138,7 @@ const parseMultisigInteractionDraft = (
     };
 };
 
+/** Parse the multisig rotation draft produced by the route view. */
 const parseMultisigRotationDraft = (
     value: string
 ): MultisigRotationDraft | null => {
@@ -157,6 +170,7 @@ const parseMultisigRotationDraft = (
     };
 };
 
+/** Parse the common input shape for inbound multisig EXN responses. */
 const parseMultisigRequestInput = (
     formData: FormData
 ): MultisigRequestActionInput | null => {
@@ -179,6 +193,7 @@ const parseMultisigRequestInput = (
     };
 };
 
+/** Normalize submitted multisig intent strings to the supported action set. */
 const multisigIntentFromString = (value: string): MultisigIntent =>
     value === 'acceptInception' ||
     value === 'joinInception' ||
@@ -195,6 +210,7 @@ const multisigIntentFromString = (value: string): MultisigIntent =>
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
 
+/** Convert runtime launch results into typed multisig route action data. */
 const multisigActionStarted = (
     intent: MultisigIntent,
     started: BackgroundWorkflowStartResult,
@@ -448,6 +464,9 @@ const runMultisigIntentAction = (
 
 /**
  * Route action for multisig group workflows.
+ *
+ * All multisig protocol mutations pass through named intent handlers so new
+ * EXN flows have to declare their routing and workflow boundary explicitly.
  */
 export const multisigAction = async (
     runtime: RouteDataRuntime,

@@ -6,8 +6,16 @@ import {
 import type { ContactActionData, RouteDataRuntime } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
 
+/**
+ * Contact route action boundary.
+ *
+ * This module parses contact, OOBI, challenge, delegation, and notification
+ * form intents before handing cancellable work to `AppRuntime`.
+ */
+
 type ContactIntent = Exclude<ContactActionData['intent'], 'unsupported'>;
 
+/** Shared context passed to contact intent handlers. */
 interface ContactActionContext {
     runtime: RouteDataRuntime;
     request: Request;
@@ -16,9 +24,11 @@ interface ContactActionContext {
     requestId: string;
 }
 
+/** Parse the limited OOBI roles this route can request for local identifiers. */
 const parseOobiRole = (value: string): OobiRole | null =>
     value === 'agent' || value === 'witness' ? value : null;
 
+/** Normalize submitted contact intent strings to the supported action set. */
 const contactIntentFromString = (value: string): ContactIntent =>
     value === 'generateOobi' ||
     value === 'generateChallenge' ||
@@ -34,6 +44,7 @@ const contactIntentFromString = (value: string): ContactIntent =>
 const requestIdOption = (requestId: string): { requestId?: string } =>
     requestId.length > 0 ? { requestId } : {};
 
+/** Convert runtime launch results into typed contact route action data. */
 const contactStartedResult = (
     intent: Exclude<ContactIntent, 'generateChallenge'>,
     started: ReturnType<RouteDataRuntime['startResolveContact']>,
@@ -541,6 +552,9 @@ const runContactIntentAction = (
 
 /**
  * Route action for contact/OOBI mutations.
+ *
+ * Recoverable KERIA/contact workflow failures stay in route action data
+ * instead of leaking service exceptions into presentational components.
  */
 export const contactsAction = async (
     runtime: RouteDataRuntime,

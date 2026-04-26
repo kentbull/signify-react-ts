@@ -57,6 +57,10 @@ const EXCHANGE_QUERY_LIMIT = 200;
 const keriaTimestamp = (): string =>
     new Date().toISOString().replace('Z', '000+00:00');
 
+/**
+ * Resolve a configured credential schema OOBI through KERIA and project the
+ * resulting schema into app state shape.
+ */
 export function* resolveCredentialSchemaService({
     client,
     schemaSaid,
@@ -91,6 +95,12 @@ export function* resolveCredentialSchemaService({
     });
 }
 
+/**
+ * Read all configured issueable credential schemas already known by KERIA.
+ *
+ * Missing schemas are normal before a user resolves a schema OOBI, so this
+ * inventory service skips unknown catalog entries instead of failing refresh.
+ */
 export function* listKnownCredentialSchemasService({
     client,
     credentialTypes,
@@ -120,6 +130,9 @@ export function* listKnownCredentialSchemasService({
     return schemas;
 }
 
+/**
+ * Create or rediscover the issuer's credential registry in KERIA.
+ */
 export function* createCredentialRegistryService({
     client,
     issuerAlias,
@@ -197,6 +210,10 @@ export function* createCredentialRegistryService({
     });
 }
 
+/**
+ * Load registries for local issuer identifiers and project them into Redux
+ * facts without storing raw KERIA registry objects.
+ */
 export function* listCredentialRegistriesService({
     client,
     identifiers,
@@ -234,6 +251,12 @@ export function* listCredentialRegistriesService({
     };
 }
 
+/**
+ * Issue the currently implemented SEDI Voter ID ACDC credential.
+ *
+ * This service stays schema-specific until another credential type has a real
+ * issue flow; generic dispatch should happen above this boundary later.
+ */
 export function* issueSediCredentialService({
     client,
     issuerAlias,
@@ -296,6 +319,10 @@ export function* issueSediCredentialService({
     });
 }
 
+/**
+ * Send an IPEX grant for an issued credential and return the updated local
+ * credential projection for the issuer wallet.
+ */
 export function* grantIssuedCredentialService({
     client,
     issuerAlias,
@@ -359,6 +386,9 @@ export function* grantIssuedCredentialService({
     };
 }
 
+/**
+ * Query KERIA exchanges by route through the generic fetch endpoint.
+ */
 function* queryExchangesByRoute({
     client,
     route,
@@ -386,6 +416,10 @@ function* queryExchangesByRoute({
     });
 }
 
+/**
+ * Build local IPEX grant/admit activity from exchange inventory for known
+ * credentials.
+ */
 export function* listCredentialIpexActivityService({
     client,
     credentials,
@@ -538,6 +572,12 @@ export function* listCredentialIpexActivityService({
     });
 }
 
+/**
+ * Fetch an admitted credential after IPEX admit submission.
+ *
+ * KERIA may not expose the held credential immediately after the admit
+ * operation completes, so the retry loop is scoped inside this service.
+ */
 function* fetchCredentialWithRetry({
     client,
     credentialSaid,
@@ -562,6 +602,10 @@ function* fetchCredentialWithRetry({
     );
 }
 
+/**
+ * Admit an inbound IPEX credential grant as the holder and clean up the KERIA
+ * notification after the admit operation succeeds.
+ */
 export function* admitCredentialGrantService({
     client,
     holderAlias,
@@ -651,6 +695,10 @@ export function* admitCredentialGrantService({
     });
 }
 
+/**
+ * Load issued and held credentials for local AIDs and project them into
+ * serializable credential summary records.
+ */
 export function* listCredentialInventoryService({
     client,
     localAids,

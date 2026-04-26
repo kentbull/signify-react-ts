@@ -1,6 +1,12 @@
 import type { IdentifierSummary } from '../identifiers/identifierTypes';
 import type { MultisigThresholdSith } from './multisigThresholds';
 
+/**
+ * Runtime details for a local multisig group identifier.
+ *
+ * The shape is derived from Signify identifier state plus `members()` response
+ * data so route loaders do not import raw KERIA group-member payloads.
+ */
 export interface MultisigGroupDetails {
     groupAlias: string;
     groupAid: string;
@@ -43,6 +49,9 @@ const aidValue = (entry: unknown): string | null => {
     return null;
 };
 
+/**
+ * Extract ordered member AIDs from KERIA group member response data.
+ */
 export const multisigMemberAidsFromResponse = (
     response: unknown,
     role: 'signing' | 'rotation'
@@ -61,6 +70,10 @@ export const multisigMemberAidsFromResponse = (
     return aids;
 };
 
+/**
+ * Project a Signify group identifier and optional member response into the
+ * route-loader detail shape used by multisig views.
+ */
 export const multisigGroupDetailsFromIdentifier = ({
     identifier,
     membersResponse,
