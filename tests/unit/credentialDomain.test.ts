@@ -14,11 +14,27 @@ import {
     statusFromCredentialState,
 } from '../../src/domain/credentials/credentialMappings';
 import {
+    projectCredentialSubjectAttributes,
+    serializeCredentialSubjectAttributes,
+} from '../../src/domain/credentials/credentialProjectors';
+import type { IssueableCredentialTypeRecord } from '../../src/domain/credentials/credentialCatalog';
+import {
     normalizeSediVoterAttributes,
     SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
 } from '../../src/domain/credentials/sediVoterId';
 
 const loadedAt = '2026-04-22T00:00:00.000Z';
+
+const credentialTypes = [
+    {
+        key: 'sediVoterId',
+        label: 'SEDI Voter ID',
+        description: 'Demo credential',
+        schemaSaid: 'Eschema',
+        schemaOobiUrl: 'http://schema.example/oobi/Eschema',
+        formKind: 'sediVoterId',
+    },
+] as const satisfies readonly IssueableCredentialTypeRecord[];
 
 const credentialSubject = {
     i: 'Eholder',
@@ -127,6 +143,7 @@ describe('credential domain mappings', () => {
                     a: credentialSubject,
                 },
             } as unknown as CredentialResult,
+            credentialTypes,
             direction: 'held',
             status: 'admitted',
             grantSaid: 'Egrant',
@@ -157,6 +174,44 @@ describe('credential domain mappings', () => {
         ).toBe('revoked');
     });
 
+    it('projects credential subjects through the schema-aware boundary', () => {
+        expect(
+            projectCredentialSubjectAttributes({
+                subject: credentialSubject,
+                context: {
+                    schemaSaid: 'Eschema',
+                    credentialTypes,
+                },
+            })
+        ).toMatchObject({
+            fullName: 'Ada Voter',
+            eligible: true,
+        });
+
+        expect(
+            serializeCredentialSubjectAttributes({
+                subject: credentialSubject,
+                context: {
+                    schemaSaid: 'Eschema',
+                    credentialTypes,
+                },
+            })
+        ).toMatchObject({
+            fullName: 'Ada Voter',
+            eligible: true,
+        });
+
+        expect(
+            projectCredentialSubjectAttributes({
+                subject: credentialSubject,
+                context: {
+                    schemaSaid: 'Eunknown',
+                    credentialTypes,
+                },
+            })
+        ).toBeNull();
+    });
+
     it('projects IPEX grant and admit exchanges with local-wallet status', () => {
         expect(
             credentialGrantFromExchange({
@@ -168,6 +223,7 @@ describe('credential domain mappings', () => {
                 },
                 exchange: grantExchange,
                 localAids: new Set(['Eholder']),
+                credentialTypes,
                 loadedAt,
             })
         ).toMatchObject({

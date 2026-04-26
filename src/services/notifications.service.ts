@@ -9,6 +9,7 @@ import {
     IPEX_ADMIT_NOTIFICATION_ROUTE,
     IPEX_GRANT_NOTIFICATION_ROUTE,
 } from '../domain/credentials/credentialMappings';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import type { ContactRecord } from '../domain/contacts/contactTypes';
 import type {
     ChallengeRequestNotification,
@@ -1187,6 +1188,7 @@ function* hydrateCredentialIpexNotification({
                 notification,
                 exchange,
                 localAids,
+                credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
                 loadedAt,
             });
             if (

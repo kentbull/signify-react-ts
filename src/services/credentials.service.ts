@@ -46,6 +46,7 @@ import {
     SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
     SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS,
 } from '../domain/credentials/sediVoterId';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import { waitOperationService } from './signify.service';
 
 const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
@@ -289,6 +290,7 @@ export function* issueSediCredentialService({
     );
     return credentialRecordFromKeriaCredential({
         credential,
+        credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
         direction: 'issued',
         status: 'issued',
     });
@@ -346,6 +348,7 @@ export function* grantIssuedCredentialService({
     return {
         ...credentialRecordFromKeriaCredential({
             credential,
+            credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
             direction: 'issued',
             status: 'grantSent',
             grantSaid,
@@ -588,6 +591,7 @@ export function* admitCredentialGrantService({
         },
         exchange,
         localAids: new Set([localHolderAid]),
+        credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
         loadedAt: new Date().toISOString(),
     });
 
@@ -637,6 +641,7 @@ export function* admitCredentialGrantService({
 
     return credentialRecordFromKeriaCredential({
         credential: admitted,
+        credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
         direction: 'held',
         status: 'admitted',
         grantSaid: grant.grantSaid,
@@ -684,6 +689,7 @@ export function* listCredentialInventoryService({
                 `issued:${said}`,
                 credentialRecordFromKeriaCredential({
                     credential,
+                    credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
                     direction: 'issued',
                     status: statusFromCredentialState(state, false),
                 })
@@ -712,6 +718,7 @@ export function* listCredentialInventoryService({
                 `held:${said}`,
                 credentialRecordFromKeriaCredential({
                     credential,
+                    credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
                     direction: 'held',
                     status: statusFromCredentialState(state, true),
                 })

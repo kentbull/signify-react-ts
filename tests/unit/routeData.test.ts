@@ -19,6 +19,7 @@ import {
     rootAction,
     type RouteDataRuntime,
 } from '../../src/app/routeData';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type {
     ConnectedSignifyClient,
     SignifyClientConfig,
@@ -1105,6 +1106,33 @@ describe('route actions', () => {
             {
                 schemaSaid: 'Eschema',
                 schemaOobiUrl: 'http://schema.example/oobi/Eschema',
+            },
+            expect.objectContaining({ requestId: 'resolve-schema-request-1' })
+        );
+    });
+
+    it('defaults credential schema resolution from the issueable catalog', async () => {
+        const runtime = makeRuntime();
+        const credentialType = ISSUEABLE_CREDENTIAL_TYPES[0];
+        expect(credentialType).toBeDefined();
+
+        await expect(
+            credentialsAction(
+                runtime,
+                makeRequest('/credentials', {
+                    intent: 'resolveSchema',
+                    requestId: 'resolve-schema-request-1',
+                })
+            )
+        ).resolves.toMatchObject({
+            intent: 'resolveSchema',
+            ok: true,
+            requestId: 'resolve-schema-request-1',
+        });
+        expect(runtime.startResolveCredentialSchema).toHaveBeenCalledWith(
+            {
+                schemaSaid: credentialType?.schemaSaid,
+                schemaOobiUrl: credentialType?.schemaOobiUrl,
             },
             expect.objectContaining({ requestId: 'resolve-schema-request-1' })
         );

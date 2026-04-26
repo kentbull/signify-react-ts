@@ -6,11 +6,6 @@ import {
 } from './session.slice';
 import type { RegistryRecord } from '../domain/credentials/credentialTypes';
 
-export type {
-    RegistryRecord,
-    RegistryStatus,
-} from '../domain/credentials/credentialTypes';
-
 /**
  * Registry slice state keyed by registry id.
  */

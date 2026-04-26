@@ -45,10 +45,10 @@ import {
     selectMultisigRequestNotificationById,
 } from '../../state/selectors';
 import type {
-    CredentialGrantNotification,
     DelegationRequestNotification,
     MultisigRequestNotification,
 } from '../../state/notifications.slice';
+import type { CredentialGrantNotification } from '../../domain/credentials/credentialTypes';
 import { ChallengeRequestResponseForm } from './ChallengeRequestResponseForm';
 import { sithSummary } from '../../domain/multisig/multisigThresholds';
 import {

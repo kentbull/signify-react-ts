@@ -9,14 +9,6 @@ import type {
     CredentialSummaryRecord,
 } from '../domain/credentials/credentialTypes';
 
-export type {
-    CredentialDirection,
-    CredentialIpexActivityRecord,
-    CredentialStatus,
-    CredentialSummaryRecord,
-    SediVoterCredentialAttributes,
-} from '../domain/credentials/credentialTypes';
-
 /**
  * Credential slice state keyed by credential SAID.
  */

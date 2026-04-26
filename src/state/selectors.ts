@@ -3,8 +3,6 @@ import type { OperationRecord } from './operations.slice';
 import type { AppNotificationRecord } from './appNotifications.slice';
 import type {
     ChallengeRequestNotification,
-    CredentialAdmitNotification,
-    CredentialGrantNotification,
     DelegationRequestNotification,
     MultisigRequestNotification,
     NotificationRecord,
@@ -14,13 +12,19 @@ import type {
     ChallengeRecord,
     StoredChallengeWordsRecord,
 } from './challenges.slice';
-import type { CredentialIpexActivityRecord } from '../domain/credentials/credentialTypes';
+import type {
+    CredentialAdmitNotification,
+    CredentialGrantNotification,
+    CredentialIpexActivityRecord,
+} from '../domain/credentials/credentialTypes';
 import {
     knownComponentsFromContacts,
     type KnownComponentRecord,
 } from '../domain/contacts/contactHelpers';
-import { buildIssueableCredentialTypeViews } from '../domain/credentials/credentialCatalog';
-import { ISSUEABLE_CREDENTIAL_TYPES } from './issueableCredentialTypes';
+import {
+    buildIssueableCredentialTypeViews,
+    ISSUEABLE_CREDENTIAL_TYPES,
+} from '../config/credentialCatalog';
 
 /** Select the serializable session connection summary. */
 export const selectSession = (state: RootState) => state.session;

@@ -6,11 +6,6 @@ import {
 } from './session.slice';
 import type { SchemaRecord } from '../domain/credentials/credentialTypes';
 
-export type {
-    SchemaRecord,
-    SchemaResolutionStatus,
-} from '../domain/credentials/credentialTypes';
-
 /**
  * Schema slice state keyed by schema SAID.
  */

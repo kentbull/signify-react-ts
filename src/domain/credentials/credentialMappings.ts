@@ -11,14 +11,14 @@ import type {
     CredentialGrantNotification,
     CredentialIpexActivityRecord,
     CredentialSummaryRecord,
-    CredentialSubjectAttributes,
     RegistryRecord,
     SchemaRecord,
 } from './credentialTypes';
+import type { IssueableCredentialTypeRecord } from './credentialCatalog';
 import {
-    sediVoterAttributesFromSubject,
-    serializableCredentialSubjectAttributes,
-} from './sediVoterId';
+    projectCredentialSubjectAttributes,
+    serializeCredentialSubjectAttributes,
+} from './credentialProjectors';
 
 export const IPEX_GRANT_EXN_ROUTE = '/ipex/grant';
 export const IPEX_ADMIT_EXN_ROUTE = '/ipex/admit';
@@ -213,12 +213,9 @@ export const statusFromCredentialState = (
     return admitted ? 'admitted' : 'issued';
 };
 
-const credentialAttributesFromSubject = (
-    subject: Record<string, unknown> | null
-): CredentialSubjectAttributes | null => sediVoterAttributesFromSubject(subject);
-
 export const credentialRecordFromKeriaCredential = ({
     credential,
+    credentialTypes,
     direction,
     status,
     grantSaid = null,
@@ -231,6 +228,7 @@ export const credentialRecordFromKeriaCredential = ({
     error = null,
 }: {
     credential: CredentialResult;
+    credentialTypes: readonly IssueableCredentialTypeRecord[];
     direction: CredentialSummaryRecord['direction'];
     status: CredentialSummaryRecord['status'];
     grantSaid?: string | null;
@@ -245,10 +243,11 @@ export const credentialRecordFromKeriaCredential = ({
     const sad = credentialSad(credential);
     const subject = credentialSubject(credential);
     const said = credentialSaid(credential);
+    const schemaSaid = recordString(sad, 's');
 
     return {
         said,
-        schemaSaid: recordString(sad, 's'),
+        schemaSaid,
         registryId: recordString(sad, 'ri'),
         issuerAid: recordString(sad, 'i'),
         holderAid: subject === null ? null : recordString(subject, 'i'),
@@ -262,7 +261,10 @@ export const credentialRecordFromKeriaCredential = ({
         admittedAt,
         revokedAt: status === 'revoked' ? updatedAt : null,
         error,
-        attributes: credentialAttributesFromSubject(subject),
+        attributes: projectCredentialSubjectAttributes({
+            subject,
+            context: { schemaSaid, credentialTypes },
+        }),
         updatedAt,
     };
 };
@@ -271,11 +273,13 @@ export const credentialGrantFromExchange = ({
     notification,
     exchange,
     localAids,
+    credentialTypes,
     loadedAt,
 }: {
     notification: CredentialExchangeNotificationReference;
     exchange: unknown;
     localAids: ReadonlySet<string>;
+    credentialTypes: readonly IssueableCredentialTypeRecord[];
     loadedAt: string;
 }): CredentialGrantNotification => {
     const exn = requireRecord(
@@ -296,6 +300,7 @@ export const credentialGrantFromExchange = ({
     const issuerAid = recordString(exn, 'i');
     const holderAid = recordString(exn, 'rp');
     const credentialSaid = recordString(acdc, 'd');
+    const schemaSaid = recordString(acdc, 's');
     if (
         grantSaid === null ||
         issuerAid === null ||
@@ -316,8 +321,11 @@ export const credentialGrantFromExchange = ({
         issuerAid,
         holderAid,
         credentialSaid,
-        schemaSaid: recordString(acdc, 's'),
-        attributes: serializableCredentialSubjectAttributes(subject),
+        schemaSaid,
+        attributes: serializeCredentialSubjectAttributes({
+            subject,
+            context: { schemaSaid, credentialTypes },
+        }),
         createdAt: recordString(exn, 'dt') ?? notification.dt ?? loadedAt,
         status: notification.read && inbound === 'actionable' ? 'admitted' : inbound,
     };

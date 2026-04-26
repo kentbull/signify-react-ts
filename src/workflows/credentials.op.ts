@@ -22,7 +22,7 @@ import {
     registryRecorded,
 } from '../state/registry.slice';
 import { schemaRecorded } from '../state/schema.slice';
-import { ISSUEABLE_CREDENTIAL_TYPES } from '../state/issueableCredentialTypes';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import type {
     CredentialSummaryRecord,
     RegistryRecord,

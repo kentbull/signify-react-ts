@@ -45,7 +45,7 @@ import type {
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
 import { useAppSelector } from '../../state/hooks';
-import { ISSUEABLE_CREDENTIAL_TYPES } from '../../state/issueableCredentialTypes';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../../config/credentialCatalog';
 import {
     selectContacts,
     selectCredentialIpexActivity,

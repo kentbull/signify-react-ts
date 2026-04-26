@@ -46,10 +46,10 @@ import type {
 import type { AppNotificationRecord } from '../state/appNotifications.slice';
 import type {
     ChallengeRequestNotification,
-    CredentialGrantNotification,
     DelegationRequestNotification,
     MultisigRequestNotification,
 } from '../state/notifications.slice';
+import type { CredentialGrantNotification } from '../domain/credentials/credentialTypes';
 import type { OperationRecord } from '../state/operations.slice';
 import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import { allAppNotificationsRead } from '../state/appNotifications.slice';

@@ -1,4 +1,4 @@
-import { appConfig } from '../config';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
 import type {
     AdmitCredentialGrantInput,
@@ -33,6 +33,17 @@ const requestIdOption = (requestId: string): { requestId?: string } =>
 const formBoolean = (formData: FormData, field: string): boolean => {
     const value = formString(formData, field).trim().toLowerCase();
     return value === 'true' || value === 'on' || value === '1';
+};
+
+const issueableCredentialTypeFromForm = (formData: FormData) => {
+    const credentialTypeKey = formString(formData, 'credentialTypeKey').trim();
+    return (
+        ISSUEABLE_CREDENTIAL_TYPES.find(
+            (credentialType) => credentialType.key === credentialTypeKey
+        ) ??
+        ISSUEABLE_CREDENTIAL_TYPES[0] ??
+        null
+    );
 };
 
 const credentialStartedResult = (
@@ -91,9 +102,9 @@ const refreshCredentialsAction = async ({
 };
 
 /**
- * Starts schema OOBI resolution for the configured credential type. Defaults
- * live here because this route exposes the demo's first-class schema, while
- * the workflow still receives an explicit SAID and OOBI URL.
+ * Starts schema OOBI resolution for the selected catalog credential type. The
+ * route may default from the app catalog, but the workflow still receives an
+ * explicit SAID and OOBI URL so it never depends on React form state.
  */
 const resolveCredentialSchemaAction = ({
     runtime,
@@ -101,13 +112,14 @@ const resolveCredentialSchemaAction = ({
     requestId,
 }: CredentialActionContext): CredentialActionData => {
     const intent = 'resolveSchema';
+    const credentialType = issueableCredentialTypeFromForm(formData);
     const schemaSaid =
         formString(formData, 'schemaSaid').trim() ||
-        appConfig.schemas.sediVoterId.said ||
+        credentialType?.schemaSaid ||
         '';
     const schemaOobiUrl =
         formString(formData, 'schemaOobiUrl').trim() ||
-        appConfig.schemas.sediVoterId.oobiUrl ||
+        credentialType?.schemaOobiUrl ||
         '';
     if (schemaSaid.length === 0 || schemaOobiUrl.length === 0) {
         return {

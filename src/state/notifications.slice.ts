@@ -76,13 +76,6 @@ export interface ChallengeRequestNotification {
     status: ChallengeRequestNotificationStatus;
 }
 
-export type {
-    CredentialAdmitNotification,
-    CredentialAdmitNotificationStatus,
-    CredentialGrantNotification,
-    CredentialGrantNotificationStatus,
-} from '../domain/credentials/credentialTypes';
-
 /**
  * Delegation request metadata hydrated from a KERIA `/delegate/request`
  * notification. The anchor is created from the delegate event and reused when

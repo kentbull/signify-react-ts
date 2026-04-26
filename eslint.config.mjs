@@ -120,6 +120,39 @@ export default [
         },
     },
     {
+        files: ['src/domain/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: [
+                                '../app/**',
+                                '../../app/**',
+                                '../../../app/**',
+                                '../features/**',
+                                '../../features/**',
+                                '../../../features/**',
+                                '../state/**',
+                                '../../state/**',
+                                '../../../state/**',
+                                '../services/**',
+                                '../../services/**',
+                                '../../../services/**',
+                                '../workflows/**',
+                                '../../workflows/**',
+                                '../../../workflows/**',
+                            ],
+                            message:
+                                'Domain modules must not import app, feature, state, service, or workflow layers.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         files: [
             'tests/**/*.{ts,js,mjs}',
             'scripts/**/*.{ts,js,mjs}',

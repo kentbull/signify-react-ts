@@ -16,11 +16,23 @@ import {
     credentialGrantFromExchange,
     IPEX_GRANT_NOTIFICATION_ROUTE,
 } from '../../src/domain/credentials/credentialMappings';
+import type { IssueableCredentialTypeRecord } from '../../src/domain/credentials/credentialCatalog';
 import { normalizeSediVoterAttributes } from '../../src/domain/credentials/sediVoterId';
-import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/state/issueableCredentialTypes';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type { NotificationRecord } from '../../src/state/notifications.slice';
 
 const loadedAt = '2026-04-22T00:00:00.000Z';
+
+const testCredentialTypes = [
+    {
+        key: 'sediVoterId',
+        label: 'SEDI Voter ID',
+        description: 'Demo credential',
+        schemaSaid: 'Eschema',
+        schemaOobiUrl: 'http://schema.example/oobi/Eschema',
+        formKind: 'sediVoterId',
+    },
+] as const satisfies readonly IssueableCredentialTypeRecord[];
 
 const grantNotification = {
     id: 'note-1',
@@ -173,6 +185,7 @@ describe('credential service helpers', () => {
                 notification: grantNotification,
                 exchange: grantExchange,
                 localAids: new Set(['Eholder']),
+                credentialTypes: testCredentialTypes,
                 loadedAt,
             })
         ).toMatchObject({
@@ -194,6 +207,7 @@ describe('credential service helpers', () => {
                 notification: grantNotification,
                 exchange: grantExchange,
                 localAids: new Set(['Eother']),
+                credentialTypes: testCredentialTypes,
                 loadedAt,
             }).status
         ).toBe('notForThisWallet');
