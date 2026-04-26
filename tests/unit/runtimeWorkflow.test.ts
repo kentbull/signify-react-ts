@@ -2,6 +2,10 @@ import { sleep } from 'effection';
 import { describe, expect, it, vi } from 'vitest';
 import type { SignifyClient } from 'signify-ts';
 import { createAppRuntime, type AppRuntime } from '../../src/app/runtime';
+import {
+    delegationPayloadDetails,
+    oobiPayloadDetails,
+} from '../../src/app/runtimeCommands/payloadDetails';
 import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 import { appNotificationRecorded } from '../../src/state/appNotifications.slice';
 import { storedChallengeWordsRecorded } from '../../src/state/challenges.slice';
@@ -297,7 +301,7 @@ describe('AppRuntime workflow bridge', () => {
         const { client, notifications } = makeWorkflowClient();
         connectRuntimeForTest(runtime, client);
 
-        await runtime.dismissExchangeNotification({
+        await runtime.notifications.dismissExchange({
             notificationId: 'exchange:Eexn',
             exnSaid: 'Eexn',
             route: '/challenge/request',
@@ -318,7 +322,7 @@ describe('AppRuntime workflow bridge', () => {
         const { client, notifications } = makeWorkflowClient();
         connectRuntimeForTest(runtime, client);
 
-        await runtime.dismissExchangeNotification({
+        await runtime.notifications.dismissExchange({
             notificationId: 'note-1',
             exnSaid: 'Eexn',
             route: '/challenge/request',
@@ -358,6 +362,7 @@ describe('AppRuntime workflow bridge', () => {
                     title: 'OOBI generated',
                     message: 'Generated an agent OOBI.',
                 },
+                payloadDetails: oobiPayloadDetails,
             }
         );
 
@@ -441,6 +446,7 @@ describe('AppRuntime workflow bridge', () => {
                     title: 'Delegated identifier created',
                     message: 'Delegation completed.',
                 },
+                payloadDetails: delegationPayloadDetails,
             }
         );
 
@@ -545,7 +551,7 @@ describe('AppRuntime workflow bridge', () => {
         );
 
         expect(
-            runtime.startResolveContact({
+            runtime.contacts.startResolve({
                 oobi,
                 alias: 'Alice',
             })
@@ -570,7 +576,7 @@ describe('AppRuntime workflow bridge', () => {
         );
 
         expect(
-            runtime.startGenerateOobi({
+            runtime.contacts.startGenerateOobi({
                 identifier: 'alice',
                 role: 'agent',
             })

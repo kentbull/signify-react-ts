@@ -59,7 +59,7 @@ const createIdentifierAction = ({
         };
     }
 
-    const started = runtime.startCreateIdentifier(
+    const started = runtime.identifiers.startCreate(
         draft,
         requestIdOption(requestId)
     );
@@ -94,7 +94,7 @@ const rotateIdentifierAction = ({
     const intent = 'rotate';
     const aid = formString(formData, 'aid');
     const requestId = formString(formData, 'requestId');
-    const started = runtime.startRotateIdentifier(
+    const started = runtime.identifiers.startRotate(
         aid,
         requestIdOption(requestId)
     );

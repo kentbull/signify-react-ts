@@ -9,7 +9,7 @@ import {
     thresholdSpecForMembers,
     type MultisigThresholdSpec,
 } from '../domain/multisig/multisigThresholds';
-import type { BackgroundWorkflowStartResult } from './runtime';
+import type { BackgroundWorkflowStartResult } from './runtimeCommands';
 import type { MultisigActionData, RouteDataRuntime } from './routeData.types';
 import {
     formString,
@@ -258,7 +258,7 @@ const createMultisigAction = ({
 
     return multisigActionStarted(
         intent,
-        runtime.startCreateMultisigGroup(draft, requestIdOption(requestId)),
+        runtime.multisig.startCreateGroup(draft, requestIdOption(requestId)),
         `Creating multisig group ${draft.groupAlias}`
     );
 };
@@ -286,7 +286,7 @@ const authorizeMultisigAgentsAction = ({
 
     return multisigActionStarted(
         intent,
-        runtime.startAuthorizeMultisigAgents(
+        runtime.multisig.startAuthorizeAgents(
             {
                 groupAlias,
                 localMemberName:
@@ -321,7 +321,7 @@ const interactMultisigAction = ({
 
     return multisigActionStarted(
         intent,
-        runtime.startInteractMultisigGroup(draft, requestIdOption(requestId)),
+        runtime.multisig.startInteractGroup(draft, requestIdOption(requestId)),
         `Interacting with ${draft.groupAlias}`
     );
 };
@@ -349,7 +349,7 @@ const rotateMultisigAction = ({
 
     return multisigActionStarted(
         intent,
-        runtime.startRotateMultisigGroup(draft, requestIdOption(requestId)),
+        runtime.multisig.startRotateGroup(draft, requestIdOption(requestId)),
         `Rotating multisig group ${draft.groupAlias}`
     );
 };
@@ -408,14 +408,14 @@ const respondToMultisigRequestAction = ({
     const options = requestIdOption(requestId);
     const started =
         intent === 'acceptInception' || intent === 'joinInception'
-            ? runtime.startAcceptMultisigInception(input, options)
+            ? runtime.multisig.startAcceptInception(input, options)
             : intent === 'acceptEndRole'
-              ? runtime.startAcceptMultisigEndRole(input, options)
+              ? runtime.multisig.startAcceptEndRole(input, options)
               : intent === 'acceptInteraction'
-                ? runtime.startAcceptMultisigInteraction(input, options)
+                ? runtime.multisig.startAcceptInteraction(input, options)
                 : intent === 'acceptRotation'
-                  ? runtime.startAcceptMultisigRotation(input, options)
-                  : runtime.startJoinMultisigRotation(input, options);
+                  ? runtime.multisig.startAcceptRotation(input, options)
+                  : runtime.multisig.startJoinRotation(input, options);
 
     return multisigActionStarted(
         intent,

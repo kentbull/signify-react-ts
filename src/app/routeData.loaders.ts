@@ -22,14 +22,14 @@ export const loadDashboard = async (
     }
 
     try {
-        await runtime.listIdentifiers({ signal: request?.signal });
+        await runtime.identifiers.list({ signal: request?.signal });
         await Promise.all([
-            runtime.syncSessionInventory({ signal: request?.signal }),
-            runtime.syncKnownCredentialSchemas({ signal: request?.signal }),
-            runtime.syncCredentialRegistries({ signal: request?.signal }),
-            runtime.syncCredentialInventory({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+            runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
+            runtime.credentials.syncRegistries({ signal: request?.signal }),
+            runtime.credentials.syncInventory({ signal: request?.signal }),
         ]);
-        await runtime.syncCredentialIpexActivity({ signal: request?.signal });
+        await runtime.credentials.syncIpexActivity({ signal: request?.signal });
         return { status: 'ready' };
     } catch (error) {
         return {
@@ -52,8 +52,8 @@ export const loadContacts = async (
 
     try {
         await Promise.all([
-            runtime.listIdentifiers({ signal: request?.signal }),
-            runtime.syncSessionInventory({ signal: request?.signal }),
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
         ]);
         return { status: 'ready' };
     } catch (error) {
@@ -77,8 +77,8 @@ export const loadNotifications = async (
 
     try {
         const [identifiers] = await Promise.all([
-            runtime.listIdentifiers({ signal: request?.signal }),
-            runtime.syncSessionInventory({ signal: request?.signal }),
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
         ]);
         return { status: 'ready', identifiers };
     } catch (error) {
@@ -110,7 +110,7 @@ export const loadIdentifiers = async (
     try {
         return {
             status: 'ready',
-            identifiers: await runtime.listIdentifiers({
+            identifiers: await runtime.identifiers.list({
                 signal: request?.signal,
             }),
         };
@@ -138,14 +138,14 @@ export const loadMultisig = async (
 
     try {
         const [identifiers] = await Promise.all([
-            runtime.listIdentifiers({ signal: request?.signal }),
-            runtime.syncSessionInventory({ signal: request?.signal }),
+            runtime.identifiers.list({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
         ]);
         const groupDetails = await Promise.all(
             identifiers
                 .filter((identifier) => 'group' in identifier)
                 .map((identifier) =>
-                    runtime.getMultisigGroupDetails(identifier, {
+                    runtime.multisig.getGroupDetails(identifier, {
                         signal: request?.signal,
                     })
                 )
@@ -199,14 +199,14 @@ export const loadCredentials = async (
     }
 
     try {
-        await runtime.listIdentifiers({ signal: request?.signal });
+        await runtime.identifiers.list({ signal: request?.signal });
         await Promise.all([
-            runtime.syncSessionInventory({ signal: request?.signal }),
-            runtime.syncKnownCredentialSchemas({ signal: request?.signal }),
-            runtime.syncCredentialRegistries({ signal: request?.signal }),
-            runtime.syncCredentialInventory({ signal: request?.signal }),
+            runtime.contacts.syncInventory({ signal: request?.signal }),
+            runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
+            runtime.credentials.syncRegistries({ signal: request?.signal }),
+            runtime.credentials.syncInventory({ signal: request?.signal }),
         ]);
-        await runtime.syncCredentialIpexActivity({ signal: request?.signal });
+        await runtime.credentials.syncIpexActivity({ signal: request?.signal });
         return { status: 'ready' };
     } catch (error) {
         return {

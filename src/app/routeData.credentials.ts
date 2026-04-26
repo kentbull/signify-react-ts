@@ -65,7 +65,7 @@ const issueableCredentialTypeFromForm = (formData: FormData) => {
 /** Convert runtime background launch results into typed route action data. */
 const credentialStartedResult = (
     intent: Exclude<CredentialIntent, 'refreshCredentials'>,
-    started: ReturnType<RouteDataRuntime['startResolveCredentialSchema']>,
+    started: ReturnType<RouteDataRuntime['credentials']['startResolveSchema']>,
     message: string
 ): CredentialActionData => {
     if (started.status === 'conflict') {
@@ -98,14 +98,14 @@ const refreshCredentialsAction = async ({
     requestId,
 }: CredentialActionContext): Promise<CredentialActionData> => {
     const intent = 'refreshCredentials';
-    await runtime.listIdentifiers({ signal: request.signal });
+    await runtime.identifiers.list({ signal: request.signal });
     await Promise.all([
-        runtime.syncSessionInventory({ signal: request.signal }),
-        runtime.syncKnownCredentialSchemas({ signal: request.signal }),
-        runtime.syncCredentialRegistries({ signal: request.signal }),
-        runtime.syncCredentialInventory({ signal: request.signal }),
+        runtime.contacts.syncInventory({ signal: request.signal }),
+        runtime.credentials.syncKnownSchemas({ signal: request.signal }),
+        runtime.credentials.syncRegistries({ signal: request.signal }),
+        runtime.credentials.syncInventory({ signal: request.signal }),
     ]);
-    await runtime.syncCredentialIpexActivity({
+    await runtime.credentials.syncIpexActivity({
         signal: request.signal,
     });
 
@@ -149,7 +149,7 @@ const resolveCredentialSchemaAction = ({
 
     return credentialStartedResult(
         intent,
-        runtime.startResolveCredentialSchema(
+        runtime.credentials.startResolveSchema(
             { schemaSaid, schemaOobiUrl },
             requestIdOption(requestId)
         ),
@@ -184,7 +184,7 @@ const createCredentialRegistryAction = ({
 
     return credentialStartedResult(
         intent,
-        runtime.startCreateCredentialRegistry(
+        runtime.credentials.startCreateRegistry(
             { issuerAlias, issuerAid, registryName },
             requestIdOption(requestId)
         ),
@@ -244,7 +244,7 @@ const issueCredentialAction = ({
 
     return credentialStartedResult(
         intent,
-        runtime.startIssueCredential(input, requestIdOption(requestId)),
+        runtime.credentials.startIssue(input, requestIdOption(requestId)),
         `Issuing credential to ${holderAid}`
     );
 };
@@ -282,7 +282,7 @@ const grantCredentialAction = ({
 
     return credentialStartedResult(
         intent,
-        runtime.startGrantCredential(input, requestIdOption(requestId)),
+        runtime.credentials.startGrant(input, requestIdOption(requestId)),
         `Granting credential ${input.credentialSaid}`
     );
 };
@@ -321,7 +321,7 @@ const admitCredentialGrantAction = ({
 
     return credentialStartedResult(
         intent,
-        runtime.startAdmitCredentialGrant(input, requestIdOption(requestId)),
+        runtime.credentials.startAdmit(input, requestIdOption(requestId)),
         `Admitting credential grant ${input.grantSaid}`
     );
 };

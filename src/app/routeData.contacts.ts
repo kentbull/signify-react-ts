@@ -47,7 +47,7 @@ const requestIdOption = (requestId: string): { requestId?: string } =>
 /** Convert runtime launch results into typed contact route action data. */
 const contactStartedResult = (
     intent: Exclude<ContactIntent, 'generateChallenge'>,
-    started: ReturnType<RouteDataRuntime['startResolveContact']>,
+    started: ReturnType<RouteDataRuntime['contacts']['startResolve']>,
     message: string
 ): ContactActionData => {
     if (started.status === 'conflict') {
@@ -93,7 +93,7 @@ const resolveContactAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startResolveContact(
+        runtime.contacts.startResolve(
             {
                 oobi,
                 alias: alias.length > 0 ? alias : null,
@@ -128,7 +128,7 @@ const generateOobiAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startGenerateOobi(
+        runtime.contacts.startGenerateOobi(
             { identifier, role },
             requestIdOption(requestId)
         ),
@@ -162,7 +162,7 @@ const generateChallengeAction = async ({
         };
     }
 
-    const generated = await runtime.generateContactChallenge(
+    const generated = await runtime.challenges.generate(
         {
             counterpartyAid: contactId,
             counterpartyAlias: contactAlias.length > 0 ? contactAlias : null,
@@ -171,7 +171,7 @@ const generateChallengeAction = async ({
         },
         { signal: request.signal }
     );
-    runtime.startSendChallengeRequest(
+    runtime.challenges.startSendRequest(
         {
             challengeId: generated.challengeId,
             counterpartyAid: generated.counterpartyAid,
@@ -185,7 +185,7 @@ const generateChallengeAction = async ({
             ? { requestId: `${requestId}:challenge-request` }
             : {}
     );
-    const started = runtime.startVerifyContactChallenge(
+    const started = runtime.challenges.startVerify(
         {
             challengeId: generated.challengeId,
             counterpartyAid: generated.counterpartyAid,
@@ -259,7 +259,7 @@ const respondChallengeAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startRespondToChallenge(
+        runtime.challenges.startRespond(
             {
                 challengeId:
                     challengeId.length > 0
@@ -326,7 +326,7 @@ const verifyChallengeAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startVerifyContactChallenge(
+        runtime.challenges.startVerify(
             {
                 challengeId,
                 counterpartyAid: contactId,
@@ -372,7 +372,7 @@ const dismissExchangeNotificationAction = async ({
         };
     }
 
-    await runtime.dismissExchangeNotification(
+    await runtime.notifications.dismissExchange(
         { notificationId, exnSaid, route },
         { ...requestIdOption(requestId), signal: request.signal }
     );
@@ -425,7 +425,7 @@ const approveDelegationRequestAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startApproveDelegation(
+        runtime.delegations.startApprove(
             {
                 notificationId,
                 delegatorName,
@@ -474,7 +474,7 @@ const deleteContactAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startDeleteContact(contactId, requestIdOption(requestId)),
+        runtime.contacts.startDelete(contactId, requestIdOption(requestId)),
         `Deleting contact ${contactId}`
     );
 };
@@ -503,7 +503,7 @@ const updateContactAliasAction = ({
 
     return contactStartedResult(
         intent,
-        runtime.startUpdateContactAlias(
+        runtime.contacts.startUpdateAlias(
             { contactId, alias },
             requestIdOption(requestId)
         ),

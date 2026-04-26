@@ -2,22 +2,7 @@ import type { Operation as EffectionOperation, Task } from 'effection';
 import type { SignifyClient } from 'signify-ts';
 import { appConfig, type AppConfig } from '../config';
 import { toErrorText } from '../effects/promise';
-import { AppEffectionScopes, type RuntimeScopeKind } from '../effects/scope';
-import { aliasForOobiResolution } from '../domain/contacts/contactHelpers';
-import type {
-    IdentifierCreateDraft,
-    IdentifierDelegationChainNode,
-    IdentifierSummary,
-} from '../domain/identifiers/identifierTypes';
-import type {
-    MultisigCreateDraft,
-    MultisigInteractionDraft,
-    MultisigRequestActionInput,
-    MultisigRotationDraft,
-} from '../domain/multisig/multisigTypes';
-import type { MultisigGroupDetails } from '../domain/multisig/multisigGroupDetails';
-import type { ResolveContactInput } from '../services/contacts.service';
-import type { GeneratedOobiRecord } from '../state/contacts.slice';
+import { AppEffectionScopes } from '../effects/scope';
 import {
     toError,
     type ConnectedSignifyClient,
@@ -30,14 +15,11 @@ import {
     appNotificationRecorded,
     type AppNotificationLink,
     type AppNotificationRecord,
-    type AppNotificationSeverity,
 } from '../state/appNotifications.slice';
 import { storedChallengeWordsRehydrated } from '../state/challenges.slice';
 import { exchangeTombstonesRehydrated } from '../state/exchangeTombstones.slice';
 import {
     cancelRunningOperations,
-    type OperationKind,
-    type OperationRouteLink,
     operationCanceled,
     operationFailed,
     operationPayloadDetailsRecorded,
@@ -61,86 +43,39 @@ import {
     sessionDisconnected,
     sessionStateRefreshed,
 } from '../state/session.slice';
-import { appStore, type AppStore, type RootState } from '../state/store';
-import {
-    identifierDelegatorAid,
-    isDelegatedIdentifier,
-} from '../domain/identifiers/delegationHelpers';
-import {
-    createIdentifierOp,
-    createIdentifierBackgroundOp,
-    getIdentifierDelegationChainOp,
-    getIdentifierOp,
-    listIdentifiersOp,
-    rotateIdentifierBackgroundOp,
-    rotateIdentifierOp,
-} from '../workflows/identifiers.op';
-import {
-    deleteContactOp,
-    generateOobiOp,
-    liveSessionInventoryOp,
-    resolveContactOobiOp,
-    syncSessionInventoryOp,
-    updateContactAliasOp,
-    type GenerateOobiInput,
-    type SessionInventorySnapshot,
-    type UpdateContactAliasInput,
-} from '../workflows/contacts.op';
-import {
-    challengeResultRoute,
-    generateContactChallengeOp,
-    respondToContactChallengeOp,
-    sendChallengeRequestOp,
-    verifyContactChallengeOp,
-    type GeneratedContactChallengeResult,
-    type GenerateContactChallengeInput,
-    type RespondToContactChallengeInput,
-    type SendChallengeRequestInput,
-    type VerifyContactChallengeInput,
-} from '../workflows/challenges.op';
+import { appStore, type AppStore } from '../state/store';
 import {
     bootOrConnectOp,
     getSignifyStateOp,
     randomPasscodeOp,
 } from '../workflows/signify.op';
 import {
-    dismissExchangeNotificationOp,
-    type DismissExchangeNotificationInput,
-} from '../workflows/notifications.op';
-import {
-    approveDelegationRequestOp,
-    type ApproveDelegationInput,
-} from '../workflows/delegations.op';
-import {
-    admitCredentialGrantOp,
-    createCredentialRegistryOp,
-    grantCredentialOp,
-    issueSediCredentialOp,
-    resolveCredentialSchemaOp,
-    syncCredentialIpexActivityOp,
-    syncCredentialInventoryOp,
-    syncCredentialRegistriesOp,
-    syncKnownCredentialSchemasOp,
-} from '../workflows/credentials.op';
-import type {
-    AdmitCredentialGrantInput,
-    CreateCredentialRegistryInput,
-    GrantCredentialInput,
-    IssueSediCredentialInput,
-    ResolveCredentialSchemaInput,
-} from '../domain/credentials/credentialCommands';
-import {
-    acceptMultisigEndRoleOp,
-    acceptMultisigInceptionOp,
-    acceptMultisigInteractionOp,
-    acceptMultisigRotationOp,
-    authorizeMultisigAgentsOp,
-    createMultisigGroupOp,
-    getMultisigGroupDetailsOp,
-    interactMultisigGroupOp,
-    joinMultisigRotationOp,
-    rotateMultisigGroupOp,
-} from '../workflows/multisig.op';
+    createChallengeRuntimeCommands,
+    createContactRuntimeCommands,
+    createCredentialRuntimeCommands,
+    createDelegationRuntimeCommands,
+    createIdentifierRuntimeCommands,
+    createMultisigRuntimeCommands,
+    createNotificationRuntimeCommands,
+    type BackgroundWorkflowRunOptions,
+    type BackgroundWorkflowStartResult,
+    type ChallengeRuntimeCommands,
+    type ContactRuntimeCommands,
+    type CredentialRuntimeCommands,
+    type DelegationRuntimeCommands,
+    type IdentifierRuntimeCommands,
+    type MultisigRuntimeCommands,
+    type NotificationRuntimeCommands,
+    type RuntimeCommandContext,
+    type WorkflowRunOptions,
+} from './runtimeCommands';
+
+export type {
+    BackgroundWorkflowRunOptions,
+    BackgroundWorkflowStartResult,
+    OperationNotificationTemplate,
+    WorkflowRunOptions,
+} from './runtimeCommands';
 
 /**
  * Complete connection-state model for the app runtime.
@@ -200,71 +135,6 @@ export interface AppRuntimeOptions {
 }
 
 /**
- * Per-call workflow controls used by route loaders/actions.
- */
-export interface WorkflowRunOptions {
-    /** Abort signal from React Router request or caller-owned cancellation. */
-    signal?: AbortSignal;
-    /** Stable id for operation tracking; generated when omitted. */
-    requestId?: string;
-    /** User-facing pending label stored in the operations slice. */
-    label?: string;
-    /** Machine-readable operation category for diagnostics. */
-    kind?: OperationKind;
-    /** Effection scope lifetime for the launched workflow. */
-    scope?: RuntimeScopeKind;
-    /** Whether to write operation lifecycle records into Redux. */
-    track?: boolean;
-}
-
-/**
- * User-facing completion copy attached to a background operation outcome.
- */
-export interface OperationNotificationTemplate {
-    title: string;
-    message: string;
-    severity?: AppNotificationSeverity;
-}
-
-/**
- * Runtime-owned metadata for one non-blocking Effection workflow.
- *
- * The workflow file owns Signify/KERIA behavior; these options describe how the
- * shell should track, de-duplicate, link, and announce that work.
- */
-export interface BackgroundWorkflowRunOptions {
-    requestId?: string;
-    label: string;
-    title?: string;
-    description?: string | null;
-    kind: OperationKind;
-    scope?: RuntimeScopeKind;
-    resourceKeys?: readonly string[];
-    resultRoute?: OperationRouteLink | null;
-    successNotification?: OperationNotificationTemplate;
-    failureNotification?: OperationNotificationTemplate;
-}
-
-/**
- * Immediate route-action result from a background workflow launch.
- *
- * Route actions return this instead of waiting for KERIA, which lets the UI
- * navigate while operation records and app notifications carry progress.
- */
-export type BackgroundWorkflowStartResult =
-    | {
-          status: 'accepted';
-          requestId: string;
-          operationRoute: string;
-      }
-    | {
-          status: 'conflict';
-          requestId: string;
-          operationRoute: string;
-          message: string;
-      };
-
-/**
  * Initial disconnected runtime state.
  *
  * Reuse this immutable value when clearing a session so idle semantics stay
@@ -312,176 +182,6 @@ const operationRoute = (requestId: string): string =>
 const notificationId = (requestId: string): string =>
     `notification-${requestId}-${Date.now()}`;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === 'object' && value !== null;
-
-const stringValue = (value: unknown): string | null =>
-    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-
-const stringArray = (value: unknown): string[] =>
-    Array.isArray(value)
-        ? value.flatMap((item) => {
-              const text = stringValue(item);
-              return text === null ? [] : [text];
-          })
-        : [];
-
-const detailId = (label: string, index: number): string =>
-    `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${index}`;
-
-const aliasForAid = (state: RootState, aid: string): string | null => {
-    const localAlias = state.identifiers.byPrefix[aid]?.name?.trim();
-    if (localAlias !== undefined && localAlias.length > 0) {
-        return localAlias === aid ? null : localAlias;
-    }
-
-    for (const contactId of state.contacts.ids) {
-        const contact = state.contacts.byId[contactId];
-        if (contact?.aid === aid) {
-            const contactAlias = contact.alias.trim();
-            return contactAlias.length > 0 && contactAlias !== aid
-                ? contactAlias
-                : null;
-        }
-    }
-
-    return null;
-};
-
-const aidDisplayValue = (
-    state: RootState | null,
-    aid: string
-): string | undefined => {
-    if (state === null) {
-        return undefined;
-    }
-
-    const alias = aliasForAid(state, aid);
-    return alias === null ? undefined : `${alias} (${aid})`;
-};
-
-const payloadDetailsFromWorkflowResult = (
-    result: unknown,
-    state: RootState | null = null
-): PayloadDetailRecord[] => {
-    if (!isRecord(result)) {
-        return [];
-    }
-
-    const details: PayloadDetailRecord[] = [];
-    const generatedOobis = stringArray(result.oobis);
-    generatedOobis.forEach((oobi, index) => {
-        details.push({
-            id: detailId('generated-oobi', index),
-            label: generatedOobis.length === 1 ? 'OOBI' : `OOBI ${index + 1}`,
-            value: oobi,
-            kind: 'oobi',
-            copyable: true,
-        });
-    });
-
-    const sourceOobi = stringValue(result.sourceOobi);
-    if (sourceOobi !== null) {
-        details.push({
-            id: detailId('source-oobi', details.length),
-            label: 'OOBI',
-            value: sourceOobi,
-            kind: 'oobi',
-            copyable: true,
-        });
-    }
-
-    const resolutionOobi = stringValue(result.resolutionOobi);
-    if (resolutionOobi !== null && resolutionOobi !== sourceOobi) {
-        details.push({
-            id: detailId('resolution-oobi', details.length),
-            label: 'Resolved URL',
-            value: resolutionOobi,
-            kind: 'oobi',
-            copyable: true,
-        });
-    }
-
-    const resolvedAid = stringValue(result.resolvedAid);
-    if (resolvedAid !== null) {
-        details.push({
-            id: detailId('resolved-aid', details.length),
-            label: 'AID',
-            value: resolvedAid,
-            kind: 'aid',
-            copyable: true,
-        });
-    }
-
-    const delegation = isRecord(result.delegation) ? result.delegation : result;
-    if (isRecord(delegation)) {
-        const delegatorAid = stringValue(delegation.delegatorAid);
-        const delegateAid = stringValue(delegation.delegateAid);
-        const delegateEventSaid = stringValue(delegation.delegateEventSaid);
-        const sequence = stringValue(delegation.sequence);
-        const requestedAt = stringValue(delegation.requestedAt);
-
-        if (delegatorAid !== null) {
-            details.push({
-                id: detailId('delegator-aid', details.length),
-                label: 'Delegator AID',
-                value: delegatorAid,
-                displayValue: aidDisplayValue(state, delegatorAid),
-                kind: 'aid',
-                copyable: true,
-            });
-        }
-        if (delegateAid !== null) {
-            details.push({
-                id: detailId('delegate-aid', details.length),
-                label: 'Delegate AID',
-                value: delegateAid,
-                displayValue: aidDisplayValue(state, delegateAid),
-                kind: 'aid',
-                copyable: true,
-            });
-        }
-        if (delegateEventSaid !== null) {
-            details.push({
-                id: detailId('delegate-event-said', details.length),
-                label: 'Delegate Event SAID',
-                value: delegateEventSaid,
-                kind: 'text',
-                copyable: true,
-            });
-        }
-        if (sequence !== null) {
-            details.push({
-                id: detailId('delegation-sequence', details.length),
-                label: 'Delegation Sequence',
-                value: sequence,
-                kind: 'text',
-                copyable: true,
-            });
-        }
-        if (requestedAt !== null) {
-            details.push({
-                id: detailId('delegation-requested-at', details.length),
-                label: 'Request Time',
-                value: requestedAt,
-                kind: 'text',
-                copyable: true,
-            });
-        }
-    }
-
-    const seen = new Set<string>();
-    return details.filter((detail) => {
-        const key = `${detail.label}:${detail.value}`;
-        if (seen.has(key)) {
-            return false;
-        }
-
-        seen.add(key);
-        return true;
-    });
-};
-
 /**
  * Data-router-safe Signify session and command boundary.
  *
@@ -499,6 +199,27 @@ export class AppRuntime {
 
     /** Effection app/session scopes that own cancellation and lifetimes. */
     private readonly scopes: AppEffectionScopes;
+
+    /** Identifier command adapter for route loaders, actions, and views. */
+    readonly identifiers: IdentifierRuntimeCommands;
+
+    /** Contact and OOBI command adapter. */
+    readonly contacts: ContactRuntimeCommands;
+
+    /** Challenge-response command adapter. */
+    readonly challenges: ChallengeRuntimeCommands;
+
+    /** Notification command adapter. */
+    readonly notifications: NotificationRuntimeCommands;
+
+    /** Delegation approval command adapter. */
+    readonly delegations: DelegationRuntimeCommands;
+
+    /** Credential/schema/registry command adapter. */
+    readonly credentials: CredentialRuntimeCommands;
+
+    /** Multisig group command adapter. */
+    readonly multisig: MultisigRuntimeCommands;
 
     /** Foreground and background task handles keyed by route request id. */
     private readonly activeTasks = new Map<string, Task<unknown>>();
@@ -541,6 +262,20 @@ export class AppRuntime {
             store: this.store,
             logger,
         });
+        const commandContext: RuntimeCommandContext = {
+            runWorkflow: this.runWorkflow,
+            startBackgroundWorkflow: this.startBackgroundWorkflow,
+            createRequestId,
+            getState: () => this.store.getState(),
+        };
+        this.identifiers = createIdentifierRuntimeCommands(commandContext);
+        this.contacts = createContactRuntimeCommands(commandContext);
+        this.challenges = createChallengeRuntimeCommands(commandContext);
+        this.notifications =
+            createNotificationRuntimeCommands(commandContext);
+        this.delegations = createDelegationRuntimeCommands(commandContext);
+        this.credentials = createCredentialRuntimeCommands(commandContext);
+        this.multisig = createMultisigRuntimeCommands(commandContext);
 
         this.storage =
             options.storage === undefined ? undefined : options.storage;
@@ -752,1063 +487,6 @@ export class AppRuntime {
     };
 
     /**
-     * List identifiers through the connected Signify client and normalize the
-     * response shape for route loader consumers.
-     */
-    listIdentifiers = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<IdentifierSummary[]> =>
-        this.runWorkflow(() => listIdentifiersOp(), {
-            ...options,
-            label: options.label ?? 'Loading identifiers...',
-            kind: options.kind ?? 'listIdentifiers',
-        });
-
-    /**
-     * Fetch one identifier by alias or prefix and merge richer state into Redux.
-     */
-    getIdentifier = async (
-        aid: string,
-        options: WorkflowRunOptions = {}
-    ): Promise<IdentifierSummary> =>
-        this.runWorkflow(() => getIdentifierOp(aid), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'listIdentifiers',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Resolve an identifier's delegation chain without recording history.
-     */
-    getIdentifierDelegationChain = async (
-        aid: string,
-        options: WorkflowRunOptions = {}
-    ): Promise<IdentifierDelegationChainNode[]> =>
-        this.runWorkflow(() => getIdentifierDelegationChainOp(aid), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'listIdentifiers',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Load multisig group member details behind the runtime/workflow boundary.
-     */
-    getMultisigGroupDetails = async (
-        identifier: IdentifierSummary,
-        options: WorkflowRunOptions = {}
-    ): Promise<MultisigGroupDetails> =>
-        this.runWorkflow(() => getMultisigGroupDetailsOp(identifier), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'listIdentifiers',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Fetch an OOBI for one managed identifier role without recording an
-     * operation-history item by default. Agent OOBIs still authorize the agent
-     * endpoint role through the shared OOBI workflow when needed.
-     */
-    getIdentifierOobi = async (
-        input: GenerateOobiInput,
-        options: WorkflowRunOptions = {}
-    ): Promise<GeneratedOobiRecord> =>
-        this.runWorkflow(() => generateOobiOp(input), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'generateOobi',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Fetch all requested OOBI roles for one managed identifier.
-     */
-    listIdentifierOobis = async (
-        identifier: string,
-        roles: readonly GenerateOobiInput['role'][],
-        options: WorkflowRunOptions = {}
-    ): Promise<GeneratedOobiRecord[]> => {
-        const records: GeneratedOobiRecord[] = [];
-        for (const role of roles) {
-            records.push(
-                await this.getIdentifierOobi(
-                    { identifier, role },
-                    {
-                        ...options,
-                        label: options.label,
-                        track: options.track ?? false,
-                    }
-                )
-            );
-        }
-
-        return records;
-    };
-
-    /**
-     * Create an identifier, wait for the resulting KERIA operation, then return
-     * a freshly loaded identifier list for router revalidation callers.
-     */
-    createIdentifier = async (
-        draft: IdentifierCreateDraft,
-        options: WorkflowRunOptions = {}
-    ): Promise<IdentifierSummary[]> => {
-        return this.runWorkflow(() => createIdentifierOp(draft), {
-            ...options,
-            label: options.label ?? 'Creating identifier...',
-            kind: options.kind ?? 'createIdentifier',
-        });
-    };
-
-    /**
-     * Rotate an identifier, wait for completion, then return a freshly loaded
-     * identifier list for router revalidation callers.
-     */
-    rotateIdentifier = async (
-        aid: string,
-        options: WorkflowRunOptions = {}
-    ): Promise<IdentifierSummary[]> => {
-        return this.runWorkflow(() => rotateIdentifierOp(aid), {
-            ...options,
-            label: options.label ?? 'Rotating identifier...',
-            kind: options.kind ?? 'rotateIdentifier',
-        });
-    };
-
-    /**
-     * Refresh live dashboard/contact facts without recording operation history.
-     */
-    syncSessionInventory = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<SessionInventorySnapshot> =>
-        this.runWorkflow(() => syncSessionInventoryOp(), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Refresh holder-side credential inventory without recording operation
-     * history by default.
-     */
-    syncCredentialInventory = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<unknown> =>
-        this.runWorkflow(() => syncCredentialInventoryOp(), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Refresh issuer-side credential registry inventory without recording
-     * operation history by default.
-     */
-    syncCredentialRegistries = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<unknown> =>
-        this.runWorkflow(() => syncCredentialRegistriesOp(), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Refresh credential-linked IPEX exchange activity without recording
-     * operation history by default.
-     */
-    syncCredentialIpexActivity = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<unknown> =>
-        this.runWorkflow(() => syncCredentialIpexActivityOp(), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Detect app-supported schemas this connected agent already knows.
-     */
-    syncKnownCredentialSchemas = async (
-        options: WorkflowRunOptions = {}
-    ): Promise<unknown> =>
-        this.runWorkflow(() => syncKnownCredentialSchemasOp(), {
-            ...options,
-            label: options.label,
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
-
-    /**
-     * Launch identifier creation as background work with name-level conflicts.
-     */
-    startCreateIdentifier = (
-        draft: IdentifierCreateDraft,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const name = draft.name.trim();
-        const delegated = draft.delegation.mode === 'delegated';
-        const requestId = options.requestId ?? createRequestId();
-        const delegatorAid =
-            draft.delegation.mode === 'delegated'
-                ? draft.delegation.delegatorAid.trim()
-                : null;
-
-        return this.startBackgroundWorkflow(
-            () => createIdentifierBackgroundOp(draft, requestId),
-            {
-                requestId,
-                label: `Creating identifier ${name}`,
-                title: delegated
-                    ? `Create delegated identifier ${name}`
-                    : `Create identifier ${name}`,
-                description:
-                    delegated && delegatorAid !== null
-                        ? `Creates a delegated identifier and waits for manual approval from ${delegatorAid}.`
-                        : 'Creates a managed identifier and waits for KERIA completion.',
-                kind: delegated
-                    ? 'createDelegatedIdentifier'
-                    : 'createIdentifier',
-                resourceKeys: [
-                    `identifier:name:${name}`,
-                    ...(delegatorAid === null
-                        ? []
-                        : [
-                              `delegation:delegator:${delegatorAid}:name:${name}`,
-                          ]),
-                ],
-                resultRoute: {
-                    label: 'View identifiers',
-                    path: '/identifiers',
-                },
-                successNotification: {
-                    title: delegated
-                        ? `Delegated identifier ${name} created`
-                        : `Identifier ${name} created`,
-                    message: delegated
-                        ? 'The delegator approved the request and the identifier is available.'
-                        : 'The identifier operation completed successfully.',
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: delegated
-                        ? `Delegated identifier ${name} failed`
-                        : `Identifier ${name} failed`,
-                    message: 'The identifier operation failed.',
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    /**
-     * Launch identifier rotation as background work keyed by identifier AID.
-     */
-    startRotateIdentifier = (
-        aid: string,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const state = this.store.getState();
-        const identifier =
-            state.identifiers.byPrefix[aid] ??
-            state.identifiers.prefixes
-                .map((prefix) => state.identifiers.byPrefix[prefix])
-                .find(
-                    (candidate) =>
-                        candidate !== undefined &&
-                        (candidate.name === aid || candidate.prefix === aid)
-                ) ??
-            null;
-        const delegated = isDelegatedIdentifier(identifier);
-        const delegatorAid = identifierDelegatorAid(identifier);
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => rotateIdentifierBackgroundOp(aid, requestId),
-            {
-                requestId,
-                label: `Rotating identifier ${aid}`,
-                title: delegated
-                    ? `Rotate delegated identifier ${aid}`
-                    : `Rotate identifier ${aid}`,
-                description:
-                    delegated && delegatorAid !== null
-                        ? `Rotates a delegated identifier and waits for manual approval from ${delegatorAid}.`
-                        : 'Rotates a managed identifier and waits for KERIA completion.',
-                kind: delegated
-                    ? 'rotateDelegatedIdentifier'
-                    : 'rotateIdentifier',
-                resourceKeys: [
-                    `identifier:aid:${aid}`,
-                    ...(delegatorAid === null
-                        ? []
-                        : [`delegation:delegate:${aid}`]),
-                ],
-                resultRoute: {
-                    label: 'View identifiers',
-                    path: '/identifiers',
-                },
-                successNotification: {
-                    title: delegated
-                        ? 'Delegated rotation complete'
-                        : 'Identifier rotation complete',
-                    message: delegated
-                        ? `The delegator approved the rotation for ${aid}.`
-                        : `The rotation for ${aid} completed successfully.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: delegated
-                        ? 'Delegated rotation failed'
-                        : 'Identifier rotation failed',
-                    message: `The rotation for ${aid} failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    /**
-     * Launch multisig group inception and invitation delivery.
-     */
-    startCreateMultisigGroup = (
-        draft: MultisigCreateDraft,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const groupAlias = draft.groupAlias.trim();
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => createMultisigGroupOp(draft, requestId),
-            {
-                requestId,
-                label: `Creating multisig group ${groupAlias}`,
-                title: `Create multisig group ${groupAlias}`,
-                description:
-                    'Creates the local group inception event, sends member invitations, and waits for KERIA completion.',
-                kind: 'createMultisigGroup',
-                resourceKeys: [
-                    `multisig:group:${groupAlias}`,
-                    `identifier:aid:${draft.localMemberAid}`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig inception complete',
-                    message: `${groupAlias} exists. Authorize group agents before using agent OOBIs.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Multisig inception failed',
-                    message: `${groupAlias} could not be created.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startAcceptMultisigInception = (
-        input: MultisigRequestActionInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => acceptMultisigInceptionOp(input, requestId),
-            {
-                requestId,
-                label: `Joining multisig group ${input.groupAlias}`,
-                title: 'Join multisig group',
-                description:
-                    'Recreates the proposed group inception event and sends this member signature to the group.',
-                kind: 'acceptMultisigInception',
-                resourceKeys: [
-                    `multisig:proposal:${input.exnSaid}`,
-                    `multisig:group:${input.groupAlias}`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Joined multisig group',
-                    message: `${input.groupAlias} exists locally. Authorize group agents before using agent OOBIs.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Multisig join failed',
-                    message: `${input.groupAlias} could not be joined.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startAuthorizeMultisigAgents = (
-        input: { groupAlias: string; localMemberName?: string | null },
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-        const groupAlias = input.groupAlias.trim();
-
-        return this.startBackgroundWorkflow(
-            () => authorizeMultisigAgentsOp(input, requestId),
-            {
-                requestId,
-                label: `Authorizing agents for ${groupAlias}`,
-                title: 'Authorize multisig agents',
-                description:
-                    'Signs endpoint role authorizations for member agents and sends them to the group.',
-                kind: 'authorizeMultisigAgent',
-                resourceKeys: [`multisig:group:${groupAlias}:agents`],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig agents authorized',
-                    message: `${groupAlias} can publish usable agent OOBIs.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Agent authorization failed',
-                    message: `${groupAlias} agent authorization failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startAcceptMultisigEndRole = (
-        input: MultisigRequestActionInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => acceptMultisigEndRoleOp(input, requestId),
-            {
-                requestId,
-                label: `Approving multisig role for ${input.groupAlias}`,
-                title: 'Approve multisig endpoint role',
-                description:
-                    'Signs the proposed endpoint role authorization and sends it to group members.',
-                kind: 'approveMultisigEndRole',
-                resourceKeys: [
-                    `multisig:proposal:${input.exnSaid}`,
-                    `multisig:group:${input.groupAlias}:agents`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig role approved',
-                    message: `${input.groupAlias} endpoint role was approved.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Role approval failed',
-                    message: `${input.groupAlias} endpoint role approval failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startInteractMultisigGroup = (
-        draft: MultisigInteractionDraft,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-        const groupAlias = draft.groupAlias.trim();
-
-        return this.startBackgroundWorkflow(
-            () => interactMultisigGroupOp(draft, requestId),
-            {
-                requestId,
-                label: `Interacting with multisig group ${groupAlias}`,
-                title: 'Create multisig interaction',
-                description:
-                    'Creates a group interaction event and sends it to the other members.',
-                kind: 'interactMultisigGroup',
-                resourceKeys: [`multisig:group:${groupAlias}:event`],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig interaction complete',
-                    message: `${groupAlias} interaction completed.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Multisig interaction failed',
-                    message: `${groupAlias} interaction failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startAcceptMultisigInteraction = (
-        input: MultisigRequestActionInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => acceptMultisigInteractionOp(input, requestId),
-            {
-                requestId,
-                label: `Accepting multisig interaction ${input.groupAlias}`,
-                title: 'Accept multisig interaction',
-                description:
-                    'Joins the proposed group interaction event and sends this member signature.',
-                kind: 'acceptMultisigInteraction',
-                resourceKeys: [
-                    `multisig:proposal:${input.exnSaid}`,
-                    `multisig:group:${input.groupAlias}:event`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig interaction accepted',
-                    message: `${input.groupAlias} interaction was accepted.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Interaction acceptance failed',
-                    message: `${input.groupAlias} interaction acceptance failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startRotateMultisigGroup = (
-        draft: MultisigRotationDraft,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-        const groupAlias = draft.groupAlias.trim();
-
-        return this.startBackgroundWorkflow(
-            () => rotateMultisigGroupOp(draft, requestId),
-            {
-                requestId,
-                label: `Rotating multisig group ${groupAlias}`,
-                title: 'Rotate multisig group',
-                description:
-                    'Creates a group rotation event with refreshed member key states and sends it to members.',
-                kind: 'rotateMultisigGroup',
-                resourceKeys: [`multisig:group:${groupAlias}:event`],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig rotation complete',
-                    message: `${groupAlias} rotation completed.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Multisig rotation failed',
-                    message: `${groupAlias} rotation failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startAcceptMultisigRotation = (
-        input: MultisigRequestActionInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => acceptMultisigRotationOp(input, requestId),
-            {
-                requestId,
-                label: `Accepting multisig rotation ${input.groupAlias}`,
-                title: 'Accept multisig rotation',
-                description:
-                    'Joins the proposed group rotation event and sends this member signature.',
-                kind: 'acceptMultisigRotation',
-                resourceKeys: [
-                    `multisig:proposal:${input.exnSaid}`,
-                    `multisig:group:${input.groupAlias}:event`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig rotation accepted',
-                    message: `${input.groupAlias} rotation was accepted.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Rotation acceptance failed',
-                    message: `${input.groupAlias} rotation acceptance failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    startJoinMultisigRotation = (
-        input: MultisigRequestActionInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const requestId = options.requestId ?? createRequestId();
-
-        return this.startBackgroundWorkflow(
-            () => joinMultisigRotationOp(input, requestId),
-            {
-                requestId,
-                label: `Joining multisig group ${input.groupAlias}`,
-                title: 'Join multisig rotation',
-                description:
-                    'Signs the embedded rotation as a newly added member and joins the group.',
-                kind: 'joinMultisigRotation',
-                resourceKeys: [
-                    `multisig:proposal:${input.exnSaid}`,
-                    `multisig:group:${input.groupAlias}:join`,
-                ],
-                resultRoute: { label: 'View multisig', path: '/multisig' },
-                successNotification: {
-                    title: 'Multisig group joined',
-                    message: `${input.groupAlias} was joined.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Multisig join failed',
-                    message: `${input.groupAlias} could not be joined.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    /**
-     * Launch OOBI generation/authorization without blocking navigation.
-     */
-    startGenerateOobi = (
-        input: GenerateOobiInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const identifier = input.identifier.trim();
-        return this.startBackgroundWorkflow(
-            () => generateOobiOp({ identifier, role: input.role }),
-            {
-                requestId: options.requestId,
-                label: `Generating ${input.role} OOBI for ${identifier}`,
-                title: `Generate ${input.role} OOBI`,
-                description:
-                    input.role === 'agent'
-                        ? 'Authorizes the agent endpoint role if needed, then fetches an identifier OOBI.'
-                        : 'Fetches witnessed identifier OOBIs from KERIA.',
-                kind: 'generateOobi',
-                resourceKeys: [`oobi:${identifier}:${input.role}`],
-                resultRoute: { label: 'View contacts', path: '/contacts' },
-                successNotification: {
-                    title: 'OOBI generated',
-                    message: `Generated a ${input.role} OOBI for ${identifier}.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'OOBI generation failed',
-                    message: `The ${input.role} OOBI generation for ${identifier} failed.`,
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    /**
-     * Launch contact OOBI resolution and protect both URL and alias resources.
-     */
-    startResolveContact = (
-        input: ResolveContactInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult => {
-        const oobi = input.oobi.trim();
-        const alias = aliasForOobiResolution(oobi, input.alias);
-        const resourceKeys = [`contact:oobi:${oobi}`];
-        if (alias !== null) {
-            resourceKeys.push(`contact:alias:${alias}`);
-        }
-
-        return this.startBackgroundWorkflow(
-            () => resolveContactOobiOp({ oobi, alias }),
-            {
-                requestId: options.requestId,
-                label:
-                    alias === null
-                        ? 'Resolving contact OOBI'
-                        : `Resolving contact ${alias}`,
-                title: 'Resolve contact OOBI',
-                description:
-                    'Submits an OOBI to KERIA and refreshes contact inventory after the operation completes.',
-                kind: 'resolveContact',
-                resourceKeys,
-                resultRoute: { label: 'View contacts', path: '/contacts' },
-                successNotification: {
-                    title: 'Contact resolved',
-                    message:
-                        alias === null
-                            ? 'The contact OOBI resolved successfully.'
-                            : `${alias} resolved successfully.`,
-                    severity: 'success',
-                },
-                failureNotification: {
-                    title: 'Contact resolution failed',
-                    message: 'The OOBI resolution failed.',
-                    severity: 'error',
-                },
-            }
-        );
-    };
-
-    /**
-     * Launch KERIA contact deletion and refresh inventory on completion.
-     */
-    startDeleteContact = (
-        contactId: string,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => deleteContactOp(contactId), {
-            requestId: options.requestId,
-            label: `Deleting contact ${contactId}`,
-            title: 'Delete contact',
-            description: 'Deletes a KERIA contact and refreshes inventory.',
-            kind: 'deleteContact',
-            resourceKeys: [`contact:${contactId}`],
-            resultRoute: { label: 'View contacts', path: '/contacts' },
-            successNotification: {
-                title: 'Contact deleted',
-                message: `${contactId} was deleted.`,
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Contact deletion failed',
-                message: `${contactId} could not be deleted.`,
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch local contact metadata update for the selected KERIA contact.
-     */
-    startUpdateContactAlias = (
-        input: UpdateContactAliasInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => updateContactAliasOp(input), {
-            requestId: options.requestId,
-            label: `Updating contact ${input.contactId}`,
-            title: 'Update contact alias',
-            description: 'Updates local KERIA contact metadata.',
-            kind: 'updateContact',
-            resourceKeys: [`contact:${input.contactId}`],
-            resultRoute: { label: 'View contacts', path: '/contacts' },
-            successNotification: {
-                title: 'Contact updated',
-                message: `${input.contactId} was updated.`,
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Contact update failed',
-                message: `${input.contactId} could not be updated.`,
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Generate challenge words in the foreground so the route can display them.
-     */
-    generateContactChallenge = async (
-        input: GenerateContactChallengeInput,
-        options: Pick<WorkflowRunOptions, 'requestId' | 'signal'> = {}
-    ): Promise<GeneratedContactChallengeResult> =>
-        this.runWorkflow(() => generateContactChallengeOp(input), {
-            ...options,
-            kind: 'generateChallenge',
-            track: false,
-        });
-
-    /**
-     * Launch responder-side signed challenge response delivery.
-     */
-    startRespondToChallenge = (
-        input: RespondToContactChallengeInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => respondToContactChallengeOp(input), {
-            requestId: options.requestId,
-            label: `Sending challenge response to ${input.counterpartyAid}`,
-            title: 'Send challenge response',
-            description:
-                'Signs the challenge words with the selected identifier and sends the response to the contact.',
-            kind: 'respondChallenge',
-            resourceKeys: [
-                `challenge:respond:${input.counterpartyAid}:${input.localIdentifier}:${input.challengeId ?? 'current'}`,
-            ],
-            resultRoute: challengeResultRoute(input.counterpartyAid),
-            successNotification: {
-                title: 'Challenge response sent',
-                message: 'The signed challenge response was sent.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Challenge response failed',
-                message: 'The challenge response could not be sent.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch challenger-side notification that asks a contact to respond.
-     */
-    startSendChallengeRequest = (
-        input: SendChallengeRequestInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => sendChallengeRequestOp(input), {
-            requestId: options.requestId,
-            label: `Sending challenge request to ${input.counterpartyAid}`,
-            title: 'Send challenge request',
-            description:
-                'Sends a challenge request notification without embedding the challenge words.',
-            kind: 'sendChallengeRequest',
-            resourceKeys: [
-                `challenge:request:${input.counterpartyAid}:${input.localIdentifier}:${input.challengeId}`,
-            ],
-            resultRoute: challengeResultRoute(input.counterpartyAid),
-            successNotification: {
-                title: 'Challenge request sent',
-                message:
-                    'The contact was notified that a challenge response is requested.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Challenge request failed',
-                message:
-                    'The challenge words remain available, but the notification could not be sent.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch challenger-side wait/verify/responded acceptance workflow.
-     */
-    startVerifyContactChallenge = (
-        input: VerifyContactChallengeInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => verifyContactChallengeOp(input), {
-            requestId: options.requestId,
-            label: `Waiting for challenge response from ${input.counterpartyAid}`,
-            title: 'Verify challenge response',
-            description:
-                'Waits for a matching challenge response, accepts the response SAID, and refreshes contact inventory.',
-            kind: 'verifyChallenge',
-            resourceKeys: [
-                `challenge:verify:${input.counterpartyAid}:${input.challengeId}`,
-            ],
-            resultRoute: challengeResultRoute(input.counterpartyAid),
-            successNotification: {
-                title: 'Challenge verified',
-                message: 'The contact challenge response was accepted.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Challenge verification failed',
-                message: 'The challenge response was not verified.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Tombstone a handled exchange notification without blocking the route.
-     */
-    dismissExchangeNotification = async (
-        input: DismissExchangeNotificationInput,
-        options: Pick<WorkflowRunOptions, 'requestId' | 'signal'> = {}
-    ): Promise<void> =>
-        this.runWorkflow(() => dismissExchangeNotificationOp(input), {
-            ...options,
-            kind: 'workflow',
-            track: false,
-        });
-
-    /**
-     * Launch manual delegator approval as background work.
-     */
-    startApproveDelegation = (
-        input: ApproveDelegationInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => approveDelegationRequestOp(input), {
-            requestId: options.requestId,
-            label: `Approving delegation for ${input.request.delegateAid}`,
-            title: 'Approve delegation',
-            description:
-                'Creates the delegator anchor event and refreshes protocol notifications.',
-            kind: 'approveDelegation',
-            resourceKeys: [
-                `delegation:approval:${input.notificationId}`,
-                `delegation:delegate:${input.request.delegateAid}`,
-            ],
-            resultRoute: {
-                label: 'View notifications',
-                path: '/notifications',
-            },
-            successNotification: {
-                title: 'Delegation approved',
-                message: `Approved delegation for ${input.request.delegateAid}.`,
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Delegation approval failed',
-                message: `Delegation approval for ${input.request.delegateAid} failed.`,
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch SEDI schema OOBI resolution as background work.
-     */
-    startResolveCredentialSchema = (
-        input: ResolveCredentialSchemaInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => resolveCredentialSchemaOp(input), {
-            requestId: options.requestId,
-            label: 'Adding SEDI credential type',
-            title: 'Add credential type',
-            description:
-                'Adds the SEDI schema OOBI to this KERIA agent and records schema metadata.',
-            kind: 'resolveSchema',
-            resourceKeys: [`schema:${input.schemaSaid}`],
-            resultRoute: { label: 'View credentials', path: '/credentials' },
-            successNotification: {
-                title: 'Credential type added',
-                message:
-                    'The SEDI credential type is available to this wallet.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Credential type add failed',
-                message: 'The SEDI credential type could not be added.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch issuer registry creation or reuse as background work.
-     */
-    startCreateCredentialRegistry = (
-        input: CreateCredentialRegistryInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => createCredentialRegistryOp(input), {
-            requestId: options.requestId,
-            label: `Creating registry for ${input.issuerAlias}`,
-            title: 'Create credential registry',
-            description:
-                'Creates or reuses the issuer credential registry for SEDI voter credentials.',
-            kind: 'createRegistry',
-            resourceKeys: [`registry:${input.issuerAid}`],
-            resultRoute: { label: 'View credentials', path: '/credentials' },
-            successNotification: {
-                title: 'Credential registry ready',
-                message: 'The issuer credential registry is ready.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Credential registry failed',
-                message:
-                    'The issuer credential registry could not be prepared.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch issuer-side SEDI credential issuance as background work.
-     */
-    startIssueCredential = (
-        input: IssueSediCredentialInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => issueSediCredentialOp(input), {
-            requestId: options.requestId,
-            label: `Issuing credential to ${input.holderAid}`,
-            title: 'Issue SEDI voter credential',
-            description:
-                'Creates the ACDC in the issuer registry and waits for KERIA completion.',
-            kind: 'issueCredential',
-            resourceKeys: [
-                `credential:issue:${input.issuerAid}:${input.holderAid}:${input.attributes.voterId}`,
-            ],
-            resultRoute: { label: 'View credentials', path: '/credentials' },
-            successNotification: {
-                title: 'Credential issued',
-                message: 'The SEDI voter credential was issued.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Credential issuance failed',
-                message: 'The SEDI voter credential could not be issued.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch issuer-side IPEX grant delivery as background work.
-     */
-    startGrantCredential = (
-        input: GrantCredentialInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => grantCredentialOp(input), {
-            requestId: options.requestId,
-            label: `Granting credential ${input.credentialSaid}`,
-            title: 'Grant credential',
-            description:
-                'Sends an IPEX grant to the holder and waits for KERIA completion.',
-            kind: 'grantCredential',
-            resourceKeys: [`credential:${input.credentialSaid}:grant`],
-            resultRoute: { label: 'View credentials', path: '/credentials' },
-            successNotification: {
-                title: 'Credential grant sent',
-                message: 'The credential grant was sent to the holder.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Credential grant failed',
-                message: 'The credential grant could not be sent.',
-                severity: 'error',
-            },
-        });
-
-    /**
-     * Launch holder-side IPEX grant admission as background work.
-     */
-    startAdmitCredentialGrant = (
-        input: AdmitCredentialGrantInput,
-        options: Pick<WorkflowRunOptions, 'requestId'> = {}
-    ): BackgroundWorkflowStartResult =>
-        this.startBackgroundWorkflow(() => admitCredentialGrantOp(input), {
-            requestId: options.requestId,
-            label: `Admitting credential grant ${input.grantSaid}`,
-            title: 'Admit credential grant',
-            description:
-                'Accepts the issuer IPEX grant and refreshes holder credential inventory.',
-            kind: 'admitCredential',
-            resourceKeys: [`grant:${input.grantSaid}:admit`],
-            resultRoute: { label: 'View credentials', path: '/credentials' },
-            successNotification: {
-                title: 'Credential admitted',
-                message: 'The credential is now available in this wallet.',
-                severity: 'success',
-            },
-            failureNotification: {
-                title: 'Credential admit failed',
-                message: 'The credential grant could not be admitted.',
-                severity: 'error',
-            },
-        });
-
-    /**
      * Start a non-blocking workflow and return accepted/conflict metadata.
      *
      * This is the top-level handoff point for background KERIA work. It owns
@@ -1818,7 +496,7 @@ export class AppRuntime {
      */
     startBackgroundWorkflow = <T>(
         operation: () => EffectionOperation<T>,
-        options: BackgroundWorkflowRunOptions
+        options: BackgroundWorkflowRunOptions<T>
     ): BackgroundWorkflowStartResult => {
         const resourceKeys = [...(options.resourceKeys ?? [])];
         const conflict = this.findResourceConflict(resourceKeys);
@@ -1947,14 +625,12 @@ export class AppRuntime {
     private watchBackgroundTask = async <T>(
         task: Task<T>,
         requestId: string,
-        options: BackgroundWorkflowRunOptions
+        options: BackgroundWorkflowRunOptions<T>
     ): Promise<void> => {
         try {
             const result = await task;
-            const payloadDetails = payloadDetailsFromWorkflowResult(
-                result,
-                this.store.getState()
-            );
+            const payloadDetails =
+                options.payloadDetails?.(result, this.store.getState()) ?? [];
             if (payloadDetails.length > 0) {
                 this.store.dispatch(
                     operationPayloadDetailsRecorded({
@@ -2004,9 +680,9 @@ export class AppRuntime {
      * Notifications are derived from runtime operation metadata so every
      * notification has a stable operation link and optional result link.
      */
-    private recordCompletionNotification = (
+    private recordCompletionNotification = <T>(
         requestId: string,
-        options: BackgroundWorkflowRunOptions,
+        options: BackgroundWorkflowRunOptions<T>,
         outcome: 'success' | 'error',
         error?: string,
         payloadDetails: PayloadDetailRecord[] = []
@@ -2158,7 +834,7 @@ export class AppRuntime {
             void this.liveSyncTask.halt();
         }
 
-        const task = this.scopes.run(() => liveSessionInventoryOp(), 'session');
+        const task = this.scopes.run(this.contacts.liveInventory, 'session');
         this.liveSyncTask = task;
 
         void (async () => {

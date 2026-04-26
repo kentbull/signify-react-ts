@@ -117,7 +117,7 @@ export const IdentifiersView = () => {
 
         void (async () => {
             try {
-                const refreshed = await runtime.getIdentifier(
+                const refreshed = await runtime.identifiers.get(
                     selectedIdentifierName,
                     {
                         signal: controller.signal,
@@ -130,7 +130,7 @@ export const IdentifiersView = () => {
 
                 setDetailRefresh({ status: 'success', message: null });
 
-                const chain = await runtime.getIdentifierDelegationChain(
+                const chain = await runtime.identifiers.getDelegationChain(
                     refreshed.name,
                     {
                         signal: controller.signal,
@@ -146,7 +146,7 @@ export const IdentifiersView = () => {
                 }
 
                 const roles = identifierAvailableOobiRoles(refreshed);
-                const records = await runtime.listIdentifierOobis(
+                const records = await runtime.contacts.listIdentifierOobis(
                     refreshed.name,
                     roles,
                     {
@@ -275,7 +275,7 @@ export const IdentifiersView = () => {
         identifier: IdentifierSummary,
         role: OobiGenerationRole
     ): Promise<GeneratedOobiRecord> => {
-        const record = await runtime.getIdentifierOobi(
+        const record = await runtime.contacts.getIdentifierOobi(
             {
                 identifier: identifier.name,
                 role,
