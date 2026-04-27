@@ -2,16 +2,13 @@ import { useEffect, useState } from 'react';
 import {
     Box,
     Button,
-    Divider,
     IconButton,
     Stack,
-    TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
-import HowToRegIcon from '@mui/icons-material/HowToReg';
 import {
     Link as RouterLink,
     useFetcher,
@@ -21,13 +18,10 @@ import {
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
 import {
-    ConsolePanel,
     EmptyState,
     PageHeader,
     StatusPill,
-    TelemetryRow,
 } from '../../app/Console';
-import { formatTimestamp } from '../../app/timeFormat';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type {
     ContactActionData,
@@ -44,79 +38,14 @@ import {
     selectKeriaNotificationById,
     selectMultisigRequestNotificationById,
 } from '../../state/selectors';
-import type {
-    DelegationRequestNotification,
-    MultisigRequestNotification,
-} from '../../state/notifications.slice';
-import type { CredentialGrantNotification } from '../../domain/credentials/credentialTypes';
-import { ChallengeRequestResponseForm } from './ChallengeRequestResponseForm';
-import { sithSummary } from '../../domain/multisig/multisigThresholds';
 import {
     defaultMultisigRequestGroupAlias,
     defaultMultisigRequestLocalMember,
     displayMultisigRequestGroupAlias,
-    multisigRequestActionLabel,
     multisigRequestIntent,
-    multisigRequestTitle,
     requiresMultisigJoinLabel,
 } from '../multisig/multisigRequestUi';
-
-const timestampText = (value: string | null): string =>
-    value === null ? 'Not available' : (formatTimestamp(value) ?? value);
-
-const grantStatusTone = (
-    status: CredentialGrantNotification['status']
-): 'neutral' | 'success' | 'warning' | 'error' | 'info' => {
-    if (status === 'error') {
-        return 'error';
-    }
-
-    if (status === 'notForThisWallet') {
-        return 'warning';
-    }
-
-    if (status === 'admitted') {
-        return 'success';
-    }
-
-    return 'info';
-};
-
-const delegationStatusTone = (
-    status: DelegationRequestNotification['status']
-): 'neutral' | 'success' | 'warning' | 'error' | 'info' => {
-    if (status === 'error') {
-        return 'error';
-    }
-
-    if (status === 'notForThisWallet') {
-        return 'warning';
-    }
-
-    if (status === 'approved') {
-        return 'success';
-    }
-
-    return 'info';
-};
-
-const multisigStatusTone = (
-    status: MultisigRequestNotification['status']
-): 'neutral' | 'success' | 'warning' | 'error' | 'info' => {
-    if (status === 'error') {
-        return 'error';
-    }
-
-    if (status === 'notForThisWallet') {
-        return 'warning';
-    }
-
-    if (status === 'approved') {
-        return 'success';
-    }
-
-    return 'info';
-};
+import { NotificationProtocolPanels } from './NotificationProtocolPanels';
 
 /**
  * Route view for one KERIA protocol notification or synthetic challenge item.
@@ -386,449 +315,27 @@ export const NotificationDetailView = () => {
                     </Typography>
                 </Box>
             )}
-            {challengeRequest !== null ? (
-                <ConsolePanel
-                    title="Challenge response"
-                    eyebrow="Responder"
-                    actions={
-                        <StatusPill
-                            label={challengeRequest.status}
-                            tone={
-                                challengeRequest.status === 'actionable'
-                                    ? 'info'
-                                    : challengeRequest.status === 'error'
-                                      ? 'error'
-                                      : challengeRequest.status ===
-                                          'senderUnknown'
-                                        ? 'warning'
-                                        : 'success'
-                            }
-                        />
-                    }
-                >
-                    <Stack spacing={2}>
-                        <Stack spacing={0.5}>
-                            <TelemetryRow
-                                label="From"
-                                value={challengeRequest.senderAlias}
-                            />
-                            <TelemetryRow
-                                label="From AID"
-                                value={challengeRequest.senderAid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Responder AID"
-                                value={
-                                    challengeRequest.recipientAid ??
-                                    'Not available'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Challenge id"
-                                value={challengeRequest.challengeId}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="EXN SAID"
-                                value={challengeRequest.exnSaid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Created"
-                                value={timestampText(
-                                    challengeRequest.createdAt
-                                )}
-                            />
-                        </Stack>
-                        <Divider />
-                        {challengeRequest.status === 'senderUnknown' ? (
-                            <EmptyState
-                                title="Sender is not a contact"
-                                message="Resolve the sender contact before responding to this challenge request."
-                            />
-                        ) : (
-                            <ChallengeRequestResponseForm
-                                request={challengeRequest}
-                                identifiers={identifiers}
-                                action={`/notifications/${encodeURIComponent(
-                                    notification.id
-                                )}`}
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-            ) : credentialGrant !== null ? (
-                <ConsolePanel
-                    title="Credential admit"
-                    eyebrow="Holder"
-                    actions={
-                        <StatusPill
-                            label={credentialGrant.status}
-                            tone={grantStatusTone(credentialGrant.status)}
-                        />
-                    }
-                >
-                    <Stack spacing={2}>
-                        <Stack spacing={0.5}>
-                            <TelemetryRow
-                                label="Issuer AID"
-                                value={credentialGrant.issuerAid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Recipient"
-                                value={grantRecipient?.name ?? 'Not available'}
-                            />
-                            <TelemetryRow
-                                label="Recipient AID"
-                                value={credentialGrant.holderAid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Credential SAID"
-                                value={credentialGrant.credentialSaid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Grant SAID"
-                                value={credentialGrant.grantSaid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Created"
-                                value={timestampText(credentialGrant.createdAt)}
-                            />
-                        </Stack>
-                        <Divider />
-                        <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1}
-                            sx={{
-                                alignItems: { xs: 'stretch', sm: 'center' },
-                            }}
-                        >
-                            <Button
-                                variant="contained"
-                                startIcon={<HowToRegIcon />}
-                                data-testid="credential-notification-detail-admit"
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                                disabled={!canAdmitGrant}
-                                onClick={admitCredentialGrant}
-                            >
-                                Admit credential
-                            </Button>
-                            <Button
-                                component={RouterLink}
-                                to={`/credentials/${encodeURIComponent(
-                                    credentialGrant.holderAid
-                                )}/wallet`}
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                            >
-                                Open wallet
-                            </Button>
-                        </Stack>
-                        {grantRecipient === undefined && (
-                            <EmptyState
-                                title="Recipient identifier unavailable"
-                                message="This grant names a recipient AID that is not loaded as a local identifier in this wallet."
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-            ) : delegationRequest !== null ? (
-                <ConsolePanel
-                    title="Delegation approval"
-                    eyebrow="Delegator"
-                    actions={
-                        <StatusPill
-                            label={delegationRequest.status}
-                            tone={delegationStatusTone(
-                                delegationRequest.status
-                            )}
-                        />
-                    }
-                >
-                    <Stack spacing={2}>
-                        <Stack spacing={0.5}>
-                            <TelemetryRow
-                                label="Delegator"
-                                value={
-                                    delegationApprover?.name ?? 'Not available'
-                                }
-                            />
-                            <TelemetryRow
-                                label="Delegator AID"
-                                value={delegationRequest.delegatorAid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Delegate AID"
-                                value={delegationRequest.delegateAid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Delegate event SAID"
-                                value={delegationRequest.delegateEventSaid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Sequence"
-                                value={delegationRequest.sequence}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Source AID"
-                                value={
-                                    delegationRequest.sourceAid ??
-                                    'Not available'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Anchor i"
-                                value={delegationRequest.anchor.i}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Anchor s"
-                                value={delegationRequest.anchor.s}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Anchor d"
-                                value={delegationRequest.anchor.d}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Requested"
-                                value={timestampText(
-                                    delegationRequest.createdAt
-                                )}
-                            />
-                        </Stack>
-                        <Divider />
-                        <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1}
-                            sx={{
-                                alignItems: { xs: 'stretch', sm: 'center' },
-                            }}
-                        >
-                            <Button
-                                variant="contained"
-                                startIcon={<HowToRegIcon />}
-                                data-testid="delegation-notification-detail-approve"
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                                disabled={!canApproveDelegation}
-                                onClick={approveDelegationRequest}
-                            >
-                                Approve delegation
-                            </Button>
-                        </Stack>
-                        {delegationApprover === undefined && (
-                            <EmptyState
-                                title="Delegator identifier unavailable"
-                                message="This request names a delegator AID that is not loaded as a local identifier in this wallet."
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-            ) : multisigRequest !== null ? (
-                <ConsolePanel
-                    title={multisigRequestTitle(multisigRequest)}
-                    eyebrow="Group"
-                    actions={
-                        <StatusPill
-                            label={multisigRequest.status}
-                            tone={multisigStatusTone(multisigRequest.status)}
-                        />
-                    }
-                >
-                    <Stack spacing={2}>
-                        <Stack spacing={0.5}>
-                            <TelemetryRow
-                                label="Route"
-                                value={multisigRequest.route}
-                            />
-                            <TelemetryRow
-                                label="Group alias"
-                                value={multisigDisplayGroupAlias}
-                            />
-                            <TelemetryRow
-                                label="Group AID"
-                                value={
-                                    multisigRequest.groupAid ??
-                                    'Not available'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Local member"
-                                value={multisigMember?.name ?? 'Not available'}
-                            />
-                            <TelemetryRow
-                                label="Sender AID"
-                                value={
-                                    multisigRequest.senderAid ??
-                                    'Not available'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="EXN SAID"
-                                value={multisigRequest.exnSaid}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Embedded event"
-                                value={
-                                    multisigRequest.embeddedEventType ??
-                                    'Not available'
-                                }
-                            />
-                            <TelemetryRow
-                                label="Responses"
-                                value={`${multisigRequest.progress.completed}/${multisigRequest.progress.total}`}
-                            />
-                            <TelemetryRow
-                                label="Responded"
-                                value={
-                                    multisigRequest.progress.respondedMemberAids
-                                        .join(', ') || 'None'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Waiting"
-                                value={
-                                    multisigRequest.progress.waitingMemberAids
-                                        .join(', ') || 'None'
-                                }
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Signing members"
-                                value={multisigRequest.signingMemberAids.length}
-                            />
-                            <TelemetryRow
-                                label="Rotation members"
-                                value={multisigRequest.rotationMemberAids.length}
-                            />
-                            <TelemetryRow
-                                label="Signing threshold"
-                                value={sithSummary(
-                                    multisigRequest.signingThreshold
-                                )}
-                                mono
-                            />
-                            <TelemetryRow
-                                label="Rotation threshold"
-                                value={sithSummary(
-                                    multisigRequest.rotationThreshold
-                                )}
-                                mono
-                            />
-                            {multisigRequest.embeddedPayloadSummary !== null && (
-                                <TelemetryRow
-                                    label="Payload"
-                                    value={
-                                        multisigRequest.embeddedPayloadSummary
-                                    }
-                                    mono
-                                />
-                            )}
-                            <TelemetryRow
-                                label="Created"
-                                value={timestampText(
-                                    multisigRequest.createdAt
-                                )}
-                            />
-                        </Stack>
-                        <Divider />
-                        <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1}
-                            sx={{
-                                alignItems: { xs: 'stretch', sm: 'center' },
-                            }}
-                        >
-                            {multisigRequiresJoinLabel && (
-                                <TextField
-                                    size="small"
-                                    label="New group label"
-                                    value={multisigGroupAlias}
-                                    helperText="Local label for this wallet after joining."
-                                    onChange={(event) =>
-                                        setMultisigAliasDrafts((current) => ({
-                                            ...current,
-                                            [multisigRequest.notificationId]:
-                                                event.target.value,
-                                        }))
-                                    }
-                                    data-testid="multisig-notification-detail-group-label"
-                                />
-                            )}
-                            <Button
-                                variant="contained"
-                                startIcon={<HowToRegIcon />}
-                                data-testid="multisig-notification-detail-approve"
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                                disabled={!canApproveMultisig}
-                                onClick={approveMultisigRequest}
-                            >
-                                {multisigRequestActionLabel(multisigRequest)}
-                            </Button>
-                            <Button
-                                component={RouterLink}
-                                to="/multisig"
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                            >
-                                Open multisig
-                            </Button>
-                        </Stack>
-                        {multisigMember === undefined && (
-                            <EmptyState
-                                title="Local member unavailable"
-                                message="This request does not name a loaded local member identifier. Open Multisig to review or resolve missing members."
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-            ) : (
-                <ConsolePanel title="Protocol metadata" eyebrow="KERIA">
-                    <Stack spacing={0.5}>
-                        <TelemetryRow
-                            label="Route"
-                            value={notification.route}
-                        />
-                        <TelemetryRow
-                            label="Status"
-                            value={notification.status}
-                        />
-                        <TelemetryRow
-                            label="Read"
-                            value={notification.read ? 'yes' : 'no'}
-                        />
-                        <TelemetryRow
-                            label="Anchor SAID"
-                            value={notification.anchorSaid ?? 'Not available'}
-                            mono
-                        />
-                        <TelemetryRow
-                            label="Updated"
-                            value={timestampText(notification.updatedAt)}
-                        />
-                        {notification.message !== null && (
-                            <TelemetryRow
-                                label="Message"
-                                value={notification.message}
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-            )}
+            <NotificationProtocolPanels
+                notification={notification}
+                challengeRequest={challengeRequest}
+                credentialGrant={credentialGrant}
+                delegationRequest={delegationRequest}
+                multisigRequest={multisigRequest}
+                identifiers={identifiers}
+                grantRecipient={grantRecipient}
+                canAdmitGrant={canAdmitGrant}
+                delegationApprover={delegationApprover}
+                canApproveDelegation={canApproveDelegation}
+                multisigMember={multisigMember}
+                multisigDisplayGroupAlias={multisigDisplayGroupAlias}
+                multisigRequiresJoinLabel={multisigRequiresJoinLabel}
+                multisigGroupAlias={multisigGroupAlias}
+                canApproveMultisig={canApproveMultisig}
+                setMultisigAliasDrafts={setMultisigAliasDrafts}
+                admitCredentialGrant={admitCredentialGrant}
+                approveDelegationRequest={approveDelegationRequest}
+                approveMultisigRequest={approveMultisigRequest}
+            />
         </Box>
     );
 };
