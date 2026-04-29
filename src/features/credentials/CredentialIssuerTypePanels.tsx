@@ -34,6 +34,9 @@ import type { ContactRecord } from '../../state/contacts.slice';
 import type { CredentialRegistryTile } from './credentialViewModels';
 import { statusTone } from './credentialDisplay';
 import { CredentialRecordRows } from './CredentialShared';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
+import type { W3CVerifier } from 'signify-ts';
+import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
 
 /**
  * Registry selection and creation controls for issuer credential-type routes.
@@ -335,13 +338,29 @@ export const IssuedCredentialsForTypePanel = ({
     actionRunning,
     credentialTypesBySchema,
     schemasBySaid,
+    identifiers,
+    didWebsReadyByAid,
+    verifiers,
+    selectedVerifierId,
     onGrant,
+    onVerifierChange,
+    onPresent,
 }: {
     credentials: readonly CredentialSummaryRecord[];
     actionRunning: boolean;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
+    identifiers: readonly IdentifierSummary[];
+    didWebsReadyByAid: ReadonlyMap<string, boolean>;
+    verifiers: readonly W3CVerifier[];
+    selectedVerifierId: string;
     onGrant: (credential: CredentialSummaryRecord) => void;
+    onVerifierChange: (verifierId: string) => void;
+    onPresent: (
+        credential: CredentialSummaryRecord,
+        presenter: IdentifierSummary,
+        verifierId: string
+    ) => void;
 }) => (
     <ConsolePanel
         title="Issued for this type"
@@ -404,6 +423,16 @@ export const IssuedCredentialsForTypePanel = ({
                                     credentialTypesBySchema
                                 }
                                 schemasBySaid={schemasBySaid}
+                            />
+                            <CredentialW3CPresentationControls
+                                credential={credential}
+                                identifiers={identifiers}
+                                didWebsReadyByAid={didWebsReadyByAid}
+                                verifiers={verifiers}
+                                selectedVerifierId={selectedVerifierId}
+                                actionRunning={actionRunning}
+                                onVerifierChange={onVerifierChange}
+                                onPresent={onPresent}
                             />
                         </Stack>
                     </Box>

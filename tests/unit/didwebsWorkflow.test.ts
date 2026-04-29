@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    approvePendingDidWebsAndW3CRequests,
     approvePendingDidWebsRequests,
     approvePendingW3CProjectionRequests,
     consumeDidWebsSignalStream,
@@ -290,5 +291,38 @@ describe('did:webs workflow SSE parsing', () => {
         });
         expect(approver.pollOnce).toHaveBeenCalledTimes(1);
         expect(approver.reconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('continues W3C polling when did:webs polling fails', async () => {
+        const didWebsApprover = {
+            pollOnce: vi.fn(async () => {
+                throw new Error('did:webs polling failed');
+            }),
+            reconcile: vi.fn(),
+        } as unknown as DidWebsAutoApprover;
+        const w3cApprover = {
+            pollOnce: vi.fn(async () => [
+                {
+                    outcome: 'submitted',
+                } satisfies W3CProjectionAutoApproveResult,
+            ]),
+            reconcile: vi.fn(async () => []),
+        } as unknown as W3CProjectionAutoApprover;
+
+        const results = await approvePendingDidWebsAndW3CRequests({
+            approver: didWebsApprover,
+            w3cApprover,
+        });
+
+        expect(results.didWebs.ok).toBe(false);
+        expect(results.w3c).toEqual({
+            ok: true,
+            value: {
+                pollResults: [{ outcome: 'submitted' }],
+                reconciled: 0,
+            },
+        });
+        expect(w3cApprover.pollOnce).toHaveBeenCalledTimes(1);
+        expect(w3cApprover.reconcile).toHaveBeenCalledTimes(1);
     });
 });

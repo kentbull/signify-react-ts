@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialWalletPanels';
 import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
-import { W3C_PRESENTABLE_VRD_SCHEMA_SAID } from '../../src/domain/credentials/credentialPresentation';
+import { IssuedCredentialsForTypePanel } from '../../src/features/credentials/CredentialIssuerTypePanels';
+import {
+    selectCredentialW3CPresenter,
+    W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+} from '../../src/domain/credentials/credentialPresentation';
 import type {
     CredentialSummaryRecord,
     SchemaRecord,
@@ -41,6 +45,23 @@ const schema = {
 } satisfies SchemaRecord;
 
 describe('wallet credential panels', () => {
+    it('prefers holder presenters for held credentials and issuer presenters for issued credentials', () => {
+        const identifiers = [
+            { name: 'issuer', prefix: 'Eissuer' },
+            { name: 'holder', prefix: 'Eholder' },
+        ];
+
+        expect(
+            selectCredentialW3CPresenter(credential, identifiers)?.prefix
+        ).toBe('Eholder');
+        expect(
+            selectCredentialW3CPresenter(
+                { ...credential, direction: 'issued' },
+                identifiers
+            )?.prefix
+        ).toBe('Eissuer');
+    });
+
     it('renders held credential rows as detail navigation targets without inline expansion details', () => {
         const markup = renderToStaticMarkup(
             <HeldCredentialsPanel
@@ -95,7 +116,109 @@ describe('wallet credential panels', () => {
         expect(markup).toContain('Python Isomer');
         expect(markup).toContain('Present');
         expect(markup).toContain(
-            'This wallet does not control the credential issuer AID required for W3C Present.'
+            'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
         );
+    });
+
+    it('uses a local holder as the presenter for held VRD credentials', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CPresentationControls
+                credential={{
+                    ...credential,
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
+                didWebsReadyByAid={new Map([['Eholder', true]])}
+                verifiers={[
+                    {
+                        id: 'isomer-python',
+                        label: 'Python Isomer',
+                        kind: 'isomer-python-vc-jwt',
+                        verifyUrl: 'http://verifier.example/verify',
+                    },
+                ]}
+                selectedVerifierId="isomer-python"
+                actionRunning={false}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Ready to present to Python Isomer.');
+    });
+
+    it('uses a local issuer as the presenter for issued VRD credentials', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CPresentationControls
+                credential={{
+                    ...credential,
+                    direction: 'issued',
+                    status: 'issued',
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', true]])}
+                verifiers={[
+                    {
+                        id: 'isomer-python',
+                        label: 'Python Isomer',
+                        kind: 'isomer-python-vc-jwt',
+                        verifyUrl: 'http://verifier.example/verify',
+                    },
+                ]}
+                selectedVerifierId="isomer-python"
+                actionRunning={false}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Ready to present to Python Isomer.');
+    });
+
+    it('renders W3C Present controls alongside issuer IPEX Grant controls', () => {
+        const markup = renderToStaticMarkup(
+            <IssuedCredentialsForTypePanel
+                credentials={[
+                    {
+                        ...credential,
+                        direction: 'issued',
+                        status: 'issued',
+                        schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                    },
+                ]}
+                actionRunning={false}
+                credentialTypesBySchema={new Map()}
+                schemasBySaid={
+                    new Map([
+                        [
+                            W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                            {
+                                ...schema,
+                                said: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                            },
+                        ],
+                    ])
+                }
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', true]])}
+                verifiers={[
+                    {
+                        id: 'isomer-python',
+                        label: 'Python Isomer',
+                        kind: 'isomer-python-vc-jwt',
+                        verifyUrl: 'http://verifier.example/verify',
+                    },
+                ]}
+                selectedVerifierId="isomer-python"
+                onGrant={vi.fn()}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Grant');
+        expect(markup).toContain('Present');
+        expect(markup).toContain('Python Isomer');
     });
 });

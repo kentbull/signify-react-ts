@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Box,
     Button,
@@ -15,11 +15,13 @@ import {
     type SediVoterIssueFormDraft,
 } from '../../domain/credentials/sediVoterId';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
     selectCredentialRegistries,
     selectCredentialSchemas,
+    selectDidWebsDidsByAid,
     selectIssueableCredentialTypeViews,
     selectIssuedCredentials,
     selectSelectedWalletRegistry,
@@ -38,6 +40,7 @@ import {
     schemaStatusTone,
 } from './credentialDisplay';
 import { useCredentialsRouteContext } from './CredentialsRouteContext';
+import { useAppRuntime } from '../../app/runtimeHooks';
 import {
     CredentialRegistrySelector,
     IssuedCredentialsForTypePanel,
@@ -65,18 +68,25 @@ export const CredentialIssuerTypeRoute = () => {
     const {
         actionRunning,
         selectedIdentifier,
+        identifiers,
         submitResolveSchema,
         submitCredentialForm,
+        w3cVerifiers,
     } = useCredentialsRouteContext();
     const { typeKey } = useParams<{ typeKey?: string }>();
+    const runtime = useAppRuntime();
     const dispatch = useAppDispatch();
     const contacts = useAppSelector(selectContacts);
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
     const schemas = useAppSelector(selectCredentialSchemas);
     const registries = useAppSelector(selectCredentialRegistries);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
+    const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const walletSelectedRegistry = useAppSelector(selectSelectedWalletRegistry);
     const [holderAid, setHolderAid] = useState('');
+    const [selectedVerifierId, setSelectedVerifierId] = useState(
+        w3cVerifiers[0]?.id ?? ''
+    );
     const [registryName, setRegistryName] = useState(
         SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME
     );
@@ -97,6 +107,16 @@ export const CredentialIssuerTypeRoute = () => {
     );
     const schemasBySaid = new Map(
         schemas.map((schema) => [schema.said, schema])
+    );
+    const didWebsReadyByAid = useMemo(
+        () =>
+            new Map(
+                Object.entries(didWebsByAid).map(([aid, did]) => [
+                    aid,
+                    did.loadState === 'ready' && did.did !== null,
+                ])
+            ),
+        [didWebsByAid]
     );
     const resolvedHolderContacts = resolvedCredentialHolderContacts(contacts);
     const activeHolderContact =
@@ -125,6 +145,21 @@ export const CredentialIssuerTypeRoute = () => {
                       registry.registryName ===
                           pendingRegistrySelection.registryName
               ) ?? null);
+    const selectedTypeIssuedCredentials =
+        selectedIdentifier === null || selectedType === null
+            ? []
+            : issuedCredentialsForAidAndSchema(
+                  issuedCredentials,
+                  selectedIdentifier.prefix,
+                  selectedType.schemaSaid
+              );
+    const effectiveVerifierId =
+        w3cVerifiers.find((verifier) => verifier.id === selectedVerifierId)
+            ?.id ??
+        w3cVerifiers[0]?.id ??
+        '';
+    const selectedIdentifierName = selectedIdentifier?.name ?? '';
+    const selectedIdentifierPrefix = selectedIdentifier?.prefix ?? '';
 
     useEffect(() => {
         if (
@@ -134,6 +169,35 @@ export const CredentialIssuerTypeRoute = () => {
             dispatch(walletRegistrySelected({ registryId: pendingRegistry.id }));
         }
     }, [dispatch, pendingRegistry, walletSelectedRegistry?.id]);
+
+    useEffect(() => {
+        if (
+            selectedIdentifierName.length === 0 ||
+            selectedIdentifierPrefix.length === 0 ||
+            selectedTypeIssuedCredentials.length === 0
+        ) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        void runtime.didwebs
+            .refreshIdentifierDid(
+                selectedIdentifierName,
+                selectedIdentifierPrefix,
+                {
+                    signal: controller.signal,
+                    track: false,
+                }
+            )
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [
+        runtime,
+        selectedIdentifierName,
+        selectedIdentifierPrefix,
+        selectedTypeIssuedCredentials.length,
+    ]);
 
     if (selectedIdentifier === null) {
         return null;
@@ -148,14 +212,6 @@ export const CredentialIssuerTypeRoute = () => {
     const selectedRegistry =
         registryTiles.find((tile) => tile.registry.id === effectiveRegistryId)
             ?.registry ?? null;
-    const selectedTypeIssuedCredentials =
-        selectedType === null
-            ? []
-            : issuedCredentialsForAidAndSchema(
-                  issuedCredentials,
-                  selectedIdentifier.prefix,
-                  selectedType.schemaSaid
-              );
     const draftErrors = validateSediVoterIssueDraft(draft);
     const draftHasErrors = hasSediVoterIssueDraftErrors(draftErrors);
     const holderSelectionMessage =
@@ -235,6 +291,24 @@ export const CredentialIssuerTypeRoute = () => {
         formData.set('issuerAid', selectedIdentifier.prefix);
         formData.set('holderAid', credential.holderAid);
         formData.set('credentialSaid', credential.said);
+        submitCredentialForm(formData);
+    };
+
+    const submitPresent = (
+        credential: CredentialSummaryRecord,
+        presenter: IdentifierSummary,
+        verifierId: string
+    ) => {
+        if (verifierId.length === 0) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.set('intent', 'presentCredential');
+        formData.set('presenterAlias', presenter.name);
+        formData.set('presenterAid', presenter.prefix);
+        formData.set('credentialSaid', credential.said);
+        formData.set('verifierId', verifierId);
         submitCredentialForm(formData);
     };
 
@@ -356,7 +430,13 @@ export const CredentialIssuerTypeRoute = () => {
                 actionRunning={actionRunning}
                 credentialTypesBySchema={credentialTypesBySchema}
                 schemasBySaid={schemasBySaid}
+                identifiers={identifiers}
+                didWebsReadyByAid={didWebsReadyByAid}
+                verifiers={w3cVerifiers}
+                selectedVerifierId={effectiveVerifierId}
                 onGrant={submitGrant}
+                onVerifierChange={setSelectedVerifierId}
+                onPresent={submitPresent}
             />
         </Stack>
     );

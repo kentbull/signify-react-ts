@@ -47,8 +47,8 @@ export interface AdmitCredentialGrantInput {
 
 /** Command data for presenting one VRD ACDC through the W3C VC-JWT path. */
 export interface PresentCredentialInput {
-    projectorAlias: string;
-    projectorAid: string;
+    presenterAlias: string;
+    presenterAid: string;
     credentialSaid: string;
     verifierId: string;
 }

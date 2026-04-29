@@ -377,14 +377,14 @@ const presentCredentialAction = ({
 }: CredentialActionContext): CredentialActionData => {
     const intent = 'presentCredential';
     const input: PresentCredentialInput = {
-        projectorAlias: formString(formData, 'projectorAlias').trim(),
-        projectorAid: formString(formData, 'projectorAid').trim(),
+        presenterAlias: formString(formData, 'presenterAlias').trim(),
+        presenterAid: formString(formData, 'presenterAid').trim(),
         credentialSaid: formString(formData, 'credentialSaid').trim(),
         verifierId: formString(formData, 'verifierId').trim(),
     };
     if (
-        input.projectorAlias.length === 0 ||
-        input.projectorAid.length === 0 ||
+        input.presenterAlias.length === 0 ||
+        input.presenterAid.length === 0 ||
         input.credentialSaid.length === 0 ||
         input.verifierId.length === 0
     ) {
@@ -392,7 +392,7 @@ const presentCredentialAction = ({
             intent,
             ok: false,
             message:
-                'Projector identifier, credential, and verifier are required.',
+                'Presenter identifier, credential, and verifier are required.',
             requestId,
         };
     }

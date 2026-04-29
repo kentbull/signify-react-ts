@@ -1390,8 +1390,8 @@ describe('route actions', () => {
                 makeRequest('/credentials', {
                     intent: 'presentCredential',
                     requestId: 'present-credential-request-1',
-                    projectorAlias: 'issuer',
-                    projectorAid: 'Eissuer',
+                    presenterAlias: 'issuer',
+                    presenterAid: 'Eissuer',
                     credentialSaid: 'Ecredential',
                     verifierId: 'isomer-python',
                 })
@@ -1405,8 +1405,8 @@ describe('route actions', () => {
         });
         expect(runtime.credentials.startPresent).toHaveBeenCalledWith(
             {
-                projectorAlias: 'issuer',
-                projectorAid: 'Eissuer',
+                presenterAlias: 'issuer',
+                presenterAid: 'Eissuer',
                 credentialSaid: 'Ecredential',
                 verifierId: 'isomer-python',
             },
@@ -1414,6 +1414,27 @@ describe('route actions', () => {
                 requestId: 'present-credential-request-1',
             })
         );
+    });
+
+    it('rejects W3C credential presentation without a local presenter', async () => {
+        const runtime = makeRuntime();
+
+        await expect(
+            credentialsAction(
+                runtime,
+                makeRequest('/credentials', {
+                    intent: 'presentCredential',
+                    credentialSaid: 'Ecredential',
+                    verifierId: 'isomer-python',
+                })
+            )
+        ).resolves.toMatchObject({
+            intent: 'presentCredential',
+            ok: false,
+            message:
+                'Presenter identifier, credential, and verifier are required.',
+        });
+        expect(runtime.credentials.startPresent).not.toHaveBeenCalled();
     });
 
     it('rejects malformed challenge word submissions', async () => {
