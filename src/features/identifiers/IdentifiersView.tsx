@@ -31,6 +31,7 @@ import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectActiveOperations,
     selectContacts,
+    selectDidWebsStatusByAid,
     selectIdentifiers,
 } from '../../state/selectors';
 import { walletAidSelected } from '../../state/walletSelection.slice';
@@ -107,6 +108,9 @@ export const IdentifiersView = () => {
             : (identifiers.find(
                   (identifier) => identifier.name === selectedIdentifierName
               ) ?? null);
+    const selectedDidWebsStatus = useAppSelector(
+        selectDidWebsStatusByAid(selectedIdentifier?.prefix)
+    );
 
     useEffect(() => {
         if (selectedIdentifierName === null) {
@@ -129,36 +133,72 @@ export const IdentifiersView = () => {
                 }
 
                 setDetailRefresh({ status: 'success', message: null });
-
-                const chain = await runtime.identifiers.getDelegationChain(
-                    refreshed.name,
-                    {
+                void runtime.didwebs
+                    .refreshIdentifierDid(refreshed.name, refreshed.prefix, {
                         signal: controller.signal,
                         track: false,
+                    })
+                    .catch(() => undefined);
+
+                try {
+                    const chain = await runtime.identifiers.getDelegationChain(
+                        refreshed.name,
+                        {
+                            signal: controller.signal,
+                            track: false,
+                        }
+                    );
+                    if (!controller.signal.aborted) {
+                        setDelegationChain({
+                            status: 'success',
+                            message: null,
+                            nodes: chain,
+                        });
                     }
-                );
-                if (!controller.signal.aborted) {
+                } catch (error: unknown) {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     setDelegationChain({
-                        status: 'success',
-                        message: null,
-                        nodes: chain,
+                        status: 'error',
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        nodes: [],
                     });
                 }
 
-                const roles = identifierAvailableOobiRoles(refreshed);
-                const records = await runtime.contacts.listIdentifierOobis(
-                    refreshed.name,
-                    roles,
-                    {
-                        signal: controller.signal,
-                        track: false,
+                try {
+                    const roles = identifierAvailableOobiRoles(refreshed);
+                    const records = await runtime.contacts.listIdentifierOobis(
+                        refreshed.name,
+                        roles,
+                        {
+                            signal: controller.signal,
+                            track: false,
+                        }
+                    );
+                    if (!controller.signal.aborted) {
+                        setDetailOobis({
+                            status: 'success',
+                            message: null,
+                            records,
+                        });
                     }
-                );
-                if (!controller.signal.aborted) {
+                } catch (error: unknown) {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     setDetailOobis({
-                        status: 'success',
-                        message: null,
-                        records,
+                        status: 'error',
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        records: [],
                     });
                 }
             } catch (error: unknown) {
@@ -449,6 +489,7 @@ export const IdentifiersView = () => {
                 refreshMessage={detailRefresh.message}
                 oobiState={detailOobis}
                 delegationChain={delegationChain}
+                didWebsStatus={selectedDidWebsStatus}
                 actionRunning={
                     selectedIdentifierName === null
                         ? false

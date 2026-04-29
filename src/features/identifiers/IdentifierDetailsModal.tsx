@@ -21,6 +21,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import type { GeneratedOobiRecord } from '../../state/contacts.slice';
+import type { DidWebsStatusRecord } from '../../state/didwebs.slice';
+import { DidWebsPublicationDetails } from '../didwebs/DidWebsPublicationDetails';
 import type {
     IdentifierDelegationChainNode,
     IdentifierDelegationChainState,
@@ -48,6 +50,7 @@ export interface IdentifierDetailsModalProps {
     refreshMessage: string | null;
     oobiState: IdentifierOobiDetailState;
     delegationChain: IdentifierDelegationChainState;
+    didWebsStatus: DidWebsStatusRecord | null;
     actionRunning: boolean;
     authorizeAgentRunning: boolean;
     onClose: () => void;
@@ -238,6 +241,7 @@ export const IdentifierDetailsModal = ({
     refreshMessage,
     oobiState,
     delegationChain,
+    didWebsStatus,
     actionRunning,
     authorizeAgentRunning,
     onClose,
@@ -419,6 +423,17 @@ export const IdentifierDetailsModal = ({
                         </AccordionSummary>
                         <AccordionDetails>
                             <IdentifierOobis state={oobiState} />
+                        </AccordionDetails>
+                    </Accordion>
+                    <Accordion disableGutters defaultExpanded>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography>did:webs Publication</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <DidWebsPublicationDetails
+                                record={didWebsStatus}
+                                testIdPrefix="identifier"
+                            />
                         </AccordionDetails>
                     </Accordion>
                     {identifier !== null && (

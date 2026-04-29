@@ -13,6 +13,9 @@ export const loadDashboard = async (
     }
 
     try {
+        await runtime
+            .refreshState({ signal: request?.signal })
+            .catch(() => null);
         await runtime.identifiers.list({ signal: request?.signal });
         await Promise.all([
             runtime.contacts.syncInventory({ signal: request?.signal }),

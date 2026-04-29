@@ -9,6 +9,7 @@ import {
     deleteContactService,
     generateIdentifierOobiService,
     listContactsService,
+    readIdentifierOobiService,
     resolveContactOobiService,
     updateContactAliasService,
     type ContactInventorySnapshot,
@@ -40,6 +41,14 @@ import type { ChallengeRecord } from '../domain/challenges/challengeTypes';
 export interface GenerateOobiInput {
     identifier: string;
     role: OobiRole;
+}
+
+/**
+ * Workflow command for reading currently available identifier OOBIs.
+ */
+export interface ListIdentifierOobisInput {
+    identifier: string;
+    roles: readonly OobiRole[];
 }
 
 /**
@@ -275,6 +284,29 @@ export function* generateOobiOp(
 
     services.store.dispatch(generatedOobiRecorded(record));
     return record;
+}
+
+/**
+ * Read available local identifier OOBIs without creating endpoint roles.
+ */
+export function* listIdentifierOobisOp({
+    identifier,
+    roles,
+}: ListIdentifierOobisInput): EffectionOperation<GeneratedOobiRecord[]> {
+    const services = yield* AppServicesContext.expect();
+    const records: GeneratedOobiRecord[] = [];
+    for (const role of roles) {
+        const record = yield* readIdentifierOobiService({
+            client: services.runtime.requireConnectedClient(),
+            identifier,
+            role,
+        });
+        if (record !== null) {
+            records.push(record);
+        }
+    }
+
+    return records;
 }
 
 /**

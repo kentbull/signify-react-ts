@@ -122,6 +122,39 @@ export function* generateIdentifierOobiService({
 }
 
 /**
+ * Read any currently available OOBIs for a local identifier role.
+ *
+ * Unlike `generateIdentifierOobiService`, this is intentionally read-only: it
+ * never creates endpoint-role authorizations and treats missing OOBIs as normal
+ * unavailable state.
+ */
+export function* readIdentifierOobiService({
+    client,
+    identifier,
+    role,
+}: {
+    client: SignifyClient;
+    identifier: string;
+    role: OobiRole;
+}): EffectionOperation<GeneratedOobiRecord | null> {
+    const result = yield* callPromise(() =>
+        client.oobis().get(identifier, role)
+    );
+    const oobis = result.oobis.filter((oobi) => oobi.trim().length > 0);
+    if (oobis.length === 0) {
+        return null;
+    }
+
+    return {
+        id: `${identifier}:${role}`,
+        identifier,
+        role,
+        oobis,
+        generatedAt: new Date().toISOString(),
+    };
+}
+
+/**
  * Resolve one OOBI through KERIA, then preserve alias/source URL metadata and
  * prove the resulting contact can be loaded before reporting success.
  */

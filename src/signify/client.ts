@@ -22,6 +22,7 @@ interface SignifyState {
   controller: {
     state: KeyState;
   };
+  dws: string | null;
   ridx: number | null;
   pidx: number;
 }
@@ -46,6 +47,7 @@ export interface SignifyClientConfig extends Partial<KeriaConfig> {
 export interface SignifyStateSummary {
   controllerPre: string;
   agentPre: string;
+  agentDws: string | null;
   ridx: number;
   pidx: number;
   state: SignifyState;
@@ -259,6 +261,7 @@ export const getSignifyState = async (
     controller: {
       state: controllerState,
     },
+    dws: typeof rawState.dws === 'string' ? rawState.dws : null,
     ridx: rawState.ridx ?? null,
     pidx: rawState.pidx,
   };
@@ -268,6 +271,7 @@ export const getSignifyState = async (
   return {
     controllerPre,
     agentPre,
+    agentDws: state.dws,
     ridx: state.ridx ?? 0,
     pidx: state.pidx ?? 0,
     state,

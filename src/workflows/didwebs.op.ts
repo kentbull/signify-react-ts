@@ -7,6 +7,7 @@ import {
 } from 'effection';
 import {
     DidWebsAutoApprover,
+    DWS_SIGNING_ROUTE,
     type DidWebsAutoApproveResult,
     type SignifyClient,
     type SignedReplyEnvelope,
@@ -14,8 +15,33 @@ import {
 import { callPromise, toErrorText } from '../effects/promise';
 import { AppServicesContext, type AppServices } from '../effects/contexts';
 import { appNotificationRecorded } from '../state/appNotifications.slice';
+import {
+    didWebsDidFailed,
+    didWebsDidLoaded,
+    didWebsDidLoading,
+    didWebsPendingObserved,
+    didWebsReadyObserved,
+} from '../state/didwebs.slice';
 
 const minimumDidWebsPollingMs = 7000;
+const DWS_READY_ROUTE = '/didwebs/ready';
+
+/** Verified did:webs signal payload observed from the generic agent stream. */
+export interface ObservedDidWebsSignal {
+    route: string;
+    payload: Record<string, unknown>;
+    envelope: SignedReplyEnvelope;
+}
+
+export type DidWebsSignalObserver = (
+    signal: ObservedDidWebsSignal
+) => void | Promise<void>;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+const stringValue = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
 /**
  * Incremental parser for JSON-valued Server-Sent Event frames.
@@ -113,10 +139,12 @@ export const consumeDidWebsSignalStream = async ({
     client,
     approver,
     signal,
+    observer,
 }: {
     client: SignifyClient;
     approver: DidWebsAutoApprover;
     signal: AbortSignal;
+    observer?: DidWebsSignalObserver;
 }): Promise<void> => {
     const response = await client.signals().stream();
     if (response.body === null) {
@@ -147,19 +175,60 @@ export const consumeDidWebsSignalStream = async ({
             const chunk = decoder.decode(value, { stream: true });
             for (const envelope of parser.push(chunk)) {
                 await approver.handleEnvelope(envelope);
+                await observeDidWebsSignal(client, envelope, observer);
             }
         }
 
         const finalChunk = decoder.decode();
         for (const envelope of parser.push(finalChunk)) {
             await approver.handleEnvelope(envelope);
+            await observeDidWebsSignal(client, envelope, observer);
         }
         for (const envelope of parser.finish()) {
             await approver.handleEnvelope(envelope);
+            await observeDidWebsSignal(client, envelope, observer);
         }
     } finally {
         signal.removeEventListener('abort', cancelReader);
         reader.releaseLock();
+    }
+};
+
+const observeDidWebsSignal = async (
+    client: SignifyClient,
+    envelope: SignedReplyEnvelope,
+    observer: DidWebsSignalObserver | undefined
+): Promise<void> => {
+    if (observer === undefined || !isRecord(envelope.rpy)) {
+        return;
+    }
+
+    const route = stringValue(envelope.rpy.r);
+    if (route !== DWS_SIGNING_ROUTE && route !== DWS_READY_ROUTE) {
+        return;
+    }
+
+    if (
+        !client.signals().verifyReplyEnvelope(envelope, {
+            route,
+        })
+    ) {
+        return;
+    }
+
+    const payload = isRecord(envelope.rpy.a) ? envelope.rpy.a : null;
+    if (payload === null) {
+        return;
+    }
+
+    try {
+        await observer({
+            route,
+            payload,
+            envelope,
+        });
+    } catch {
+        // Status projection must not interrupt did:webs auto-approval.
     }
 };
 
@@ -181,6 +250,50 @@ export const approvePendingDidWebsRequests = async (
 };
 
 /**
+ * Refresh one managed identifier did:webs DID into Redux.
+ */
+export function* refreshIdentifierDidWebsOp({
+    name,
+    aid,
+}: {
+    name: string;
+    aid: string;
+}): EffectionOperation<string | null> {
+    const services = yield* AppServicesContext.expect();
+    const updatedAt = new Date().toISOString();
+    services.store.dispatch(
+        didWebsDidLoading({
+            aid,
+            updatedAt,
+        })
+    );
+
+    try {
+        const did = yield* callPromise(() =>
+            services.runtime.requireConnectedClient().identifiers().dws(name)
+        );
+        const completedAt = new Date().toISOString();
+        services.store.dispatch(
+            didWebsDidLoaded({
+                aid,
+                did,
+                updatedAt: completedAt,
+            })
+        );
+        return did;
+    } catch (error) {
+        services.store.dispatch(
+            didWebsDidFailed({
+                aid,
+                error: toErrorText(error),
+                updatedAt: new Date().toISOString(),
+            })
+        );
+        return null;
+    }
+}
+
+/**
  * Session-scoped did:webs publication auto-approval coordinator.
  *
  * SSE is the low-latency path. Polling and reconcile are kept running as the
@@ -192,13 +305,49 @@ export function* liveDidWebsPublicationOp(): EffectionOperation<void> {
     const client = services.runtime.requireConnectedClient();
     const approver = new DidWebsAutoApprover(client);
 
-    yield* spawn(() => didWebsSignalLoop(approver));
+    yield* spawn(() =>
+        didWebsSignalLoop(approver, didWebsSignalObserver(services))
+    );
     yield* spawn(() => didWebsPollingLoop(approver));
     yield* suspend();
 }
 
+const didWebsSignalObserver =
+    (services: AppServices): DidWebsSignalObserver =>
+    ({ route, payload }) => {
+        const updatedAt = new Date().toISOString();
+        const aid = stringValue(payload.aid);
+        if (aid === null) {
+            return;
+        }
+
+        if (route === DWS_READY_ROUTE) {
+            const did = stringValue(payload.did);
+            if (did === null) {
+                return;
+            }
+
+            services.store.dispatch(
+                didWebsReadyObserved({
+                    aid,
+                    did,
+                    updatedAt,
+                })
+            );
+            return;
+        }
+
+        services.store.dispatch(
+            didWebsPendingObserved({
+                aid,
+                updatedAt,
+            })
+        );
+    };
+
 function* didWebsSignalLoop(
-    approver: DidWebsAutoApprover
+    approver: DidWebsAutoApprover,
+    observer: DidWebsSignalObserver
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
     const signal = yield* effectionAbortSignal();
@@ -212,6 +361,7 @@ function* didWebsSignalLoop(
                     client: services.runtime.requireConnectedClient(),
                     approver,
                     signal,
+                    observer,
                 })
             );
             consecutiveFailures = 0;
@@ -278,8 +428,7 @@ const isOptionalDidWebsEndpointUnavailable = (error: unknown): boolean => {
     return (
         message.includes('HTTP GET /signals/stream - 404') ||
         (message.includes('HTTP GET /didwebs/signing/requests') &&
-            message.includes('404 Not Found')) ||
-        (message.includes('did:webs') && message.includes('404 Not Found'))
+            message.includes('404 Not Found'))
     );
 };
 

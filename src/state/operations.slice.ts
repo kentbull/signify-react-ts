@@ -19,6 +19,7 @@ export type OperationKind =
     | 'connect'
     | 'generatePasscode'
     | 'refreshState'
+    | 'refreshDidWebsDid'
     | 'listIdentifiers'
     | 'createIdentifier'
     | 'rotateIdentifier'
