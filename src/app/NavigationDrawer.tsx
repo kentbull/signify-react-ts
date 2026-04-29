@@ -87,7 +87,7 @@ const navButtonSx = (active: boolean) => ({
 });
 
 const LOCAL_STATE_CLEAR_CONFIRMATION =
-    'Clear all saved local app state for every identifier? This removes operation history, app notifications, and dismissed exchange records stored in this browser.';
+    'Clear all saved local app state for every identifier? This removes operation history, app notifications, dismissed exchange records, and the saved selected identifier stored in this browser.';
 
 const ClearLocalStateIcon = () => (
     <ListItemIcon

@@ -365,6 +365,11 @@ describe('credential service helpers', () => {
                                         eligible: true,
                                         expires: '2026-12-31T23:59:59Z',
                                     },
+                                    e: {
+                                        source: {
+                                            n: 'EsourceCredential',
+                                        },
+                                    },
                                 },
                                 schema: {
                                     $id: 'Eschema',
@@ -373,6 +378,28 @@ describe('credential service helpers', () => {
                                     credentialType: 'VRDCredential',
                                     version: '1.0.0',
                                 },
+                                chains: [
+                                    {
+                                        sad: {
+                                            d: 'EsourceCredential',
+                                            s: 'EsourceSchema',
+                                            i: 'EsourceIssuer',
+                                            a: {
+                                                i: 'EsourceSubject',
+                                                LEI: '5493001KJTIIGC8Y1R12',
+                                            },
+                                        },
+                                        schema: {
+                                            $id: 'EsourceSchema',
+                                            title: 'Legal Entity vLEI Credential',
+                                            description: 'LE credential',
+                                            credentialType:
+                                                'LegalEntityvLEICredential',
+                                            version: '1.0.0',
+                                        },
+                                        status: { et: 'iss' },
+                                    },
+                                ],
                             },
                         ];
                     }
@@ -432,7 +459,42 @@ describe('credential service helpers', () => {
                     title: 'Verifiable Reference Data (VRD) Credential',
                     credentialType: 'VRDCredential',
                 }),
+                expect.objectContaining({
+                    said: 'EsourceSchema',
+                    title: 'Legal Entity vLEI Credential',
+                    credentialType: 'LegalEntityvLEICredential',
+                }),
             ]);
+            expect(inventory.acdcs).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        said: 'EissuedCredential',
+                        edges: [
+                            expect.objectContaining({
+                                label: 'source',
+                                said: 'EsourceCredential',
+                            }),
+                        ],
+                    }),
+                    expect.objectContaining({
+                        said: 'EsourceCredential',
+                        issuerAid: 'EsourceIssuer',
+                    }),
+                ])
+            );
+            expect(inventory.chainGraphs).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        rootSaid: 'EissuedCredential',
+                        nodes: expect.arrayContaining([
+                            expect.objectContaining({
+                                said: 'EsourceCredential',
+                                unresolved: false,
+                            }),
+                        ]),
+                    }),
+                ])
+            );
         } finally {
             await runtime.destroy();
         }

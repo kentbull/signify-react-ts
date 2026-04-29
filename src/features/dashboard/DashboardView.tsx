@@ -11,6 +11,9 @@ import type { DashboardLoaderData } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
+    selectCredentialAcdcsBySaid,
+    selectCredentialAcdc,
+    selectCredentialChainGraph,
     selectCredentialIpexActivity,
     selectCredentialRegistries,
     selectDashboardCounts,
@@ -67,6 +70,13 @@ export const DashboardView = () => {
     const selectedCredentialExchangeActivities = useAppSelector(
         selectCredentialIpexActivity(credentialSaid)
     );
+    const selectedCredentialAcdc = useAppSelector(
+        selectCredentialAcdc(credentialSaid)
+    );
+    const selectedCredentialChainGraph = useAppSelector(
+        selectCredentialChainGraph(credentialSaid)
+    );
+    const credentialAcdcsBySaid = useAppSelector(selectCredentialAcdcsBySaid);
     const registries = useAppSelector(selectCredentialRegistries);
     const contacts = useAppSelector(selectContacts);
     const identifiers = useAppSelector(selectIdentifiers);
@@ -175,6 +185,10 @@ export const DashboardView = () => {
                 registriesById={registriesById}
                 aidAliases={aidAliases}
                 activity={selectedCredentialActivity}
+                acdc={selectedCredentialAcdc}
+                chainGraph={selectedCredentialChainGraph}
+                acdcsBySaid={credentialAcdcsBySaid}
+                schemasBySaid={schemasBySaid}
             />
         );
     }

@@ -66,7 +66,7 @@ export const CredentialsView = () => {
     const identifiers = useAppSelector(selectIdentifiers);
     const walletSelectedAid = useAppSelector(selectSelectedWalletAid);
     const actionRunning = fetcher.state !== 'idle';
-    const selectedAid = aidParam ?? '';
+    const selectedAid = aidParam ?? walletSelectedAid ?? '';
     const selectedIdentifier =
         identifiers.find((identifier) => identifier.prefix === selectedAid) ??
         null;
@@ -74,13 +74,20 @@ export const CredentialsView = () => {
         loaderData.status === 'ready' ? loaderData.verifiers : [];
 
     useEffect(() => {
+        if (aidParam === undefined && walletSelectedAid !== null) {
+            navigate(credentialPath(walletSelectedAid), { replace: true });
+        }
+    }, [aidParam, navigate, walletSelectedAid]);
+
+    useEffect(() => {
         if (
+            aidParam !== undefined &&
             selectedIdentifier !== null &&
             walletSelectedAid !== selectedIdentifier.prefix
         ) {
             dispatch(walletAidSelected({ aid: selectedIdentifier.prefix }));
         }
-    }, [dispatch, selectedIdentifier, walletSelectedAid]);
+    }, [aidParam, dispatch, selectedIdentifier, walletSelectedAid]);
 
     useEffect(() => {
         if (selectedIdentifier === null) {

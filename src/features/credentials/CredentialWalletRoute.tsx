@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
@@ -17,6 +17,7 @@ import {
 } from './credentialViewModels';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import { credentialPath } from './credentialDisplay';
+import { credentialDetailPath } from '../dashboard/dashboardViewModels';
 import { useCredentialsRouteContext } from './CredentialsRouteContext';
 import {
     HeldCredentialsPanel,
@@ -29,9 +30,10 @@ import {
  * Wallet route for one selected local AID.
  *
  * This route owns holder-side schema readiness, inbound grant admission, and
- * held credential expansion state.
+ * held credential presentation/project actions.
  */
 export const CredentialWalletRoute = () => {
+    const navigate = useNavigate();
     const {
         actionRunning,
         selectedIdentifier,
@@ -46,7 +48,6 @@ export const CredentialWalletRoute = () => {
     const didWebsDid = useAppSelector(
         selectDidWebsDidByAid(selectedIdentifier?.prefix)
     );
-    const [expandedCredentialSaid, setExpandedCredentialSaid] = useState('');
     const [selectedVerifierId, setSelectedVerifierId] = useState(
         w3cVerifiers[0]?.id ?? ''
     );
@@ -95,10 +96,8 @@ export const CredentialWalletRoute = () => {
         submitCredentialForm(formData);
     };
 
-    const toggleHeldCredential = (credentialSaid: string) => {
-        setExpandedCredentialSaid((current) =>
-            current === credentialSaid ? '' : credentialSaid
-        );
+    const openHeldCredential = (credentialSaid: string) => {
+        navigate(credentialDetailPath(credentialSaid));
     };
 
     const submitProject = (credential: CredentialSummaryRecord) => {
@@ -147,7 +146,6 @@ export const CredentialWalletRoute = () => {
             />
             <HeldCredentialsPanel
                 credentials={selectedAidHeldCredentials}
-                expandedCredentialSaid={expandedCredentialSaid}
                 credentialTypesBySchema={credentialTypesBySchema}
                 schemasBySaid={schemasBySaid}
                 verifiers={w3cVerifiers}
@@ -157,7 +155,7 @@ export const CredentialWalletRoute = () => {
                     didWebsDid.did !== null
                 }
                 actionRunning={actionRunning}
-                onToggleCredential={toggleHeldCredential}
+                onOpenCredential={openHeldCredential}
                 onVerifierChange={setSelectedVerifierId}
                 onProject={submitProject}
             />

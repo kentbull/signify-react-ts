@@ -258,7 +258,13 @@ export function* syncCredentialInventoryOp(): EffectionOperation<
     }
 
     const credentials = inventory.credentials;
-    services.store.dispatch(credentialInventoryLoaded({ credentials }));
+    services.store.dispatch(
+        credentialInventoryLoaded({
+            credentials,
+            acdcs: inventory.acdcs,
+            chainGraphs: inventory.chainGraphs,
+        })
+    );
     return credentials;
 }
 

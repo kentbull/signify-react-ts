@@ -1,7 +1,6 @@
 import {
     Box,
     Button,
-    Collapse,
     FormControl,
     InputLabel,
     MenuItem,
@@ -28,7 +27,6 @@ import {
     schemaStatusTone,
     statusTone,
 } from './credentialDisplay';
-import { CredentialRecordRows } from './CredentialShared';
 
 /**
  * Holder-side credential type readiness panel.
@@ -271,30 +269,29 @@ export const InboundGrantsPanel = ({
 );
 
 /**
- * Holder-side admitted credential list with local expansion state owned by the route.
+ * Holder-side admitted credential list. Rows navigate to the full dashboard
+ * credential detail route; the Project action remains a row-local command.
  */
 export const HeldCredentialsPanel = ({
     credentials,
-    expandedCredentialSaid,
     credentialTypesBySchema,
     schemasBySaid,
     verifiers,
     selectedVerifierId,
     didWebsReady,
     actionRunning,
-    onToggleCredential,
+    onOpenCredential,
     onVerifierChange,
     onProject,
 }: {
     credentials: readonly CredentialSummaryRecord[];
-    expandedCredentialSaid: string;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     verifiers: readonly W3CVerifier[];
     selectedVerifierId: string;
     didWebsReady: boolean;
     actionRunning: boolean;
-    onToggleCredential: (credentialSaid: string) => void;
+    onOpenCredential: (credentialSaid: string) => void;
     onVerifierChange: (verifierId: string) => void;
     onProject: (credential: CredentialSummaryRecord) => void;
 }) => (
@@ -336,7 +333,6 @@ export const HeldCredentialsPanel = ({
         ) : (
             <Stack spacing={1.5}>
                 {credentials.map((credential) => {
-                    const expanded = expandedCredentialSaid === credential.said;
                     const isProjectable =
                         credential.status === 'admitted' &&
                         credential.schemaSaid !== null &&
@@ -353,22 +349,20 @@ export const HeldCredentialsPanel = ({
                             key={credential.said}
                             role="button"
                             tabIndex={0}
-                            onClick={() => onToggleCredential(credential.said)}
+                            onClick={() => onOpenCredential(credential.said)}
                             onKeyDown={(event) => {
                                 if (
                                     event.key === 'Enter' ||
                                     event.key === ' '
                                 ) {
                                     event.preventDefault();
-                                    onToggleCredential(credential.said);
+                                    onOpenCredential(credential.said);
                                 }
                             }}
                             sx={[
                                 {
                                     border: 1,
-                                    borderColor: expanded
-                                        ? 'primary.main'
-                                        : 'divider',
+                                    borderColor: 'divider',
                                     borderRadius: 1,
                                     p: 1.5,
                                     bgcolor: 'rgba(13, 23, 34, 0.72)',
@@ -408,6 +402,9 @@ export const HeldCredentialsPanel = ({
                                                 event.stopPropagation();
                                                 onProject(credential);
                                             }}
+                                            onKeyDown={(event) => {
+                                                event.stopPropagation();
+                                            }}
                                         >
                                             Project
                                         </Button>
@@ -416,17 +413,6 @@ export const HeldCredentialsPanel = ({
                                 <Typography variant="body2" sx={monoValueSx}>
                                     {abbreviateMiddle(credential.said, 28)}
                                 </Typography>
-                                <Collapse in={expanded}>
-                                    <Box sx={{ pt: 1 }}>
-                                        <CredentialRecordRows
-                                            credential={credential}
-                                            credentialTypesBySchema={
-                                                credentialTypesBySchema
-                                            }
-                                            schemasBySaid={schemasBySaid}
-                                        />
-                                    </Box>
-                                </Collapse>
                             </Stack>
                         </Box>
                     );

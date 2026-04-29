@@ -1,7 +1,11 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Box,
     Button,
+    Divider,
     List,
     ListItem,
     ListItemText,
@@ -14,16 +18,25 @@ import {
     TableRow,
     Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Link as RouterLink } from 'react-router-dom';
 import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
 import type {
+    CredentialAcdcRecord,
+    CredentialChainGraphRecord,
+    CredentialChainGraphNodeRecord,
     CredentialSummaryRecord,
     RegistryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
+import {
+    credentialGraphNodeLabel,
+    credentialRulesRows,
+    credentialSubjectDataRows,
+} from './credentialAcdcDisplay';
 import { schemaRuleViews } from './schemaRules';
 import type { AidAliases, CredentialActivityEntry } from './dashboardViewModels';
 import {
@@ -44,6 +57,37 @@ import {
     schemaTitle,
     timestampText,
 } from './dashboardDisplay';
+
+const RulesAccordion = ({
+    title,
+    count,
+    children,
+}: {
+    title: string;
+    count: number;
+    children: ReactNode;
+}) => (
+    <Accordion
+        disableGutters
+        elevation={0}
+        sx={{
+            border: 1,
+            borderColor: 'divider',
+            bgcolor: 'transparent',
+            '&:before': { display: 'none' },
+        }}
+    >
+        <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            aria-controls={`${title.replaceAll(' ', '-').toLowerCase()}-content`}
+        >
+            <Typography variant="subtitle2">
+                {title} ({count})
+            </Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0 }}>{children}</AccordionDetails>
+    </Accordion>
+);
 
 /**
  * Detail page for resolved credential schemas on the dashboard.
@@ -482,24 +526,403 @@ const CredentialActivityPill = ({
 /**
  * Domain data rows displayed only when the credential carries known attributes.
  */
-const credentialDataRows = (
+const curatedCredentialDataRows = (
     credential: CredentialSummaryRecord
-): Array<{ label: string; value: ReactNode }> => {
+): Array<{ name: string; label: string; value: ReactNode }> => {
     if (credential.attributes === null) {
         return [];
     }
 
     return [
-        { label: 'Subject AID', value: credential.attributes.i },
-        { label: 'Full name', value: credential.attributes.fullName },
-        { label: 'Voter ID', value: credential.attributes.voterId },
-        { label: 'Precinct ID', value: credential.attributes.precinctId },
-        { label: 'County', value: credential.attributes.county },
-        { label: 'Jurisdiction', value: credential.attributes.jurisdiction },
-        { label: 'Election ID', value: credential.attributes.electionId },
-        { label: 'Eligible', value: credential.attributes.eligible ? 'Yes' : 'No' },
-        { label: 'Expires', value: credential.attributes.expires },
+        { name: 'i', label: 'Subject AID', value: credential.attributes.i },
+        { name: 'fullName', label: 'Full name', value: credential.attributes.fullName },
+        { name: 'voterId', label: 'Voter ID', value: credential.attributes.voterId },
+        { name: 'precinctId', label: 'Precinct ID', value: credential.attributes.precinctId },
+        { name: 'county', label: 'County', value: credential.attributes.county },
+        { name: 'jurisdiction', label: 'Jurisdiction', value: credential.attributes.jurisdiction },
+        { name: 'electionId', label: 'Election ID', value: credential.attributes.electionId },
+        { name: 'eligible', label: 'Eligible', value: credential.attributes.eligible ? 'Yes' : 'No' },
+        { name: 'expires', label: 'Expires', value: credential.attributes.expires },
     ];
+};
+
+const credentialDataRows = (
+    credential: CredentialSummaryRecord,
+    acdc: CredentialAcdcRecord | null,
+    schema: SchemaRecord | null
+): Array<{
+    name: string;
+    label: string;
+    value: ReactNode;
+    description?: string | null;
+}> => {
+    const curated = curatedCredentialDataRows(credential);
+    if (curated.length > 0) {
+        return curated;
+    }
+
+    return credentialSubjectDataRows(acdc, schema).map((row) => ({
+        name: row.name,
+        label: row.label,
+        value: row.value,
+        description: row.description,
+    }));
+};
+
+const graphNodeSize = { width: 190, height: 74 };
+
+const graphNodeSx = ({
+    selected,
+    unresolved,
+}: {
+    selected: boolean;
+    unresolved: boolean;
+}) => ({
+    position: 'absolute',
+    width: graphNodeSize.width,
+    minHeight: graphNodeSize.height,
+    p: 1,
+    borderRadius: 1,
+    border: 1,
+    borderStyle: unresolved ? 'dashed' : 'solid',
+    borderColor: selected ? 'primary.main' : 'divider',
+    bgcolor: selected ? 'rgba(110, 231, 255, 0.12)' : 'background.paper',
+    color: 'text.primary',
+    cursor: 'pointer',
+    textAlign: 'left',
+    '&:hover': {
+        borderColor: 'primary.main',
+        bgcolor: 'rgba(110, 231, 255, 0.08)',
+    },
+});
+
+const graphLayout = (graph: CredentialChainGraphRecord) => {
+    const nodesByDepth = new Map<number, CredentialChainGraphNodeRecord[]>();
+    for (const node of graph.nodes) {
+        nodesByDepth.set(node.depth, [...(nodesByDepth.get(node.depth) ?? []), node]);
+    }
+
+    const maxDepth = Math.max(0, ...graph.nodes.map((node) => node.depth));
+    const maxRows = Math.max(1, ...Array.from(nodesByDepth.values()).map((nodes) => nodes.length));
+    const columnGap = 250;
+    const rowGap = 120;
+    const margin = 32;
+    const width = Math.max(560, margin * 2 + graphNodeSize.width + maxDepth * columnGap);
+    const height = Math.max(180, margin * 2 + graphNodeSize.height + (maxRows - 1) * rowGap);
+    const positions = new Map<string, { x: number; y: number }>();
+
+    for (const [depth, nodes] of nodesByDepth) {
+        const x = margin + (maxDepth - depth) * columnGap;
+        const groupHeight = graphNodeSize.height + (nodes.length - 1) * rowGap;
+        const startY = Math.max(margin, (height - groupHeight) / 2);
+        nodes
+            .slice()
+            .sort((left, right) => left.said.localeCompare(right.said))
+            .forEach((node, index) => {
+                positions.set(node.said, { x, y: startY + index * rowGap });
+            });
+    }
+
+    return { width, height, positions };
+};
+
+const CredentialNodeFacts = ({
+    node,
+    acdc,
+    schema,
+    aidAliases,
+}: {
+    node: CredentialChainGraphNodeRecord;
+    acdc: CredentialAcdcRecord | null;
+    schema: SchemaRecord | null;
+    aidAliases: AidAliases;
+}) => {
+    const subjectRows = credentialSubjectDataRows(acdc, schema);
+    const ruleRows = credentialRulesRows(acdc);
+    const edgeRows = acdc?.edges ?? [];
+
+    return (
+        <Stack spacing={2}>
+            <Stack spacing={0.5}>
+                <TelemetryRow
+                    label="Credential SAID"
+                    value={<FullMonoValue value={node.said} />}
+                />
+                <TelemetryRow
+                    label="Schema SAID"
+                    value={
+                        node.schemaSaid === null ? (
+                            'Not available'
+                        ) : (
+                            <FullMonoValue value={node.schemaSaid} />
+                        )
+                    }
+                />
+                <TelemetryRow
+                    label="Issuer AID"
+                    value={<FullAidValue aid={node.issuerAid} aliases={aidAliases} />}
+                />
+                <TelemetryRow
+                    label="Holder AID"
+                    value={<FullAidValue aid={node.holderAid} aliases={aidAliases} />}
+                />
+            </Stack>
+            <Divider />
+            <Stack spacing={0.75}>
+                <Typography variant="subtitle2">Credential data</Typography>
+                {subjectRows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                        No subject data available.
+                    </Typography>
+                ) : (
+                    subjectRows.map((row) => (
+                        <TelemetryRow
+                            key={row.name}
+                            label={row.label}
+                            value={row.value}
+                        />
+                    ))
+                )}
+            </Stack>
+            <RulesAccordion title="ACDC rules" count={ruleRows.length}>
+                {ruleRows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                        No credential rules.
+                    </Typography>
+                ) : (
+                    ruleRows.map((row) => (
+                        <TelemetryRow
+                            key={row.name}
+                            label={row.name}
+                            value={row.value}
+                        />
+                    ))
+                )}
+            </RulesAccordion>
+            <Stack spacing={0.75}>
+                <Typography variant="subtitle2">Edges</Typography>
+                {edgeRows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                        No chained source credentials.
+                    </Typography>
+                ) : (
+                    edgeRows.map((edge) => (
+                        <TelemetryRow
+                            key={`${edge.label}:${edge.said ?? 'missing'}`}
+                            label={edge.label}
+                            value={
+                                edge.said === null ? (
+                                    'No source SAID'
+                                ) : (
+                                    <FullMonoValue value={edge.said} />
+                                )
+                            }
+                        />
+                    ))
+                )}
+            </Stack>
+        </Stack>
+    );
+};
+
+const CredentialChainGraphPanel = ({
+    rootSaid,
+    graph,
+    acdcsBySaid,
+    schemasBySaid,
+    aidAliases,
+}: {
+    rootSaid: string;
+    graph: CredentialChainGraphRecord | null;
+    acdcsBySaid: Readonly<Record<string, CredentialAcdcRecord>>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
+    aidAliases: AidAliases;
+}) => {
+    const [requestedSelectedSaid, setRequestedSelectedSaid] = useState<
+        string | null
+    >(null);
+
+    const layout = useMemo(
+        () => (graph === null ? null : graphLayout(graph)),
+        [graph]
+    );
+    const selectedSaid =
+        requestedSelectedSaid !== null &&
+        graph?.nodes.some((node) => node.said === requestedSelectedSaid)
+            ? requestedSelectedSaid
+            : rootSaid;
+    const selectedNode =
+        graph?.nodes.find((node) => node.said === selectedSaid) ??
+        graph?.nodes.find((node) => node.said === rootSaid) ??
+        null;
+    const selectedAcdc =
+        selectedNode === null ? null : (acdcsBySaid[selectedNode.said] ?? null);
+    const selectedSchema =
+        selectedNode?.schemaSaid === null || selectedNode?.schemaSaid === undefined
+            ? null
+            : (schemasBySaid.get(selectedNode.schemaSaid) ?? null);
+
+    return (
+        <ConsolePanel title="Credential chain" eyebrow="ACDC DAG">
+            {graph === null || layout === null || graph.nodes.length === 0 ? (
+                <EmptyState
+                    title="No credential chain"
+                    message="No chained ACDC data is available for this credential."
+                />
+            ) : (
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.4fr) minmax(360px, 0.8fr)' },
+                        gap: 2,
+                    }}
+                >
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <Box
+                            sx={{
+                                position: 'relative',
+                                width: layout.width,
+                                height: layout.height,
+                            }}
+                            data-testid="credential-chain-graph"
+                        >
+                            <Box
+                                component="svg"
+                                viewBox={`0 0 ${layout.width} ${layout.height}`}
+                                sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                }}
+                                aria-hidden="true"
+                            >
+                                <defs>
+                                    <marker
+                                        id="credential-chain-arrow"
+                                        markerWidth="8"
+                                        markerHeight="8"
+                                        refX="7"
+                                        refY="4"
+                                        orient="auto"
+                                    >
+                                        <path
+                                            d="M 0 0 L 8 4 L 0 8 z"
+                                            fill="currentColor"
+                                        />
+                                    </marker>
+                                </defs>
+                                {graph.edges.map((edge) => {
+                                    const from = layout.positions.get(edge.from);
+                                    const to = layout.positions.get(edge.to);
+                                    if (from === undefined || to === undefined) {
+                                        return null;
+                                    }
+
+                                    const x1 = from.x + graphNodeSize.width;
+                                    const y1 = from.y + graphNodeSize.height / 2;
+                                    const x2 = to.x;
+                                    const y2 = to.y + graphNodeSize.height / 2;
+                                    const labelX = (x1 + x2) / 2;
+                                    const labelY = (y1 + y2) / 2 - 8;
+                                    return (
+                                        <g key={edge.id}>
+                                            <path
+                                                d={`M ${x1} ${y1} C ${x1 + 70} ${y1}, ${x2 - 70} ${y2}, ${x2} ${y2}`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeOpacity="0.5"
+                                                markerEnd="url(#credential-chain-arrow)"
+                                            />
+                                            <text
+                                                x={labelX}
+                                                y={labelY}
+                                                textAnchor="middle"
+                                                fontSize="11"
+                                                fill="currentColor"
+                                            >
+                                                {edge.label}
+                                            </text>
+                                        </g>
+                                    );
+                                })}
+                            </Box>
+                            {graph.nodes.map((node) => {
+                                const position = layout.positions.get(node.said);
+                                if (position === undefined) {
+                                    return null;
+                                }
+
+                                const selected = node.said === selectedNode?.said;
+                                const label = credentialGraphNodeLabel({
+                                    node,
+                                    schemasBySaid,
+                                });
+                                return (
+                                    <Box
+                                        key={node.said}
+                                        component="button"
+                                        type="button"
+                                        data-testid={`credential-chain-node-${node.said}`}
+                                        data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                        onClick={() =>
+                                            setRequestedSelectedSaid(node.said)
+                                        }
+                                        sx={{
+                                            ...graphNodeSx({
+                                                selected,
+                                                unresolved: node.unresolved,
+                                            }),
+                                            left: position.x,
+                                            top: position.y,
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ fontWeight: 800 }}
+                                            noWrap
+                                        >
+                                            {label}
+                                        </Typography>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{
+                                                display: 'block',
+                                                ...monoValueSx,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                            }}
+                                        >
+                                            {node.said}
+                                        </Typography>
+                                        {node.said === rootSaid && (
+                                            <StatusPill label="selected root" tone="info" />
+                                        )}
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                    </Box>
+                    <Box>
+                        {selectedNode === null ? (
+                            <EmptyState
+                                title="No selected credential"
+                                message="Select a credential in the graph to inspect its data."
+                            />
+                        ) : (
+                            <CredentialNodeFacts
+                                node={selectedNode}
+                                acdc={selectedAcdc}
+                                schema={selectedSchema}
+                                aidAliases={aidAliases}
+                            />
+                        )}
+                    </Box>
+                </Box>
+            )}
+        </ConsolePanel>
+    );
 };
 
 /**
@@ -508,6 +931,10 @@ const credentialDataRows = (
 export const CredentialRecordDetail = ({
     loaderData,
     credential,
+    acdc,
+    chainGraph,
+    acdcsBySaid,
+    schemasBySaid,
     schema,
     registriesById,
     aidAliases,
@@ -515,6 +942,10 @@ export const CredentialRecordDetail = ({
 }: {
     loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
     credential: CredentialSummaryRecord | null;
+    acdc: CredentialAcdcRecord | null;
+    chainGraph: CredentialChainGraphRecord | null;
+    acdcsBySaid: Readonly<Record<string, CredentialAcdcRecord>>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     schema: SchemaRecord | null;
     registriesById: ReadonlyMap<string, RegistryRecord>;
     aidAliases: AidAliases;
@@ -553,7 +984,7 @@ export const CredentialRecordDetail = ({
     }
 
     const ledgerStatus = credentialLedgerStatus(credential);
-    const dataRows = credentialDataRows(credential);
+    const dataRows = credentialDataRows(credential, acdc, schema);
     const schemaRules = schema?.rules ?? null;
     const schemaRulesRows = schemaRuleViews(schemaRules);
     const backPath =
@@ -670,62 +1101,84 @@ export const CredentialRecordDetail = ({
                     ) : (
                         <Stack spacing={0.5}>
                             {dataRows.map((row) => (
-                                <TelemetryRow
-                                    key={row.label}
-                                    label={row.label}
-                                    value={row.value}
-                                />
+                                <Stack key={row.name} spacing={0.25}>
+                                    <TelemetryRow
+                                        label={row.label}
+                                        value={row.value}
+                                    />
+                                    {row.description !== null &&
+                                        row.description !== undefined && (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                            >
+                                                {row.description}
+                                            </Typography>
+                                        )}
+                                </Stack>
                             ))}
                         </Stack>
                     )}
                 </ConsolePanel>
             </Box>
+            <CredentialChainGraphPanel
+                rootSaid={credential.said}
+                graph={chainGraph}
+                acdcsBySaid={acdcsBySaid}
+                schemasBySaid={schemasBySaid}
+                aidAliases={aidAliases}
+            />
             <ConsolePanel title="Schema rules" eyebrow="ACDC">
-                {schemaRulesRows.length === 0 ? (
-                    <EmptyState
-                        title="No schema rules"
-                        message="The resolved schema does not include a top-level rules section."
-                    />
-                ) : (
-                    <TableContainer>
-                        <Table size="small" aria-label="Schema rules">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Value</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {schemaRulesRows.map((rule) => (
-                                    <TableRow
-                                        key={rule.name}
-                                        data-testid={`schema-rule-${rule.name}`}
-                                    >
-                                        <TableCell
-                                            sx={{
-                                                width: { xs: '42%', md: '30%' },
-                                                verticalAlign: 'top',
-                                                ...monoValueSx,
-                                                overflowWrap: 'anywhere',
-                                            }}
-                                        >
-                                            {rule.name}
-                                        </TableCell>
-                                        <TableCell
-                                            sx={{
-                                                verticalAlign: 'top',
-                                                overflowWrap: 'anywhere',
-                                                whiteSpace: 'pre-wrap',
-                                            }}
-                                        >
-                                            {rule.value}
-                                        </TableCell>
+                <RulesAccordion title="Schema rules" count={schemaRulesRows.length}>
+                    {schemaRulesRows.length === 0 ? (
+                        <EmptyState
+                            title="No schema rules"
+                            message="The resolved schema does not include a top-level rules section."
+                        />
+                    ) : (
+                        <TableContainer>
+                            <Table size="small" aria-label="Schema rules">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Name</TableCell>
+                                        <TableCell>Value</TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
+                                </TableHead>
+                                <TableBody>
+                                    {schemaRulesRows.map((rule) => (
+                                        <TableRow
+                                            key={rule.name}
+                                            data-testid={`schema-rule-${rule.name}`}
+                                        >
+                                            <TableCell
+                                                sx={{
+                                                    width: {
+                                                        xs: '42%',
+                                                        md: '30%',
+                                                    },
+                                                    verticalAlign: 'top',
+                                                    ...monoValueSx,
+                                                    overflowWrap: 'anywhere',
+                                                }}
+                                            >
+                                                {rule.name}
+                                            </TableCell>
+                                            <TableCell
+                                                sx={{
+                                                    verticalAlign: 'top',
+                                                    overflowWrap: 'anywhere',
+                                                    whiteSpace: 'pre-wrap',
+                                                }}
+                                            >
+                                                {rule.value}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </RulesAccordion>
             </ConsolePanel>
             <ConsolePanel title="Activity log" eyebrow="IPEX">
                 {activity.length === 0 ? (
