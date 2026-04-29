@@ -4,6 +4,9 @@ import { ConnectionRequired } from '../../app/ConnectionRequired';
 import { ConsolePanel, PageHeader, TelemetryRow } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import type { ClientLoaderData } from '../../app/routeData';
+import { DidWebsPublicationDetails } from '../didwebs/DidWebsPublicationDetails';
+import { useAppSelector } from '../../state/hooks';
+import { selectAgentDidWebsStatus } from '../../state/selectors';
 import { AidCard } from './AidCard';
 
 /**
@@ -15,6 +18,7 @@ import { AidCard } from './AidCard';
  */
 export const ClientView = () => {
     const loaderData = useLoaderData() as ClientLoaderData;
+    const agentDidWebsStatus = useAppSelector(selectAgentDidWebsStatus);
 
     if (loaderData.status === 'blocked') {
         return <ConnectionRequired />;
@@ -58,6 +62,12 @@ export const ClientView = () => {
                         }
                     />
                 </Stack>
+            </ConsolePanel>
+            <ConsolePanel title="did:webs publication" eyebrow="Agent">
+                <DidWebsPublicationDetails
+                    record={agentDidWebsStatus}
+                    testIdPrefix="client-agent"
+                />
             </ConsolePanel>
             <Grid container spacing={2} sx={{ alignItems: 'stretch' }}>
                 <Grid size={{ xs: 12, md: 6 }}>

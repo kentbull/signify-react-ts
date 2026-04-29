@@ -25,6 +25,7 @@ import {
     sessionConnecting,
     sessionStateRefreshed,
 } from '../state/session.slice';
+import { didWebsDidLoaded } from '../state/didwebs.slice';
 
 /**
  * Prepare Signify's WASM/runtime dependencies.
@@ -68,6 +69,15 @@ export function* bootOrConnectOp(
                 connectedAt: new Date().toISOString(),
             })
         );
+        if (connected.state.agentPre.length > 0) {
+            services.store.dispatch(
+                didWebsDidLoaded({
+                    aid: connected.state.agentPre,
+                    did: connected.state.agentDws,
+                    updatedAt: new Date().toISOString(),
+                })
+            );
+        }
         return connected;
     } catch (error) {
         services.store.dispatch(sessionConnectionFailed(toErrorText(error)));
@@ -91,6 +101,15 @@ export function* getSignifyStateOp(
             agentAid: state.agentPre,
         })
     );
+    if (state.agentPre.length > 0) {
+        services.store.dispatch(
+            didWebsDidLoaded({
+                aid: state.agentPre,
+                did: state.agentDws,
+                updatedAt: new Date().toISOString(),
+            })
+        );
+    }
 
     return state;
 }

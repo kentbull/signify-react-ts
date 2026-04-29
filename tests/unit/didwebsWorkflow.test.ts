@@ -22,6 +22,27 @@ const envelope = (agent = 'Eagent'): SignedReplyEnvelope => ({
     sigs: ['signature'],
 });
 
+const publicationPayload = {
+    aid: 'Eaid',
+    did: 'did:webs:example:dws:Eaid',
+    didJsonUrl: 'https://example/did.json',
+    keriCesrUrl: 'https://example/keri.cesr',
+};
+
+const publicationEnvelope = (
+    route = '/didwebs/signing/request',
+    payload: Record<string, unknown> = {
+        ...publicationPayload,
+        action: 'create_registry',
+    }
+): SignedReplyEnvelope => ({
+    rpy: {
+        r: route,
+        a: payload,
+    },
+    sigs: ['signature'],
+});
+
 describe('did:webs workflow SSE parsing', () => {
     it('ignores the retry prelude and parses JSON data frames across chunks', () => {
         const parser = new SseJsonEnvelopeParser();
@@ -83,6 +104,93 @@ describe('did:webs workflow SSE parsing', () => {
         });
 
         expect(approver.handleEnvelope).toHaveBeenCalledTimes(1);
+    });
+
+    it('observes verified signing request envelopes without disrupting approval', async () => {
+        const signal = publicationEnvelope();
+        const response = new Response(
+            new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(
+                        new TextEncoder().encode(
+                            `data: ${JSON.stringify(signal)}\n\n`
+                        )
+                    );
+                    controller.close();
+                },
+            })
+        );
+        const stream = vi.fn(async () => response);
+        const verifyReplyEnvelope = vi.fn(() => true);
+        const client = {
+            signals: () => ({
+                stream,
+                verifyReplyEnvelope,
+            }),
+        } as unknown as SignifyClient;
+        const approver = {
+            handleEnvelope: vi.fn(async () => ({
+                outcome: 'submitted',
+            })),
+        } as unknown as DidWebsAutoApprover;
+        const observer = vi.fn();
+
+        await consumeDidWebsSignalStream({
+            client,
+            approver,
+            signal: new AbortController().signal,
+            observer,
+        });
+
+        expect(approver.handleEnvelope).toHaveBeenCalledWith(signal);
+        expect(observer).toHaveBeenCalledWith(
+            expect.objectContaining({
+                route: '/didwebs/signing/request',
+                payload: expect.objectContaining(publicationPayload),
+            })
+        );
+    });
+
+    it('observes verified ready envelopes from the shared signal stream', async () => {
+        const ready = publicationEnvelope('/didwebs/ready', publicationPayload);
+        const response = new Response(
+            new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(
+                        new TextEncoder().encode(
+                            `data: ${JSON.stringify(ready)}\n\n`
+                        )
+                    );
+                    controller.close();
+                },
+            })
+        );
+        const client = {
+            signals: () => ({
+                stream: vi.fn(async () => response),
+                verifyReplyEnvelope: vi.fn(() => true),
+            }),
+        } as unknown as SignifyClient;
+        const approver = {
+            handleEnvelope: vi.fn(async () => ({
+                outcome: 'rejected',
+            })),
+        } as unknown as DidWebsAutoApprover;
+        const observer = vi.fn();
+
+        await consumeDidWebsSignalStream({
+            client,
+            approver,
+            signal: new AbortController().signal,
+            observer,
+        });
+
+        expect(observer).toHaveBeenCalledWith(
+            expect.objectContaining({
+                route: '/didwebs/ready',
+                payload: publicationPayload,
+            })
+        );
     });
 
     it('polls pending requests and reconciles completion through one approver', async () => {

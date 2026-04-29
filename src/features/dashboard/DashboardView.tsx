@@ -5,6 +5,7 @@ import { useAppSession } from '../../app/runtimeHooks';
 import type { DashboardLoaderData } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
+    selectAgentDidWebsStatus,
     selectContacts,
     selectCredentialIpexActivity,
     selectCredentialRegistries,
@@ -44,6 +45,7 @@ export const DashboardView = () => {
     const { credentialSaid = '' } = useParams();
     const runtimeSnapshot = useAppSession();
     const session = useAppSelector(selectSession);
+    const agentDidWebsStatus = useAppSelector(selectAgentDidWebsStatus);
     const counts = useAppSelector(selectDashboardCounts);
     const recentOperations = useAppSelector(selectRecentOperations(5));
     const recentKeriaNotifications = useAppSelector(selectRecentKeriaNotifications(5));
@@ -171,6 +173,7 @@ export const DashboardView = () => {
             recentAppNotifications={recentAppNotifications}
             recentChallenges={recentChallenges}
             connectionUrl={connectionUrl}
+            agentDidWebsStatus={agentDidWebsStatus}
         />
     );
 };
