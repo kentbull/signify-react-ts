@@ -5,7 +5,10 @@ import { StatusPill } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
-import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type {
+    CredentialSummaryRecord,
+    SchemaRecord,
+} from '../../domain/credentials/credentialTypes';
 import type { AidAliases } from './dashboardViewModels';
 import { credentialTypeLabel } from './dashboardDisplay';
 
@@ -130,12 +133,19 @@ export const FullAidValue = ({
  */
 export const CredentialTypeValue = ({
     credential,
+    schemasBySaid = new Map(),
 }: {
     credential: CredentialSummaryRecord;
+    schemasBySaid?: ReadonlyMap<string, SchemaRecord>;
 }) => (
     <Stack spacing={0.25} sx={{ minWidth: 0 }}>
         <Typography variant="body2" noWrap>
-            {credentialTypeLabel(credential)}
+            {credentialTypeLabel(
+                credential,
+                credential.schemaSaid === null
+                    ? null
+                    : (schemasBySaid.get(credential.schemaSaid) ?? null)
+            )}
         </Typography>
         {credential.schemaSaid !== null && (
             <CopyableAbbreviation

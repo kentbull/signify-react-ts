@@ -182,6 +182,7 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
             syncRegistries: vi.fn(async () => ({})),
             syncIpexActivity: vi.fn(async () => ({})),
             syncKnownSchemas: vi.fn(async () => ({})),
+            listW3CVerifiers: vi.fn(async () => []),
             startResolveSchema: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'resolve-schema-request-1',
@@ -206,6 +207,11 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
                 status: 'accepted',
                 requestId: 'admit-credential-request-1',
                 operationRoute: '/operations/admit-credential-request-1',
+            })),
+            startProject: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'project-credential-request-1',
+                operationRoute: '/operations/project-credential-request-1',
             })),
         },
         multisig: {
@@ -505,11 +511,16 @@ describe('route loaders', () => {
                     calls.push('ipexActivity');
                     return {};
                 }),
+                listW3CVerifiers: vi.fn(async () => {
+                    calls.push('w3cVerifiers');
+                    return [];
+                }),
             },
         });
 
         await expect(loadCredentials(runtime)).resolves.toEqual({
             status: 'ready',
+            verifiers: [],
         });
         expect(calls[0]).toBe('identifiers');
         expect(calls).toEqual(
@@ -518,6 +529,7 @@ describe('route loaders', () => {
                 'schemas',
                 'registries',
                 'credentials',
+                'w3cVerifiers',
                 'ipexActivity',
             ])
         );
@@ -1363,6 +1375,41 @@ describe('route actions', () => {
                 grantSaid: 'Egrant',
             },
             expect.objectContaining({ requestId: 'admit-credential-request-1' })
+        );
+    });
+
+    it('starts W3C credential projection through the credentials action', async () => {
+        const runtime = makeRuntime();
+
+        await expect(
+            credentialsAction(
+                runtime,
+                makeRequest('/credentials', {
+                    intent: 'projectCredential',
+                    requestId: 'project-credential-request-1',
+                    holderAlias: 'holder',
+                    holderAid: 'Eholder',
+                    credentialSaid: 'Ecredential',
+                    verifierId: 'isomer-python',
+                })
+            )
+        ).resolves.toEqual({
+            intent: 'projectCredential',
+            ok: true,
+            message: 'Projecting credential Ecredential',
+            requestId: 'project-credential-request-1',
+            operationRoute: '/operations/project-credential-request-1',
+        });
+        expect(runtime.credentials.startProject).toHaveBeenCalledWith(
+            {
+                holderAlias: 'holder',
+                holderAid: 'Eholder',
+                credentialSaid: 'Ecredential',
+                verifierId: 'isomer-python',
+            },
+            expect.objectContaining({
+                requestId: 'project-credential-request-1',
+            })
         );
     });
 

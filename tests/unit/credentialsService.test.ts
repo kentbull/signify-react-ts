@@ -93,6 +93,13 @@ const admittedCredential = {
             expires: '2026-12-31T23:59:59Z',
         },
     },
+    schema: {
+        $id: 'Eschema',
+        title: 'Verifiable Reference Data (VRD) Credential',
+        description: 'A VRD credential',
+        credentialType: 'VRDCredential',
+        version: '1.0.0',
+    },
     status: { s: '0' },
 } as unknown as CredentialResult;
 
@@ -359,6 +366,13 @@ describe('credential service helpers', () => {
                                         expires: '2026-12-31T23:59:59Z',
                                     },
                                 },
+                                schema: {
+                                    $id: 'Eschema',
+                                    title: 'Verifiable Reference Data (VRD) Credential',
+                                    description: 'A VRD credential',
+                                    credentialType: 'VRDCredential',
+                                    version: '1.0.0',
+                                },
                             },
                         ];
                     }
@@ -396,7 +410,7 @@ describe('credential service helpers', () => {
             expect(credentials.list).toHaveBeenCalledWith({
                 filter: { '-a-i': 'Eholder' },
             });
-            expect(inventory).toEqual([
+            expect(inventory.credentials).toEqual([
                 expect.objectContaining({
                     said: 'EissuedCredential',
                     issuerAid: 'Eissuer',
@@ -410,6 +424,13 @@ describe('credential service helpers', () => {
                     holderAid: 'Eholder',
                     direction: 'held',
                     status: 'admitted',
+                }),
+            ]);
+            expect(inventory.schemas).toEqual([
+                expect.objectContaining({
+                    said: 'Eschema',
+                    title: 'Verifiable Reference Data (VRD) Credential',
+                    credentialType: 'VRDCredential',
                 }),
             ]);
         } finally {
@@ -546,6 +567,7 @@ describe('credential service helpers', () => {
             get: vi.fn(async (said: string) => ({
                 title: `Schema ${said}`,
                 description: 'Known schema',
+                credentialType: 'KnownCredential',
                 version: '1.0.0',
                 rules: {
                     usageDisclaimer: {
@@ -577,6 +599,7 @@ describe('credential service helpers', () => {
                 said: credentialType.schemaSaid,
                 status: 'resolved',
                 title: `Schema ${credentialType.schemaSaid}`,
+                credentialType: 'KnownCredential',
                 rules: {
                     usageDisclaimer: {
                         l: 'Usage disclaimer',

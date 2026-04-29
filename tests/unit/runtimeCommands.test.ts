@@ -374,6 +374,12 @@ describe('runtime command adapters', () => {
             notificationId: 'note-1',
             grantSaid: 'Egrant',
         });
+        commands.startProject({
+            holderAlias: 'holder',
+            holderAid: 'Eholder',
+            credentialSaid: 'Ecredential',
+            verifierId: 'isomer-python',
+        });
 
         expect(startedOptions[0]).toMatchObject({
             label: 'Adding SEDI credential type',
@@ -459,6 +465,25 @@ describe('runtime command adapters', () => {
             failureNotification: {
                 title: 'Credential admit failed',
                 message: 'The credential grant could not be admitted.',
+                severity: 'error',
+            },
+        });
+        expect(startedOptions[5]).toMatchObject({
+            label: 'Projecting credential Ecredential',
+            title: 'Project credential',
+            kind: 'presentCredential',
+            resourceKeys: ['credential:Ecredential:w3c-project'],
+            resultRoute: { label: 'View credentials', path: '/credentials' },
+            successNotification: {
+                title: 'Credential projected',
+                message:
+                    'The W3C VC-JWT was accepted by the selected verifier.',
+                severity: 'success',
+            },
+            failureNotification: {
+                title: 'Credential projection failed',
+                message:
+                    'The credential could not be projected for the selected verifier.',
                 severity: 'error',
             },
         });

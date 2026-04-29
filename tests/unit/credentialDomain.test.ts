@@ -94,6 +94,7 @@ describe('credential domain mappings', () => {
                 schema: {
                     title: 'SEDI Voter ID',
                     description: 'Demo credential',
+                    credentialType: 'SEDIVoterCredential',
                     version: '1.0.0',
                     rules: { issuer: 'SEDI' },
                 } as unknown as Schema,
@@ -107,6 +108,7 @@ describe('credential domain mappings', () => {
             status: 'resolved',
             title: 'SEDI Voter ID',
             description: 'Demo credential',
+            credentialType: 'SEDIVoterCredential',
             version: '1.0.0',
             rules: { issuer: 'SEDI' },
             error: null,

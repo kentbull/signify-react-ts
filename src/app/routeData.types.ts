@@ -5,6 +5,7 @@ import type {
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../signify/client';
+import type { W3CVerifier } from 'signify-ts';
 import type {
     ChallengeRuntimeCommands,
     ContactRuntimeCommands,
@@ -93,7 +94,7 @@ export type ClientLoaderData =
  * Loader data for the credentials route.
  */
 export type CredentialsLoaderData =
-    | { status: 'ready' }
+    | { status: 'ready'; verifiers: W3CVerifier[] }
     | { status: 'error'; message: string }
     | BlockedRouteData;
 
@@ -184,6 +185,7 @@ export type CredentialActionData =
               | 'issueCredential'
               | 'grantCredential'
               | 'admitCredentialGrant'
+              | 'projectCredential'
               | 'refreshCredentials';
           ok: true;
           message: string;
@@ -197,6 +199,7 @@ export type CredentialActionData =
               | 'issueCredential'
               | 'grantCredential'
               | 'admitCredentialGrant'
+              | 'projectCredential'
               | 'refreshCredentials'
               | 'unsupported';
           ok: false;

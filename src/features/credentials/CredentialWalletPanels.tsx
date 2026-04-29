@@ -2,11 +2,16 @@ import {
     Box,
     Button,
     Collapse,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
     Stack,
     Typography,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SendIcon from '@mui/icons-material/Send';
 import { ConsolePanel, EmptyState, StatusPill, TelemetryRow } from '../../app/Console';
 import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
@@ -14,7 +19,9 @@ import type { IssueableCredentialTypeView } from '../../domain/credentials/crede
 import type {
     CredentialGrantNotification,
     CredentialSummaryRecord,
+    SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
+import type { W3CVerifier } from 'signify-ts';
 import type { CredentialWalletStats } from './credentialViewModels';
 import {
     schemaLabel,
@@ -182,11 +189,13 @@ export const InboundGrantsPanel = ({
     grants,
     actionRunning,
     credentialTypesBySchema,
+    schemasBySaid,
     onAdmit,
 }: {
     grants: readonly CredentialGrantNotification[];
     actionRunning: boolean;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     onAdmit: (notificationId: string, grantSaid: string) => void;
 }) => (
     <ConsolePanel title="Inbound grants">
@@ -226,7 +235,8 @@ export const InboundGrantsPanel = ({
                                             grant.attributes.fullName ??
                                                 schemaLabel(
                                                     grant.schemaSaid,
-                                                    credentialTypesBySchema
+                                                    credentialTypesBySchema,
+                                                    schemasBySaid
                                                 )
                                         )}
                                     </Typography>
@@ -267,14 +277,57 @@ export const HeldCredentialsPanel = ({
     credentials,
     expandedCredentialSaid,
     credentialTypesBySchema,
+    schemasBySaid,
+    verifiers,
+    selectedVerifierId,
+    didWebsReady,
+    actionRunning,
     onToggleCredential,
+    onVerifierChange,
+    onProject,
 }: {
     credentials: readonly CredentialSummaryRecord[];
     expandedCredentialSaid: string;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
+    verifiers: readonly W3CVerifier[];
+    selectedVerifierId: string;
+    didWebsReady: boolean;
+    actionRunning: boolean;
     onToggleCredential: (credentialSaid: string) => void;
+    onVerifierChange: (verifierId: string) => void;
+    onProject: (credential: CredentialSummaryRecord) => void;
 }) => (
-    <ConsolePanel title="Held credentials">
+    <ConsolePanel
+        title="Held credentials"
+        actions={
+            verifiers.length === 0 ? null : (
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <InputLabel id="w3c-verifier-label">Verifier</InputLabel>
+                    <Select
+                        labelId="w3c-verifier-label"
+                        label="Verifier"
+                        value={
+                            verifiers.some(
+                                (verifier) => verifier.id === selectedVerifierId
+                            )
+                                ? selectedVerifierId
+                                : ''
+                        }
+                        onChange={(event) =>
+                            onVerifierChange(event.target.value)
+                        }
+                    >
+                        {verifiers.map((verifier) => (
+                            <MenuItem key={verifier.id} value={verifier.id}>
+                                {verifier.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            )
+        }
+    >
         {credentials.length === 0 ? (
             <EmptyState
                 title="No held credentials"
@@ -284,6 +337,17 @@ export const HeldCredentialsPanel = ({
             <Stack spacing={1.5}>
                 {credentials.map((credential) => {
                     const expanded = expandedCredentialSaid === credential.said;
+                    const isProjectable =
+                        credential.status === 'admitted' &&
+                        credential.schemaSaid !== null &&
+                        credentialTypesBySchema.has(credential.schemaSaid);
+                    const canProject =
+                        isProjectable &&
+                        didWebsReady &&
+                        selectedVerifierId.length > 0 &&
+                        !actionRunning;
+                    const showProject =
+                        isProjectable && didWebsReady && verifiers.length > 0;
                     return (
                         <Box
                             key={credential.said}
@@ -327,13 +391,27 @@ export const HeldCredentialsPanel = ({
                                     <Typography sx={{ fontWeight: 800 }}>
                                         {schemaLabel(
                                             credential.schemaSaid,
-                                            credentialTypesBySchema
+                                            credentialTypesBySchema,
+                                            schemasBySaid
                                         )}
                                     </Typography>
                                     <StatusPill
                                         label={credential.status}
                                         tone={statusTone(credential.status)}
                                     />
+                                    {showProject && (
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<SendIcon />}
+                                            disabled={!canProject}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onProject(credential);
+                                            }}
+                                        >
+                                            Project
+                                        </Button>
+                                    )}
                                 </Stack>
                                 <Typography variant="body2" sx={monoValueSx}>
                                     {abbreviateMiddle(credential.said, 28)}
@@ -345,6 +423,7 @@ export const HeldCredentialsPanel = ({
                                             credentialTypesBySchema={
                                                 credentialTypesBySchema
                                             }
+                                            schemasBySaid={schemasBySaid}
                                         />
                                     </Box>
                                 </Collapse>

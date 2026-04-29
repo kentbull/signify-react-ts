@@ -78,10 +78,17 @@ export interface SchemaRecord {
     status: SchemaResolutionStatus;
     title: string | null;
     description: string | null;
+    credentialType: string | null;
     version: string | null;
     rules?: Record<string, unknown> | null;
     error: string | null;
     updatedAt: string | null;
+}
+
+/** Credential inventory plus embedded schemas observed while loading credentials. */
+export interface CredentialInventorySnapshot {
+    credentials: CredentialSummaryRecord[];
+    schemas: SchemaRecord[];
 }
 
 /** Lifecycle of a credential registry known to the local issuer role. */

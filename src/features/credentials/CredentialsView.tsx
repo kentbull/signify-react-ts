@@ -17,6 +17,7 @@ import {
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
 import { ConsolePanel, EmptyState, PageHeader, StatusPill } from '../../app/Console';
+import { useAppRuntime } from '../../app/runtimeHooks';
 import type { CredentialActionData, CredentialsLoaderData } from '../../app/routeData';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
@@ -58,6 +59,7 @@ const submitWithId = (fetcher: FormSubmitter, formData: FormData): void => {
 export const CredentialsView = () => {
     const loaderData = useLoaderData() as CredentialsLoaderData;
     const fetcher = useFetcher<CredentialActionData>();
+    const runtime = useAppRuntime();
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { aid: aidParam } = useParams<{ aid?: string }>();
@@ -68,6 +70,8 @@ export const CredentialsView = () => {
     const selectedIdentifier =
         identifiers.find((identifier) => identifier.prefix === selectedAid) ??
         null;
+    const w3cVerifiers =
+        loaderData.status === 'ready' ? loaderData.verifiers : [];
 
     useEffect(() => {
         if (
@@ -77,6 +81,22 @@ export const CredentialsView = () => {
             dispatch(walletAidSelected({ aid: selectedIdentifier.prefix }));
         }
     }, [dispatch, selectedIdentifier, walletSelectedAid]);
+
+    useEffect(() => {
+        if (selectedIdentifier === null) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        void runtime.didwebs
+            .refreshIdentifierDid(selectedIdentifier.name, selectedIdentifier.prefix, {
+                signal: controller.signal,
+                track: false,
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [runtime, selectedIdentifier]);
 
     if (loaderData.status === 'blocked') {
         return <ConnectionRequired />;
@@ -122,6 +142,7 @@ export const CredentialsView = () => {
         selectedAid,
         selectedIdentifier,
         identifiers,
+        w3cVerifiers,
         navigateToAid,
         submitRefresh,
         submitResolveSchema,

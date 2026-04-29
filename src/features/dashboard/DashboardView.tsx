@@ -85,6 +85,10 @@ export const DashboardView = () => {
         () => [...issuedCredentials, ...heldCredentials],
         [issuedCredentials, heldCredentials]
     );
+    const schemasBySaid = useMemo(
+        () => new Map(resolvedSchemas.map((schema) => [schema.said, schema])),
+        [resolvedSchemas]
+    );
     const selectedCredential = useMemo(
         () =>
             credentials.find(
@@ -141,6 +145,7 @@ export const DashboardView = () => {
             <CredentialsDetail
                 loaderData={loaderData}
                 credentials={issuedCredentials}
+                schemasBySaid={schemasBySaid}
                 aidAliases={aidAliases}
                 kind="issued"
                 onOpenCredential={openCredential}
@@ -153,6 +158,7 @@ export const DashboardView = () => {
             <CredentialsDetail
                 loaderData={loaderData}
                 credentials={heldCredentials}
+                schemasBySaid={schemasBySaid}
                 aidAliases={aidAliases}
                 kind="held"
                 onOpenCredential={openCredential}

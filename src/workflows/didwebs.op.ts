@@ -8,9 +8,12 @@ import {
 import {
     DidWebsAutoApprover,
     DWS_SIGNING_ROUTE,
+    W3CProjectionAutoApprover,
+    W3C_SIGNING_ROUTE,
     type DidWebsAutoApproveResult,
     type SignifyClient,
     type SignedReplyEnvelope,
+    type W3CProjectionAutoApproveResult,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import { AppServicesContext, type AppServices } from '../effects/contexts';
@@ -138,11 +141,13 @@ export class SseJsonEnvelopeParser {
 export const consumeDidWebsSignalStream = async ({
     client,
     approver,
+    w3cApprover,
     signal,
     observer,
 }: {
     client: SignifyClient;
     approver: DidWebsAutoApprover;
+    w3cApprover?: W3CProjectionAutoApprover;
     signal: AbortSignal;
     observer?: DidWebsSignalObserver;
 }): Promise<void> => {
@@ -174,23 +179,52 @@ export const consumeDidWebsSignalStream = async ({
 
             const chunk = decoder.decode(value, { stream: true });
             for (const envelope of parser.push(chunk)) {
-                await approver.handleEnvelope(envelope);
+                await handleSignalEnvelope({
+                    envelope,
+                    didWebsApprover: approver,
+                    w3cApprover,
+                });
                 await observeDidWebsSignal(client, envelope, observer);
             }
         }
 
         const finalChunk = decoder.decode();
         for (const envelope of parser.push(finalChunk)) {
-            await approver.handleEnvelope(envelope);
+            await handleSignalEnvelope({
+                envelope,
+                didWebsApprover: approver,
+                w3cApprover,
+            });
             await observeDidWebsSignal(client, envelope, observer);
         }
         for (const envelope of parser.finish()) {
-            await approver.handleEnvelope(envelope);
+            await handleSignalEnvelope({
+                envelope,
+                didWebsApprover: approver,
+                w3cApprover,
+            });
             await observeDidWebsSignal(client, envelope, observer);
         }
     } finally {
         signal.removeEventListener('abort', cancelReader);
         reader.releaseLock();
+    }
+};
+
+const handleSignalEnvelope = async ({
+    envelope,
+    didWebsApprover,
+    w3cApprover,
+}: {
+    envelope: SignedReplyEnvelope;
+    didWebsApprover: DidWebsAutoApprover;
+    w3cApprover?: W3CProjectionAutoApprover;
+}): Promise<void> => {
+    const route = isRecord(envelope.rpy) ? stringValue(envelope.rpy.r) : null;
+    if (route === DWS_SIGNING_ROUTE) {
+        await didWebsApprover.handleEnvelope(envelope);
+    } else if (route === W3C_SIGNING_ROUTE && w3cApprover !== undefined) {
+        await w3cApprover.handleEnvelope(envelope);
     }
 };
 
@@ -239,6 +273,23 @@ export const approvePendingDidWebsRequests = async (
     approver: DidWebsAutoApprover
 ): Promise<{
     pollResults: DidWebsAutoApproveResult[];
+    reconciled: number;
+}> => {
+    const pollResults = await approver.pollOnce();
+    const reconciled = await approver.reconcile();
+    return {
+        pollResults,
+        reconciled: reconciled.length,
+    };
+};
+
+/**
+ * Poll durable W3C projection requests and reconcile completed ones.
+ */
+export const approvePendingW3CProjectionRequests = async (
+    approver: W3CProjectionAutoApprover
+): Promise<{
+    pollResults: W3CProjectionAutoApproveResult[];
     reconciled: number;
 }> => {
     const pollResults = await approver.pollOnce();
@@ -304,11 +355,16 @@ export function* liveDidWebsPublicationOp(): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
     const client = services.runtime.requireConnectedClient();
     const approver = new DidWebsAutoApprover(client);
+    const w3cApprover = new W3CProjectionAutoApprover(client);
 
     yield* spawn(() =>
-        didWebsSignalLoop(approver, didWebsSignalObserver(services))
+        didWebsSignalLoop(
+            approver,
+            w3cApprover,
+            didWebsSignalObserver(services)
+        )
     );
-    yield* spawn(() => didWebsPollingLoop(approver));
+    yield* spawn(() => didWebsPollingLoop(approver, w3cApprover));
     yield* suspend();
 }
 
@@ -347,6 +403,7 @@ const didWebsSignalObserver =
 
 function* didWebsSignalLoop(
     approver: DidWebsAutoApprover,
+    w3cApprover: W3CProjectionAutoApprover,
     observer: DidWebsSignalObserver
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
@@ -360,6 +417,7 @@ function* didWebsSignalLoop(
                 consumeDidWebsSignalStream({
                     client: services.runtime.requireConnectedClient(),
                     approver,
+                    w3cApprover,
                     signal,
                     observer,
                 })
@@ -390,7 +448,8 @@ function* didWebsSignalLoop(
 }
 
 function* didWebsPollingLoop(
-    approver: DidWebsAutoApprover
+    approver: DidWebsAutoApprover,
+    w3cApprover: W3CProjectionAutoApprover
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
     let consecutiveFailures = 0;
@@ -398,7 +457,10 @@ function* didWebsPollingLoop(
 
     while (true) {
         try {
-            yield* callPromise(() => approvePendingDidWebsRequests(approver));
+            yield* callPromise(async () => {
+                await approvePendingDidWebsRequests(approver);
+                await approvePendingW3CProjectionRequests(w3cApprover);
+            });
             consecutiveFailures = 0;
         } catch (error) {
             if (!isOptionalDidWebsEndpointUnavailable(error)) {
@@ -428,6 +490,8 @@ const isOptionalDidWebsEndpointUnavailable = (error: unknown): boolean => {
     return (
         message.includes('HTTP GET /signals/stream - 404') ||
         (message.includes('HTTP GET /didwebs/signing/requests') &&
+            message.includes('404 Not Found')) ||
+        (message.includes('/w3c/signing-requests') &&
             message.includes('404 Not Found'))
     );
 };

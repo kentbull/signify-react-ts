@@ -36,14 +36,18 @@ const schemaTypeLabel = (schemaSaid: string | null | undefined): string => {
  * Prefer the resolved schema title, then the catalog label, then a generic fallback.
  */
 export const schemaTitle = (schema: SchemaRecord): string =>
-    schema.title ?? schemaTypeLabel(schema.said);
+    schema.title ?? schema.credentialType ?? schemaTypeLabel(schema.said);
 
 /**
  * Resolve a credential's schema SAID into the dashboard type label.
  */
 export const credentialTypeLabel = (
-    credential: CredentialSummaryRecord
-): string => schemaTypeLabel(credential.schemaSaid);
+    credential: CredentialSummaryRecord,
+    schema: SchemaRecord | null = null
+): string =>
+    schema?.title ??
+    schema?.credentialType ??
+    schemaTypeLabel(credential.schemaSaid);
 
 /**
  * Collapse credential persistence facts into the ledger status shown in dashboard lists.

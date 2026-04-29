@@ -140,6 +140,7 @@ export const schemaRecordFromKeriaSchema = ({
     status: 'resolved',
     title: schemaText(schema, 'title'),
     description: schemaText(schema, 'description'),
+    credentialType: schemaText(schema, 'credentialType'),
     version: schemaText(schema, 'version'),
     rules: schemaRules(schema),
     error: null,
@@ -191,6 +192,12 @@ export const registryRecordFromKeriaRegistry = ({
 export const credentialSad = (
     credential: CredentialResult
 ): Record<string, unknown> => requireRecord(credential.sad, 'Credential SAD');
+
+/** Return the embedded schema from a credential result when KERIA supplied it. */
+export const credentialSchema = (credential: CredentialResult): Schema | null => {
+    const schema = (credential as Record<string, unknown>).schema;
+    return isRecord(schema) ? (schema as Schema) : null;
+};
 
 const credentialSubject = (
     credential: CredentialResult

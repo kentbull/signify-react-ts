@@ -19,6 +19,7 @@ import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialRegistries,
+    selectCredentialSchemas,
     selectIssueableCredentialTypeViews,
     selectIssuedCredentials,
 } from '../../state/selectors';
@@ -52,6 +53,7 @@ export const CredentialIssuerRoute = () => {
     } = useCredentialsRouteContext();
     const navigate = useNavigate();
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
+    const schemas = useAppSelector(selectCredentialSchemas);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const registries = useAppSelector(selectCredentialRegistries);
 
@@ -70,6 +72,9 @@ export const CredentialIssuerRoute = () => {
             credentialType.schemaSaid,
             credentialType,
         ])
+    );
+    const schemasBySaid = new Map(
+        schemas.map((schema) => [schema.said, schema])
     );
     const issuerStats = issuerStatsForAid({
         aid: selectedIdentifier.prefix,
@@ -283,7 +288,8 @@ export const CredentialIssuerRoute = () => {
                                             <TableCell>
                                                 {schemaLabel(
                                                     credential.schemaSaid,
-                                                    credentialTypesBySchema
+                                                    credentialTypesBySchema,
+                                                    schemasBySaid
                                                 )}
                                             </TableCell>
                                             <TableCell>
