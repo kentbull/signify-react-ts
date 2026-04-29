@@ -101,6 +101,11 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
                 requestId: 'rotate-request-1',
                 operationRoute: '/operations/rotate-request-1',
             })),
+            startAuthorizeAgent: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'authorize-agent-request-1',
+                operationRoute: '/operations/authorize-agent-request-1',
+            })),
         },
         contacts: {
             syncInventory: vi.fn(async () => ({})),
@@ -642,6 +647,31 @@ describe('route actions', () => {
         expect(runtime.identifiers.startRotate).toHaveBeenCalledWith(
             'alice',
             expect.objectContaining({ requestId: 'rotate-request-1' })
+        );
+    });
+
+    it('authorizes identifier agent end-role through the identifiers action', async () => {
+        const runtime = makeRuntime();
+
+        await expect(
+            identifiersAction(
+                runtime,
+                makeRequest('/identifiers', {
+                    intent: 'authorizeAgent',
+                    aid: 'alice',
+                    requestId: 'authorize-agent-request-1',
+                })
+            )
+        ).resolves.toEqual({
+            intent: 'authorizeAgent',
+            ok: true,
+            message: 'Authorizing agent for alice',
+            requestId: 'authorize-agent-request-1',
+            operationRoute: '/operations/authorize-agent-request-1',
+        });
+        expect(runtime.identifiers.startAuthorizeAgent).toHaveBeenCalledWith(
+            'alice',
+            expect.objectContaining({ requestId: 'authorize-agent-request-1' })
         );
     });
 

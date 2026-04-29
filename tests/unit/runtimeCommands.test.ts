@@ -13,6 +13,7 @@ import {
     type WorkflowRunOptions,
 } from '../../src/app/runtimeCommands';
 import { defaultIdentifierCreateDraft } from '../../src/domain/identifiers/identifierHelpers';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 import { identifierListLoaded } from '../../src/state/identifiers.slice';
 import type { DelegationRequestNotification } from '../../src/state/notifications.slice';
 import { createAppStore } from '../../src/state/store';
@@ -169,6 +170,47 @@ describe('runtime command adapters', () => {
             },
         });
         expect(startedOptions[0]?.payloadDetails).toBeDefined();
+    });
+
+    it('builds identifier agent authorization metadata with conflict resource keys', () => {
+        const { context, startedOptions, store } = makeContext();
+        store.dispatch(
+            identifierListLoaded({
+                identifiers: [
+                    {
+                        name: 'alice',
+                        prefix: 'Ealice',
+                    },
+                ] as IdentifierSummary[],
+                loadedAt: '2026-04-21T00:00:00.000Z',
+            })
+        );
+
+        createIdentifierRuntimeCommands(context).startAuthorizeAgent('Ealice', {
+            requestId: 'authorize-agent-request',
+        });
+
+        expect(startedOptions[0]).toMatchObject({
+            requestId: 'authorize-agent-request',
+            label: 'Authorizing agent for alice',
+            title: 'Authorize agent for alice',
+            kind: 'authorizeAgentEndRole',
+            resourceKeys: [
+                'identifier:aid:Ealice',
+                'identifier:agent-endrole:Ealice',
+            ],
+            resultRoute: { label: 'View identifiers', path: '/identifiers' },
+            successNotification: {
+                title: 'Agent authorization complete',
+                message: 'The agent endpoint role for alice is authorized.',
+                severity: 'success',
+            },
+            failureNotification: {
+                title: 'Agent authorization failed',
+                message: 'The agent endpoint role for alice failed.',
+                severity: 'error',
+            },
+        });
     });
 
     it('builds contact resolve and OOBI metadata with copyable payload extractors', () => {

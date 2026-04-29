@@ -240,6 +240,16 @@ export const IdentifiersView = () => {
         fetcher.submit(formData, { method: 'post' });
     };
 
+    const handleAuthorizeAgent = (aid: string) => {
+        const requestId = globalThis.crypto.randomUUID();
+        setPendingMessage(`Authorizing agent for ${aid}`);
+        const formData = new FormData();
+        formData.set('intent', 'authorizeAgent');
+        formData.set('aid', aid);
+        formData.set('requestId', requestId);
+        fetcher.submit(formData, { method: 'post' });
+    };
+
     const handleCreate = async (
         draft: IdentifierCreateDraft
     ): Promise<void> => {
@@ -255,6 +265,9 @@ export const IdentifiersView = () => {
 
     const isRotateDisabled = (identifierName: string): boolean =>
         activeResourceKeys.has(`identifier:aid:${identifierName}`);
+    const isAuthorizeAgentDisabled = (identifierName: string): boolean =>
+        activeResourceKeys.has(`identifier:aid:${identifierName}`) ||
+        activeResourceKeys.has(`identifier:agent-endrole:${identifierName}`);
     const openCreate = () => {
         setActiveCreateRequestId(null);
         setCreateOpen(true);
@@ -419,6 +432,10 @@ export const IdentifiersView = () => {
                 isRotateDisabled={(identifier) =>
                     isRotateDisabled(identifier.name)
                 }
+                onAuthorizeAgent={handleAuthorizeAgent}
+                isAuthorizeAgentDisabled={(identifier) =>
+                    isAuthorizeAgentDisabled(identifier.name)
+                }
                 onCopyAgentOobi={handleCopyAgentOobi}
                 agentOobiCopyStatus={agentOobiCopyStatus}
             />
@@ -437,6 +454,11 @@ export const IdentifiersView = () => {
                         ? false
                         : isRotateDisabled(selectedIdentifierName)
                 }
+                authorizeAgentRunning={
+                    selectedIdentifierName === null
+                        ? false
+                        : isAuthorizeAgentDisabled(selectedIdentifierName)
+                }
                 onClose={() => {
                     setSelectedIdentifierName(null);
                     setDetailRefresh({ status: 'idle', message: null });
@@ -452,6 +474,7 @@ export const IdentifiersView = () => {
                     });
                 }}
                 onRotate={handleRotate}
+                onAuthorizeAgent={handleAuthorizeAgent}
             />
             {createDialogOpen && (
                 <IdentifierCreateDialog

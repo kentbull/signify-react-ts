@@ -113,14 +113,14 @@ export type RootActionData =
  */
 export type IdentifierActionData =
     | {
-          intent: 'create' | 'rotate';
+          intent: 'create' | 'rotate' | 'authorizeAgent';
           ok: true;
           message: string;
           requestId: string;
           operationRoute: string;
       }
     | {
-          intent: 'create' | 'rotate' | 'unsupported';
+          intent: 'create' | 'rotate' | 'authorizeAgent' | 'unsupported';
           ok: false;
           message: string;
           requestId?: string;
