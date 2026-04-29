@@ -49,6 +49,9 @@ export interface IdentifierMutationResult {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
+const stringValue = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+
 const operationName = (operation: KeriaOperation): string | null => {
     const candidate = (operation as { name?: unknown }).name;
     return typeof candidate === 'string' ? candidate : null;
@@ -66,6 +69,32 @@ const eventFromResult = (result: unknown): unknown => {
 
     return serder.sad;
 };
+
+const hasEndRole = (raw: unknown, role: string, eid: string): boolean =>
+    Array.isArray(raw) &&
+    raw.some(
+        (item) =>
+            isRecord(item) &&
+            item.role === role &&
+            stringValue(item.eid) === eid
+    );
+
+const listIdentifierEndRoles = ({
+    client,
+    identifier,
+    role,
+}: {
+    client: SignifyClient;
+    identifier: string;
+    role: string;
+}): Promise<unknown> =>
+    client
+        .fetch(
+            `/identifiers/${encodeURIComponent(identifier)}/endroles/${encodeURIComponent(role)}`,
+            'GET',
+            null
+        )
+        .then((response) => response.json());
 
 function* waitDelegationApproval({
     client,
@@ -131,6 +160,76 @@ export function* getIdentifierService({
     aid: string;
 }): EffectionOperation<IdentifierSummary> {
     return yield* callPromise(() => client.identifiers().get(aid));
+}
+
+/**
+ * Ensure the local identifier has authorized this KERIA agent as its `agent`
+ * endpoint role. Existing matching authorizations are treated as success.
+ */
+export function* ensureAgentEndRoleService({
+    client,
+    identifier,
+    logger,
+}: {
+    client: SignifyClient;
+    identifier: string;
+    logger?: OperationLogger;
+}): EffectionOperation<void> {
+    const agentPre = client.agent?.pre;
+    if (agentPre === undefined) {
+        throw new Error('Connected Signify client is missing its agent AID.');
+    }
+
+    const existing = yield* callPromise(() =>
+        listIdentifierEndRoles({
+            client,
+            identifier,
+            role: 'agent',
+        })
+    );
+    if (hasEndRole(existing, 'agent', agentPre)) {
+        return;
+    }
+
+    const result = yield* callPromise(() =>
+        client.identifiers().addEndRole(identifier, 'agent', agentPre)
+    );
+    const operation = (yield* callPromise(() => result.op())) as KeriaOperation;
+    yield* waitOperationService({
+        client,
+        operation,
+        label: `authorizing ${identifier} agent endpoint`,
+        logger,
+    });
+}
+
+/**
+ * Authorize the current KERIA agent as an endpoint role for one identifier and
+ * return refreshed identifier facts for the UI.
+ */
+export function* authorizeAgentEndRoleService({
+    client,
+    aid,
+    logger,
+}: {
+    client: SignifyClient;
+    aid: string;
+    logger?: OperationLogger;
+}): EffectionOperation<IdentifierMutationResult> {
+    yield* ensureAgentEndRoleService({
+        client,
+        identifier: aid,
+        logger,
+    });
+
+    const identifiers = yield* listIdentifiersService({ client });
+    const refreshed = yield* getIdentifierService({ client, aid });
+
+    return {
+        identifiers: replaceIdentifierSummary(identifiers, refreshed),
+        refreshed,
+        delegation: null,
+    };
 }
 
 /**

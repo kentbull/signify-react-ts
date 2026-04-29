@@ -22,6 +22,7 @@ export type OperationKind =
     | 'listIdentifiers'
     | 'createIdentifier'
     | 'rotateIdentifier'
+    | 'authorizeAgentEndRole'
     | 'createDelegatedIdentifier'
     | 'rotateDelegatedIdentifier'
     | 'createMultisigGroup'

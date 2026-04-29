@@ -7,6 +7,9 @@
 
         /* Bundler mode */
         "moduleResolution": "bundler",
+        "paths": {
+            "signify-ts": ["../signify-ts/src/index.ts"]
+        },
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,

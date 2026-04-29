@@ -156,6 +156,39 @@ const rotateIdentifierAction = ({
 };
 
 /**
+ * Starts agent endpoint-role authorization for one existing identifier.
+ */
+const authorizeAgentAction = ({
+    runtime,
+    formData,
+}: IdentifierActionContext): IdentifierActionData => {
+    const intent = 'authorizeAgent';
+    const aid = formString(formData, 'aid');
+    const requestId = formString(formData, 'requestId');
+    const started = runtime.identifiers.startAuthorizeAgent(
+        aid,
+        requestIdOption(requestId)
+    );
+    if (started.status === 'conflict') {
+        return {
+            intent,
+            ok: false,
+            message: started.message,
+            requestId: started.requestId,
+            operationRoute: started.operationRoute,
+        };
+    }
+
+    return {
+        intent,
+        ok: true,
+        message: `Authorizing agent for ${aid}`,
+        requestId: started.requestId,
+        operationRoute: started.operationRoute,
+    };
+};
+
+/**
  * Dispatches identifier route intents to named handlers. The switch is kept
  * explicit because identifier commands are high-impact protocol mutations and
  * should not be hidden behind dynamic lookup.
@@ -168,6 +201,8 @@ const runIdentifierIntentAction = (
             return createIdentifierAction(context);
         case 'rotate':
             return rotateIdentifierAction(context);
+        case 'authorizeAgent':
+            return authorizeAgentAction(context);
         default:
             return {
                 intent: 'unsupported',
@@ -199,7 +234,10 @@ export const identifiersAction = async (
 
     if (runtime.getClient() === null) {
         return {
-            intent: intent === 'rotate' ? 'rotate' : 'create',
+            intent:
+                intent === 'rotate' || intent === 'authorizeAgent'
+                    ? intent
+                    : 'create',
             ok: false,
             message: 'Connect to KERIA before changing identifiers.',
         };
@@ -209,7 +247,10 @@ export const identifiersAction = async (
         return runIdentifierIntentAction(context);
     } catch (error) {
         return {
-            intent: intent === 'rotate' ? 'rotate' : 'create',
+            intent:
+                intent === 'rotate' || intent === 'authorizeAgent'
+                    ? intent
+                    : 'create',
             ok: false,
             message: toRouteError(error).message,
             requestId: formString(formData, 'requestId'),

@@ -17,6 +17,7 @@ import {
     Typography,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import {
@@ -36,6 +37,8 @@ export interface IdentifierTableProps {
     onSelect: (identifier: IdentifierSummary) => void;
     onRotate: (name: string) => void;
     isRotateDisabled: (identifier: IdentifierSummary) => boolean;
+    onAuthorizeAgent: (name: string) => void;
+    isAuthorizeAgentDisabled: (identifier: IdentifierSummary) => boolean;
     onCopyAgentOobi: (identifier: IdentifierSummary) => void;
     agentOobiCopyStatus: Record<string, IdentifierOobiCopyStatus>;
 }
@@ -71,8 +74,8 @@ const stickyActionCellSx = {
     position: 'sticky',
     right: 0,
     zIndex: 2,
-    width: { sm: 104, lg: 72 },
-    minWidth: { sm: 104, lg: 72 },
+    width: { sm: 144, lg: 96 },
+    minWidth: { sm: 144, lg: 96 },
     bgcolor: 'background.paper',
     borderLeft: 1,
     borderLeftColor: 'divider',
@@ -141,6 +144,8 @@ export const IdentifierTable = ({
     onSelect,
     onRotate,
     isRotateDisabled,
+    onAuthorizeAgent,
+    isAuthorizeAgentDisabled,
     onCopyAgentOobi,
     agentOobiCopyStatus,
 }: IdentifierTableProps) => {
@@ -162,6 +167,14 @@ export const IdentifierTable = ({
     ) => {
         event.stopPropagation();
         onRotate(identifier.name);
+    };
+
+    const authorizeAgent = (
+        event: MouseEvent<HTMLButtonElement>,
+        identifier: IdentifierSummary
+    ) => {
+        event.stopPropagation();
+        onAuthorizeAgent(identifier.name);
     };
 
     const copyAgentOobi = (
@@ -250,6 +263,11 @@ export const IdentifierTable = ({
                                 identifier={identifier}
                                 copyStatus={agentOobiCopyStatus[identifier.name]}
                                 onCopy={copyAgentOobi}
+                            />
+                            <AuthorizeAgentButton
+                                identifier={identifier}
+                                disabled={isAuthorizeAgentDisabled(identifier)}
+                                onAuthorize={authorizeAgent}
                             />
                             <Tooltip title="Rotate identifier">
                                 <span>
@@ -418,6 +436,14 @@ export const IdentifierTable = ({
                                                 size="small"
                                             />
                                         </Box>
+                                        <AuthorizeAgentButton
+                                            identifier={identifier}
+                                            disabled={isAuthorizeAgentDisabled(
+                                                identifier
+                                            )}
+                                            onAuthorize={authorizeAgent}
+                                            size="small"
+                                        />
                                         <Tooltip title="Rotate identifier">
                                             <span>
                                                 <IconButton
@@ -462,6 +488,36 @@ const oobiCopyTooltip = (
 
     return 'Copy agent OOBI';
 };
+
+const AuthorizeAgentButton = ({
+    identifier,
+    disabled,
+    onAuthorize,
+    size = 'medium',
+}: {
+    identifier: IdentifierSummary;
+    disabled: boolean;
+    onAuthorize: (
+        event: MouseEvent<HTMLButtonElement>,
+        identifier: IdentifierSummary
+    ) => void;
+    size?: 'small' | 'medium';
+}) => (
+    <Tooltip title="Authorize agent">
+        <span>
+            <IconButton
+                size={size}
+                aria-label={`Authorize agent for ${identifier.name}`}
+                disabled={disabled}
+                onClick={(event) => onAuthorize(event, identifier)}
+            >
+                <ManageAccountsIcon
+                    fontSize={size === 'small' ? 'small' : 'medium'}
+                />
+            </IconButton>
+        </span>
+    </Tooltip>
+);
 
 const OobiCopyButton = ({
     identifier,

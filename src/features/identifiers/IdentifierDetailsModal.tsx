@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import type { GeneratedOobiRecord } from '../../state/contacts.slice';
 import type {
@@ -48,8 +49,10 @@ export interface IdentifierDetailsModalProps {
     oobiState: IdentifierOobiDetailState;
     delegationChain: IdentifierDelegationChainState;
     actionRunning: boolean;
+    authorizeAgentRunning: boolean;
     onClose: () => void;
     onRotate: (name: string) => void;
+    onAuthorizeAgent: (name: string) => void;
 }
 
 /**
@@ -236,8 +239,10 @@ export const IdentifierDetailsModal = ({
     oobiState,
     delegationChain,
     actionRunning,
+    authorizeAgentRunning,
     onClose,
     onRotate,
+    onAuthorizeAgent,
 }: IdentifierDetailsModalProps) => {
     const currentKeys =
         identifier === null ? [] : identifierCurrentKeys(identifier);
@@ -443,6 +448,19 @@ export const IdentifierDetailsModal = ({
                     sx={{ width: { xs: '100%', sm: 'auto' } }}
                 >
                     Close
+                </Button>
+                <Button
+                    variant="outlined"
+                    startIcon={<ManageAccountsIcon />}
+                    disabled={authorizeAgentRunning || !identifier?.name}
+                    onClick={() => {
+                        if (identifier?.name) {
+                            onAuthorizeAgent(identifier.name);
+                        }
+                    }}
+                    sx={{ width: { xs: '100%', sm: 'auto' } }}
+                >
+                    {authorizeAgentRunning ? 'Working...' : 'Authorize Agent'}
                 </Button>
                 <Button
                     variant="contained"
