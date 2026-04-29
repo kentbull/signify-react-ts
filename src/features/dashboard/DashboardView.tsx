@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
-import { useLoaderData, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+    useLoaderData,
+    useLocation,
+    useNavigate,
+    useParams,
+} from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
 import { useAppSession } from '../../app/runtimeHooks';
 import type { DashboardLoaderData } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
-    selectAgentDidWebsStatus,
     selectContacts,
     selectCredentialIpexActivity,
     selectCredentialRegistries,
@@ -45,16 +49,21 @@ export const DashboardView = () => {
     const { credentialSaid = '' } = useParams();
     const runtimeSnapshot = useAppSession();
     const session = useAppSelector(selectSession);
-    const agentDidWebsStatus = useAppSelector(selectAgentDidWebsStatus);
     const counts = useAppSelector(selectDashboardCounts);
     const recentOperations = useAppSelector(selectRecentOperations(5));
-    const recentKeriaNotifications = useAppSelector(selectRecentKeriaNotifications(5));
-    const recentAppNotifications = useAppSelector(selectRecentAppNotifications(5));
+    const recentKeriaNotifications = useAppSelector(
+        selectRecentKeriaNotifications(5)
+    );
+    const recentAppNotifications = useAppSelector(
+        selectRecentAppNotifications(5)
+    );
     const recentChallenges = useAppSelector(selectRecentChallenges(5));
     const resolvedSchemas = useAppSelector(selectResolvedCredentialSchemas);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const heldCredentials = useAppSelector(selectHeldCredentials);
-    const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
+    const grantNotifications = useAppSelector(
+        selectCredentialGrantNotifications
+    );
     const selectedCredentialExchangeActivities = useAppSelector(
         selectCredentialIpexActivity(credentialSaid)
     );
@@ -62,7 +71,8 @@ export const DashboardView = () => {
     const contacts = useAppSelector(selectContacts);
     const identifiers = useAppSelector(selectIdentifiers);
     const connection = runtimeSnapshot.connection;
-    const connectionUrl = connection.status === 'connected' ? connection.client.url : null;
+    const connectionUrl =
+        connection.status === 'connected' ? connection.client.url : null;
     const registriesById = useMemo(
         () => buildDashboardRegistryMap(registries),
         [registries]
@@ -173,7 +183,6 @@ export const DashboardView = () => {
             recentAppNotifications={recentAppNotifications}
             recentChallenges={recentChallenges}
             connectionUrl={connectionUrl}
-            agentDidWebsStatus={agentDidWebsStatus}
         />
     );
 };

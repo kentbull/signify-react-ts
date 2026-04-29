@@ -8,13 +8,17 @@ import {
     Typography,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { clickablePanelSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
-import { DidWebsPublicationDetails } from '../didwebs/DidWebsPublicationDetails';
 import type { SessionState } from '../../state/session.slice';
-import type { DidWebsStatusRecord } from '../../state/didwebs.slice';
 import type { OperationRecord } from '../../state/operations.slice';
 import type { NotificationRecord } from '../../state/notifications.slice';
 import type { AppNotificationRecord } from '../../state/appNotifications.slice';
@@ -175,7 +179,6 @@ export const DashboardOverview = ({
     recentAppNotifications,
     recentChallenges,
     connectionUrl,
-    agentDidWebsStatus,
 }: {
     loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
     session: SessionState;
@@ -185,7 +188,6 @@ export const DashboardOverview = ({
     recentAppNotifications: readonly AppNotificationRecord[];
     recentChallenges: readonly ChallengeRecord[];
     connectionUrl: string | null;
-    agentDidWebsStatus: DidWebsStatusRecord | null;
 }) => {
     const keriaTarget = connectionUrl ?? 'Disconnected';
 
@@ -287,12 +289,6 @@ export const DashboardOverview = ({
                     label="Booted this session"
                     value={session.booted ? 'Yes' : 'No'}
                 />
-                <Box sx={{ pt: 1.25 }}>
-                    <DidWebsPublicationDetails
-                        record={agentDidWebsStatus}
-                        testIdPrefix="dashboard-agent"
-                    />
-                </Box>
             </ConsolePanel>
             <Box
                 sx={{

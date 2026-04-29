@@ -21,7 +21,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import type { GeneratedOobiRecord } from '../../state/contacts.slice';
-import type { DidWebsStatusRecord } from '../../state/didwebs.slice';
+import type { DidWebsDidRecord } from '../../state/didwebs.slice';
 import { DidWebsPublicationDetails } from '../didwebs/DidWebsPublicationDetails';
 import type {
     IdentifierDelegationChainNode,
@@ -50,7 +50,7 @@ export interface IdentifierDetailsModalProps {
     refreshMessage: string | null;
     oobiState: IdentifierOobiDetailState;
     delegationChain: IdentifierDelegationChainState;
-    didWebsStatus: DidWebsStatusRecord | null;
+    didWebsDid: DidWebsDidRecord | null;
     actionRunning: boolean;
     authorizeAgentRunning: boolean;
     onClose: () => void;
@@ -241,7 +241,7 @@ export const IdentifierDetailsModal = ({
     refreshMessage,
     oobiState,
     delegationChain,
-    didWebsStatus,
+    didWebsDid,
     actionRunning,
     authorizeAgentRunning,
     onClose,
@@ -268,6 +268,7 @@ export const IdentifierDetailsModal = ({
             aria-describedby="modal-modal-description"
             fullWidth
             maxWidth="md"
+            data-testid="identifier-details-modal"
             slotProps={{
                 paper: {
                     sx: {
@@ -427,11 +428,11 @@ export const IdentifierDetailsModal = ({
                     </Accordion>
                     <Accordion disableGutters defaultExpanded>
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography>did:webs Publication</Typography>
+                            <Typography>did:webs DID</Typography>
                         </AccordionSummary>
                         <AccordionDetails>
                             <DidWebsPublicationDetails
-                                record={didWebsStatus}
+                                record={didWebsDid}
                                 testIdPrefix="identifier"
                             />
                         </AccordionDetails>

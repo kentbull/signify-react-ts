@@ -1,11 +1,11 @@
 import {
-  SignifyClient,
-  randomPasscode,
-  ready,
-  type CompletedOperation,
-  type KeyState,
-  type Operation,
-  type Tier,
+    SignifyClient,
+    randomPasscode,
+    ready,
+    type CompletedOperation,
+    type KeyState,
+    type Operation,
+    type Tier,
 } from 'signify-ts';
 import { appConfig, type KeriaConfig, type OperationConfig } from '../config';
 
@@ -18,13 +18,12 @@ import { appConfig, type KeriaConfig, type OperationConfig } from '../config';
  * should call this boundary instead of duplicating lifecycle code.
  */
 interface SignifyState {
-  agent: KeyState;
-  controller: {
-    state: KeyState;
-  };
-  dws: string | null;
-  ridx: number | null;
-  pidx: number;
+    agent: KeyState;
+    controller: {
+        state: KeyState;
+    };
+    ridx: number | null;
+    pidx: number;
 }
 
 /**
@@ -34,8 +33,8 @@ interface SignifyState {
  * `appConfig` so UI code and smoke scripts use the same local defaults.
  */
 export interface SignifyClientConfig extends Partial<KeriaConfig> {
-  passcode: string;
-  tier?: Tier;
+    passcode: string;
+    tier?: Tier;
 }
 
 /**
@@ -45,57 +44,56 @@ export interface SignifyClientConfig extends Partial<KeriaConfig> {
  * AIDs and indexes are normalized into predictable top-level fields.
  */
 export interface SignifyStateSummary {
-  controllerPre: string;
-  agentPre: string;
-  agentDws: string | null;
-  ridx: number;
-  pidx: number;
-  state: SignifyState;
+    controllerPre: string;
+    agentPre: string;
+    ridx: number;
+    pidx: number;
+    state: SignifyState;
 }
 
 /**
  * Connected client plus normalized state returned by the boundary.
  */
 export interface ConnectedSignifyClient {
-  /** Connected raw Signify client. Callers may use resource APIs from here. */
-  client: SignifyClient;
-  /** Normalized state snapshot read immediately after the connection succeeds. */
-  state: SignifyStateSummary;
-  /** True when this call created the KERIA agent before connecting. */
-  booted: boolean;
+    /** Connected raw Signify client. Callers may use resource APIs from here. */
+    client: SignifyClient;
+    /** Normalized state snapshot read immediately after the connection succeeds. */
+    state: SignifyStateSummary;
+    /** True when this call created the KERIA agent before connecting. */
+    booted: boolean;
 }
 
 /**
  * Controls for boot/connect behavior at the KERIA boundary.
  */
 export interface ConnectOptions {
-  /** Boot only when KERIA says the controller has no agent yet. */
-  bootIfMissing?: boolean;
+    /** Boot only when KERIA says the controller has no agent yet. */
+    bootIfMissing?: boolean;
 }
 
 /**
  * Structured telemetry emitted around Signify operation waits.
  */
 export type OperationLogEvent =
-  | {
-      status: 'start';
-      label: string;
-      operationName: string;
-      elapsedMs: number;
-    }
-  | {
-      status: 'success';
-      label: string;
-      operationName: string;
-      elapsedMs: number;
-    }
-  | {
-      status: 'failure';
-      label: string;
-      operationName: string;
-      elapsedMs: number;
-      error: Error;
-    };
+    | {
+          status: 'start';
+          label: string;
+          operationName: string;
+          elapsedMs: number;
+      }
+    | {
+          status: 'success';
+          label: string;
+          operationName: string;
+          elapsedMs: number;
+      }
+    | {
+          status: 'failure';
+          label: string;
+          operationName: string;
+          elapsedMs: number;
+          error: Error;
+      };
 
 /**
  * Optional observer for wait-operation telemetry.
@@ -106,39 +104,39 @@ export type OperationLogger = (event: OperationLogEvent) => void;
  * App policy for waiting on one long-running KERIA operation.
  */
 export interface WaitOperationOptions extends Partial<OperationConfig> {
-  /** Human-readable phase included in timeout/failure messages. */
-  label: string;
-  /** Optional caller cancellation signal, composed with the timeout signal. */
-  signal?: AbortSignal;
-  /** Optional structured operation logger. Defaults to no logging. */
-  logger?: OperationLogger;
+    /** Human-readable phase included in timeout/failure messages. */
+    label: string;
+    /** Optional caller cancellation signal, composed with the timeout signal. */
+    signal?: AbortSignal;
+    /** Optional structured operation logger. Defaults to no logging. */
+    logger?: OperationLogger;
 }
 
 const isMissingAgentError = (error: unknown): boolean =>
-  error instanceof Error && error.message.includes('agent does not exist');
+    error instanceof Error && error.message.includes('agent does not exist');
 
 /**
  * Normalize unknown catches into `Error` instances without losing messages.
  */
 export const toError = (error: unknown): Error =>
-  error instanceof Error ? error : new Error(String(error));
+    error instanceof Error ? error : new Error(String(error));
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+    typeof value === 'object' && value !== null;
 
 const isKeyState = (value: unknown): value is KeyState =>
-  isObjectRecord(value) &&
-  typeof value.i === 'string' &&
-  typeof value.s === 'string' &&
-  typeof value.d === 'string' &&
-  Array.isArray(value.k);
+    isObjectRecord(value) &&
+    typeof value.i === 'string' &&
+    typeof value.s === 'string' &&
+    typeof value.d === 'string' &&
+    Array.isArray(value.k);
 
 const requireKeyState = (value: unknown, label: string): KeyState => {
-  if (isKeyState(value)) {
-    return value;
-  }
+    if (isKeyState(value)) {
+        return value;
+    }
 
-  throw new Error(`KERIA state did not include a valid ${label} key state.`);
+    throw new Error(`KERIA state did not include a valid ${label} key state.`);
 };
 
 /**
@@ -156,18 +154,18 @@ const requireKeyState = (value: unknown, label: string): KeyState => {
  * `operations().wait`, that is a sign the boundary is doing too much.
  */
 interface OperationWaiter {
-  wait(
-    operation: Operation,
-    options: {
-      signal?: AbortSignal;
-      minSleep?: number;
-      maxSleep?: number;
-    }
-  ): Promise<CompletedOperation>;
+    wait(
+        operation: Operation,
+        options: {
+            signal?: AbortSignal;
+            minSleep?: number;
+            maxSleep?: number;
+        }
+    ): Promise<CompletedOperation>;
 }
 
 interface OperationWaitClient {
-  operations(): OperationWaiter;
+    operations(): OperationWaiter;
 }
 
 /**
@@ -180,36 +178,36 @@ interface OperationWaitClient {
  * removes listeners/timers after every success or failure path.
  */
 const combineWithTimeout = (
-  timeoutMs: number,
-  signal?: AbortSignal
+    timeoutMs: number,
+    signal?: AbortSignal
 ): { signal: AbortSignal; cleanup: () => void } => {
-  /*
-   * Signify's operation waiter accepts one AbortSignal. We compose the caller's
-   * optional signal with an internal timeout signal and return cleanup so each
-   * wait removes listeners and clears its timer in success and failure paths.
-   */
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => {
-    controller.abort(new Error(`Operation timed out after ${timeoutMs}ms`));
-  }, timeoutMs);
+    /*
+     * Signify's operation waiter accepts one AbortSignal. We compose the caller's
+     * optional signal with an internal timeout signal and return cleanup so each
+     * wait removes listeners and clears its timer in success and failure paths.
+     */
+    const controller = new AbortController();
+    const timeout = globalThis.setTimeout(() => {
+        controller.abort(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
 
-  const onAbort = () => {
-    controller.abort(signal?.reason ?? new Error('Operation aborted'));
-  };
+    const onAbort = () => {
+        controller.abort(signal?.reason ?? new Error('Operation aborted'));
+    };
 
-  if (signal?.aborted) {
-    onAbort();
-  } else {
-    signal?.addEventListener('abort', onAbort, { once: true });
-  }
+    if (signal?.aborted) {
+        onAbort();
+    } else {
+        signal?.addEventListener('abort', onAbort, { once: true });
+    }
 
-  return {
-    signal: controller.signal,
-    cleanup: () => {
-      globalThis.clearTimeout(timeout);
-      signal?.removeEventListener('abort', onAbort);
-    },
-  };
+    return {
+        signal: controller.signal,
+        cleanup: () => {
+            globalThis.clearTimeout(timeout);
+            signal?.removeEventListener('abort', onAbort);
+        },
+    };
 };
 
 /**
@@ -220,16 +218,16 @@ const combineWithTimeout = (
  * boot/connect sequence manually.
  */
 export const createSignifyClient = async (
-  config: SignifyClientConfig
+    config: SignifyClientConfig
 ): Promise<SignifyClient> => {
-  await ready();
+    await ready();
 
-  return new SignifyClient(
-    config.adminUrl ?? appConfig.keria.adminUrl,
-    config.passcode,
-    config.tier ?? appConfig.defaultTier,
-    config.bootUrl ?? appConfig.keria.bootUrl
-  );
+    return new SignifyClient(
+        config.adminUrl ?? appConfig.keria.adminUrl,
+        config.passcode,
+        config.tier ?? appConfig.defaultTier,
+        config.bootUrl ?? appConfig.keria.bootUrl
+    );
 };
 
 /**
@@ -239,43 +237,41 @@ export const createSignifyClient = async (
  * generation is part of the boundary instead of being called directly from UI.
  */
 export const randomSignifyPasscode = async (): Promise<string> => {
-  await ready();
-  return randomPasscode();
+    await ready();
+    return randomPasscode();
 };
 
 /**
  * Read and normalize current KERIA agent/controller state.
  */
 export const getSignifyState = async (
-  client: SignifyClient
+    client: SignifyClient
 ): Promise<SignifyStateSummary> => {
-  const rawState = await client.state();
-  const rawController = rawState.controller;
-  const controllerState = requireKeyState(
-    isObjectRecord(rawController) ? rawController.state : null,
-    'controller'
-  );
-  const agent = requireKeyState(rawState.agent, 'agent');
-  const state: SignifyState = {
-    agent,
-    controller: {
-      state: controllerState,
-    },
-    dws: typeof rawState.dws === 'string' ? rawState.dws : null,
-    ridx: rawState.ridx ?? null,
-    pidx: rawState.pidx,
-  };
-  const controllerPre = state.controller.state.i ?? client.controller.pre;
-  const agentPre = state.agent.i ?? client.agent?.pre ?? '';
+    const rawState = await client.state();
+    const rawController = rawState.controller;
+    const controllerState = requireKeyState(
+        isObjectRecord(rawController) ? rawController.state : null,
+        'controller'
+    );
+    const agent = requireKeyState(rawState.agent, 'agent');
+    const state: SignifyState = {
+        agent,
+        controller: {
+            state: controllerState,
+        },
+        ridx: rawState.ridx ?? null,
+        pidx: rawState.pidx,
+    };
+    const controllerPre = state.controller.state.i ?? client.controller.pre;
+    const agentPre = state.agent.i ?? client.agent?.pre ?? '';
 
-  return {
-    controllerPre,
-    agentPre,
-    agentDws: state.dws,
-    ridx: state.ridx ?? 0,
-    pidx: state.pidx ?? 0,
-    state,
-  };
+    return {
+        controllerPre,
+        agentPre,
+        ridx: state.ridx ?? 0,
+        pidx: state.pidx ?? 0,
+        state,
+    };
 };
 
 /**
@@ -286,37 +282,37 @@ export const getSignifyState = async (
  * unconditional boot attempt.
  */
 export const connectSignifyClient = async (
-  config: SignifyClientConfig,
-  options: ConnectOptions = {}
+    config: SignifyClientConfig,
+    options: ConnectOptions = {}
 ): Promise<ConnectedSignifyClient> => {
-  const bootIfMissing = options.bootIfMissing ?? true;
-  const client = await createSignifyClient(config);
-  let booted = false;
+    const bootIfMissing = options.bootIfMissing ?? true;
+    const client = await createSignifyClient(config);
+    let booted = false;
 
-  try {
-    await client.connect();
-  } catch (error) {
-    if (!bootIfMissing || !isMissingAgentError(error)) {
-      throw error;
+    try {
+        await client.connect();
+    } catch (error) {
+        if (!bootIfMissing || !isMissingAgentError(error)) {
+            throw error;
+        }
+
+        const response = await client.boot();
+        if (!response.ok) {
+            throw new Error(
+                `KERIA boot failed: ${response.status} ${response.statusText}`,
+                { cause: error }
+            );
+        }
+
+        booted = true;
+        await client.connect();
     }
 
-    const response = await client.boot();
-    if (!response.ok) {
-      throw new Error(
-        `KERIA boot failed: ${response.status} ${response.statusText}`,
-        { cause: error }
-      );
-    }
-
-    booted = true;
-    await client.connect();
-  }
-
-  return {
-    client,
-    state: await getSignifyState(client),
-    booted,
-  };
+    return {
+        client,
+        state: await getSignifyState(client),
+        booted,
+    };
 };
 
 /**
@@ -339,53 +335,53 @@ export const connectSignifyClient = async (
  * manual `operations().get` polling loops or local done/error interpretation.
  */
 export const waitOperation = async (
-  client: OperationWaitClient,
-  op: Operation,
-  options: WaitOperationOptions
+    client: OperationWaitClient,
+    op: Operation,
+    options: WaitOperationOptions
 ): Promise<CompletedOperation> => {
-  const timeoutMs = options.timeoutMs ?? appConfig.operations.timeoutMs;
-  const minSleepMs = options.minSleepMs ?? appConfig.operations.minSleepMs;
-  const maxSleepMs = options.maxSleepMs ?? appConfig.operations.maxSleepMs;
-  const { signal, cleanup } = combineWithTimeout(timeoutMs, options.signal);
-  const startedAt = Date.now();
-  const operationName = op.name;
-  const elapsedMs = () => Date.now() - startedAt;
+    const timeoutMs = options.timeoutMs ?? appConfig.operations.timeoutMs;
+    const minSleepMs = options.minSleepMs ?? appConfig.operations.minSleepMs;
+    const maxSleepMs = options.maxSleepMs ?? appConfig.operations.maxSleepMs;
+    const { signal, cleanup } = combineWithTimeout(timeoutMs, options.signal);
+    const startedAt = Date.now();
+    const operationName = op.name;
+    const elapsedMs = () => Date.now() - startedAt;
 
-  options.logger?.({
-    status: 'start',
-    label: options.label,
-    operationName,
-    elapsedMs: 0,
-  });
+    options.logger?.({
+        status: 'start',
+        label: options.label,
+        operationName,
+        elapsedMs: 0,
+    });
 
-  try {
-    const completed = await client.operations().wait(op, {
-      signal,
-      minSleep: minSleepMs,
-      maxSleep: maxSleepMs,
-    });
-    options.logger?.({
-      status: 'success',
-      label: options.label,
-      operationName,
-      elapsedMs: elapsedMs(),
-    });
-    return completed;
-  } catch (error) {
-    const normalized = toError(error);
-    const elapsed = elapsedMs();
-    options.logger?.({
-      status: 'failure',
-      label: options.label,
-      operationName,
-      elapsedMs: elapsed,
-      error: normalized,
-    });
-    throw new Error(
-      `Operation failed while ${options.label} [operation=${operationName}, elapsed=${elapsed}ms]: ${normalized.message}`,
-      { cause: error }
-    );
-  } finally {
-    cleanup();
-  }
+    try {
+        const completed = await client.operations().wait(op, {
+            signal,
+            minSleep: minSleepMs,
+            maxSleep: maxSleepMs,
+        });
+        options.logger?.({
+            status: 'success',
+            label: options.label,
+            operationName,
+            elapsedMs: elapsedMs(),
+        });
+        return completed;
+    } catch (error) {
+        const normalized = toError(error);
+        const elapsed = elapsedMs();
+        options.logger?.({
+            status: 'failure',
+            label: options.label,
+            operationName,
+            elapsedMs: elapsed,
+            error: normalized,
+        });
+        throw new Error(
+            `Operation failed while ${options.label} [operation=${operationName}, elapsed=${elapsed}ms]: ${normalized.message}`,
+            { cause: error }
+        );
+    } finally {
+        cleanup();
+    }
 };

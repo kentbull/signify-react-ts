@@ -6,11 +6,7 @@ import {
     didWebsPendingObserved,
     didWebsReadyObserved,
 } from '../../src/state/didwebs.slice';
-import {
-    selectAgentDidWebsStatus,
-    selectDidWebsStatusByAid,
-} from '../../src/state/selectors';
-import { sessionConnected, sessionDisconnected } from '../../src/state/session.slice';
+import { selectDidWebsDidByAid } from '../../src/state/selectors';
 import { createAppStore } from '../../src/state/store';
 
 describe('did:webs state', () => {
@@ -23,7 +19,7 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:00.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'loading',
             did: null,
         });
@@ -35,8 +31,8 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:01.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
-            loadState: 'unavailable',
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
+            loadState: 'pending',
             did: null,
         });
 
@@ -47,7 +43,7 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:02.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'ready',
             did: 'did:webs:example:dws:Eaid',
         });
@@ -59,7 +55,7 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:03.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'error',
             error: 'network down',
         });
@@ -74,8 +70,8 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:00.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
-            loadState: 'unavailable',
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
+            loadState: 'pending',
             did: null,
         });
 
@@ -86,35 +82,9 @@ describe('did:webs state', () => {
                 updatedAt: '2026-04-29T00:00:01.000Z',
             })
         );
-        expect(selectDidWebsStatusByAid('Eaid')(store.getState())).toMatchObject({
+        expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'ready',
             did: 'did:webs:example:dws:Eaid',
         });
-    });
-
-    it('selects agent status and resets on session teardown', () => {
-        const store = createAppStore();
-
-        store.dispatch(
-            sessionConnected({
-                booted: false,
-                controllerAid: 'Econtroller',
-                agentAid: 'Eagent',
-                connectedAt: '2026-04-29T00:00:00.000Z',
-            })
-        );
-        store.dispatch(
-            didWebsReadyObserved({
-                aid: 'Eagent',
-                did: 'did:webs:example:dws:Eagent',
-                updatedAt: '2026-04-29T00:00:01.000Z',
-            })
-        );
-
-        expect(selectAgentDidWebsStatus(store.getState())?.did).toBe(
-            'did:webs:example:dws:Eagent'
-        );
-        store.dispatch(sessionDisconnected());
-        expect(selectAgentDidWebsStatus(store.getState())).toBeNull();
     });
 });
