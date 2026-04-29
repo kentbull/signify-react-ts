@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialWalletPanels';
+import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
+import { W3C_PRESENTABLE_VRD_SCHEMA_SAID } from '../../src/domain/credentials/credentialPresentation';
 import type {
     CredentialSummaryRecord,
     SchemaRecord,
@@ -45,21 +47,55 @@ describe('wallet credential panels', () => {
                 credentials={[credential]}
                 credentialTypesBySchema={new Map()}
                 schemasBySaid={new Map([['Eschema', schema]])}
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', false]])}
                 verifiers={[]}
                 selectedVerifierId=""
-                didWebsReady={false}
                 actionRunning={false}
                 onOpenCredential={vi.fn()}
                 onVerifierChange={vi.fn()}
-                onProject={vi.fn()}
+                onPresent={vi.fn()}
             />
         );
 
         expect(markup).toContain('role="button"');
         expect(markup).toContain('Verifiable Reference Data (VRD) Credential');
+        expect(markup).toContain('Present');
         expect(markup).toContain('Ecredential');
         expect(markup).not.toContain('Schema SAID');
         expect(markup).not.toContain('Issuer');
         expect(markup).not.toContain('Holder');
+    });
+
+    it('renders the shared verifier selector and explicit W3C Present blockers', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CPresentationControls
+                credential={{
+                    ...credential,
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[]}
+                didWebsReadyByAid={new Map()}
+                verifiers={[
+                    {
+                        id: 'isomer-python',
+                        label: 'Python Isomer',
+                        kind: 'isomer-python-vc-jwt',
+                        verifyUrl: 'http://verifier.example/verify',
+                    },
+                ]}
+                selectedVerifierId="isomer-python"
+                actionRunning={false}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Verifier');
+        expect(markup).toContain('Python Isomer');
+        expect(markup).toContain('Present');
+        expect(markup).toContain(
+            'This wallet does not control the credential issuer AID required for W3C Present.'
+        );
     });
 });

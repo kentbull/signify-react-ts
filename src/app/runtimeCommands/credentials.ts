@@ -3,7 +3,7 @@ import type {
     CreateCredentialRegistryInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
-    ProjectCredentialInput,
+    PresentCredentialInput,
     ResolveCredentialSchemaInput,
 } from '../../domain/credentials/credentialCommands';
 import type {
@@ -18,7 +18,7 @@ import {
     grantCredentialOp,
     issueSediCredentialOp,
     listW3CVerifiersOp,
-    projectCredentialOp,
+    presentCredentialOp,
     resolveCredentialSchemaOp,
     syncCredentialInventoryOp,
     syncCredentialIpexActivityOp,
@@ -59,8 +59,8 @@ export interface CredentialRuntimeCommands {
         input: AdmitCredentialGrantInput,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
-    startProject(
-        input: ProjectCredentialInput,
+    startPresent(
+        input: PresentCredentialInput,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
     listW3CVerifiers(options?: WorkflowRunOptions): Promise<W3CVerifier[]>;
@@ -81,7 +81,7 @@ export const createCredentialRuntimeCommands = (
     startIssue: startIssueCredential(context),
     startGrant: startGrantCredential(context),
     startAdmit: startAdmitCredentialGrant(context),
-    startProject: startProjectCredential(context),
+    startPresent: startPresentCredential(context),
     listW3CVerifiers: listW3CVerifiers(context),
 });
 
@@ -180,15 +180,15 @@ const startAdmitCredentialGrant =
             admitCredentialGrantOptions(input, options)
         );
 
-const startProjectCredential =
+const startPresentCredential =
     (context: RuntimeCommandContext) =>
     (
-        input: ProjectCredentialInput,
+        input: PresentCredentialInput,
         options: RequestIdOptions = {}
     ): BackgroundWorkflowStartResult =>
         context.startBackgroundWorkflow(
-            () => projectCredentialOp(input),
-            projectCredentialOptions(input, options)
+            () => presentCredentialOp(input),
+            presentCredentialOptions(input, options)
         );
 
 const listW3CVerifiers =
@@ -323,26 +323,27 @@ const admitCredentialGrantOptions = (
     },
 });
 
-const projectCredentialOptions = (
-    input: ProjectCredentialInput,
+const presentCredentialOptions = (
+    input: PresentCredentialInput,
     options: RequestIdOptions
 ): BackgroundWorkflowRunOptions<W3CProjectionSession> => ({
     requestId: options.requestId,
-    label: `Projecting credential ${input.credentialSaid}`,
-    title: 'Project credential',
+    label: `Presenting credential ${input.credentialSaid}`,
+    title: 'Present credential',
     description:
         'Projects the VRD credential into a short-lived W3C VC-JWT and submits it to the selected verifier.',
     kind: 'presentCredential',
-    resourceKeys: [`credential:${input.credentialSaid}:w3c-project`],
+    resourceKeys: [`credential:${input.credentialSaid}:w3c-present`],
     resultRoute: credentialsRoute,
     successNotification: {
-        title: 'Credential projected',
+        title: 'Credential presented',
         message: 'The W3C VC-JWT was accepted by the selected verifier.',
         severity: 'success',
     },
     failureNotification: {
-        title: 'Credential projection failed',
-        message: 'The credential could not be projected for the selected verifier.',
+        title: 'Credential presentation failed',
+        message:
+            'The credential could not be presented to the selected verifier.',
         severity: 'error',
     },
 });

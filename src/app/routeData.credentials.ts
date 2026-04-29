@@ -4,6 +4,7 @@ import type {
     AdmitCredentialGrantInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
+    PresentCredentialInput,
 } from '../domain/credentials/credentialCommands';
 import type {
     CredentialActionData,
@@ -36,7 +37,7 @@ const credentialIntentFromString = (value: string): CredentialIntent =>
     value === 'issueCredential' ||
     value === 'grantCredential' ||
     value === 'admitCredentialGrant' ||
-    value === 'projectCredential' ||
+    value === 'presentCredential' ||
     value === 'refreshCredentials'
         ? value
         : 'resolveSchema';
@@ -367,38 +368,39 @@ const admitCredentialGrantAction = ({
 };
 
 /**
- * Starts holder-side W3C projection for an admitted VRD credential.
+ * Starts W3C presentation for an admitted VRD credential.
  */
-const projectCredentialAction = ({
+const presentCredentialAction = ({
     runtime,
     formData,
     requestId,
 }: CredentialActionContext): CredentialActionData => {
-    const intent = 'projectCredential';
-    const input = {
-        holderAlias: formString(formData, 'holderAlias').trim(),
-        holderAid: formString(formData, 'holderAid').trim(),
+    const intent = 'presentCredential';
+    const input: PresentCredentialInput = {
+        projectorAlias: formString(formData, 'projectorAlias').trim(),
+        projectorAid: formString(formData, 'projectorAid').trim(),
         credentialSaid: formString(formData, 'credentialSaid').trim(),
         verifierId: formString(formData, 'verifierId').trim(),
     };
     if (
-        input.holderAlias.length === 0 ||
-        input.holderAid.length === 0 ||
+        input.projectorAlias.length === 0 ||
+        input.projectorAid.length === 0 ||
         input.credentialSaid.length === 0 ||
         input.verifierId.length === 0
     ) {
         return {
             intent,
             ok: false,
-            message: 'Holder, credential, and verifier are required.',
+            message:
+                'Projector identifier, credential, and verifier are required.',
             requestId,
         };
     }
 
     return credentialStartedResult(
         intent,
-        runtime.credentials.startProject(input, requestIdOption(requestId)),
-        `Projecting credential ${input.credentialSaid}`
+        runtime.credentials.startPresent(input, requestIdOption(requestId)),
+        `Presenting credential ${input.credentialSaid}`
     );
 };
 
@@ -423,8 +425,8 @@ const runCredentialIntentAction = (
             return grantCredentialAction(context);
         case 'admitCredentialGrant':
             return admitCredentialGrantAction(context);
-        case 'projectCredential':
-            return projectCredentialAction(context);
+        case 'presentCredential':
+            return presentCredentialAction(context);
         default:
             return {
                 intent: 'unsupported',

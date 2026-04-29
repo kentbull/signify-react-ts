@@ -374,9 +374,9 @@ describe('runtime command adapters', () => {
             notificationId: 'note-1',
             grantSaid: 'Egrant',
         });
-        commands.startProject({
-            holderAlias: 'holder',
-            holderAid: 'Eholder',
+        commands.startPresent({
+            projectorAlias: 'issuer',
+            projectorAid: 'Eissuer',
             credentialSaid: 'Ecredential',
             verifierId: 'isomer-python',
         });
@@ -469,21 +469,21 @@ describe('runtime command adapters', () => {
             },
         });
         expect(startedOptions[5]).toMatchObject({
-            label: 'Projecting credential Ecredential',
-            title: 'Project credential',
+            label: 'Presenting credential Ecredential',
+            title: 'Present credential',
             kind: 'presentCredential',
-            resourceKeys: ['credential:Ecredential:w3c-project'],
+            resourceKeys: ['credential:Ecredential:w3c-present'],
             resultRoute: { label: 'View credentials', path: '/credentials' },
             successNotification: {
-                title: 'Credential projected',
+                title: 'Credential presented',
                 message:
                     'The W3C VC-JWT was accepted by the selected verifier.',
                 severity: 'success',
             },
             failureNotification: {
-                title: 'Credential projection failed',
+                title: 'Credential presentation failed',
                 message:
-                    'The credential could not be projected for the selected verifier.',
+                    'The credential could not be presented to the selected verifier.',
                 severity: 'error',
             },
         });

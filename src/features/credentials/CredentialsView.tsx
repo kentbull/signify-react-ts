@@ -19,6 +19,7 @@ import { ConnectionRequired } from '../../app/ConnectionRequired';
 import { ConsolePanel, EmptyState, PageHeader, StatusPill } from '../../app/Console';
 import { useAppRuntime } from '../../app/runtimeHooks';
 import type { CredentialActionData, CredentialsLoaderData } from '../../app/routeData';
+import { submitCredentialAction } from '../../app/credentialActionSubmit';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
@@ -32,22 +33,6 @@ import {
 import { credentialPath } from './credentialDisplay';
 import { AidSelector } from './CredentialShared';
 import type { CredentialsRouteContextValue } from './CredentialsRouteContext';
-
-const newRequestId = (): string =>
-    globalThis.crypto?.randomUUID?.() ??
-    `credential-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-interface FormSubmitter {
-    submit(
-        formData: FormData,
-        options: { method: 'post'; action: string }
-    ): void;
-}
-
-const submitWithId = (fetcher: FormSubmitter, formData: FormData): void => {
-    formData.set('requestId', newRequestId());
-    fetcher.submit(formData, { method: 'post', action: '/credentials' });
-};
 
 /**
  * Credentials route layout.
@@ -126,7 +111,7 @@ export const CredentialsView = () => {
     };
 
     const submitCredentialForm = (formData: FormData) => {
-        submitWithId(fetcher, formData);
+        submitCredentialAction(fetcher, formData);
     };
 
     const submitRefresh = () => {

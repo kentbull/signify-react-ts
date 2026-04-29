@@ -45,10 +45,10 @@ export interface AdmitCredentialGrantInput {
     grantSaid: string;
 }
 
-/** Command data for projecting one VRD ACDC into an ephemeral W3C VC-JWT. */
-export interface ProjectCredentialInput {
-    holderAlias: string;
-    holderAid: string;
+/** Command data for presenting one VRD ACDC through the W3C VC-JWT path. */
+export interface PresentCredentialInput {
+    projectorAlias: string;
+    projectorAid: string;
     credentialSaid: string;
     verifierId: string;
 }

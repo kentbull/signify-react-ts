@@ -706,30 +706,30 @@ export function* admitCredentialGrantService({
 }
 
 /**
- * Start an ephemeral KERIA W3C projection session and wait until KERIA has
- * either submitted the assembled VC-JWT to the configured verifier or failed.
+ * Start an ephemeral KERIA W3C presentation session and wait until KERIA has
+ * submitted the assembled VC-JWT to the configured verifier or failed.
  *
  * The edge signatures are supplied by the live W3C auto-approver running on
  * the generic KERIA signal stream; this foreground workflow only creates the
  * session and observes KERIA's short-lived session state.
  */
-export function* projectCredentialService({
+export function* presentCredentialService({
     client,
-    holderAlias,
-    holderAid,
+    projectorAlias,
+    projectorAid,
     credentialSaid,
     verifierId,
     timeoutMs,
 }: {
     client: SignifyClient;
-    holderAlias: string;
-    holderAid: string;
+    projectorAlias: string;
+    projectorAid: string;
     credentialSaid: string;
     verifierId: string;
     timeoutMs: number;
 }): EffectionOperation<W3CProjectionSession> {
-    const name = requireNonEmpty(holderAlias, 'Holder identifier');
-    requireNonEmpty(holderAid, 'Holder AID');
+    const name = requireNonEmpty(projectorAlias, 'Projector identifier');
+    requireNonEmpty(projectorAid, 'Projector AID');
     const said = requireNonEmpty(credentialSaid, 'Credential SAID');
     const verifier = requireNonEmpty(verifierId, 'Verifier');
     const session = yield* callPromise(() =>

@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Button, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
-    selectDidWebsDidByAid,
+    selectDidWebsDidsByAid,
     selectHeldCredentials,
     selectIssueableCredentialTypeViews,
     selectCredentialSchemas,
 } from '../../state/selectors';
+import { useAppRuntime } from '../../app/runtimeHooks';
 import {
     grantsForAid,
     heldCredentialsForAid,
@@ -25,18 +26,21 @@ import {
     WalletCredentialTypesPanel,
     WalletStatsPanel,
 } from './CredentialWalletPanels';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 
 /**
  * Wallet route for one selected local AID.
  *
  * This route owns holder-side schema readiness, inbound grant admission, and
- * held credential presentation/project actions.
+ * held credential W3C Present actions.
  */
 export const CredentialWalletRoute = () => {
     const navigate = useNavigate();
+    const runtime = useAppRuntime();
     const {
         actionRunning,
         selectedIdentifier,
+        identifiers,
         submitResolveSchema,
         submitCredentialForm,
         w3cVerifiers,
@@ -45,16 +49,10 @@ export const CredentialWalletRoute = () => {
     const schemas = useAppSelector(selectCredentialSchemas);
     const heldCredentials = useAppSelector(selectHeldCredentials);
     const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
-    const didWebsDid = useAppSelector(
-        selectDidWebsDidByAid(selectedIdentifier?.prefix)
-    );
+    const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const [selectedVerifierId, setSelectedVerifierId] = useState(
         w3cVerifiers[0]?.id ?? ''
     );
-
-    if (selectedIdentifier === null) {
-        return null;
-    }
 
     const credentialTypesBySchema = new Map(
         credentialTypes.map((credentialType) => [
@@ -65,16 +63,36 @@ export const CredentialWalletRoute = () => {
     const schemasBySaid = new Map(
         schemas.map((schema) => [schema.said, schema])
     );
+    const selectedAid = selectedIdentifier?.prefix ?? '';
     const selectedAidHeldCredentials = heldCredentialsForAid(
         heldCredentials,
-        selectedIdentifier.prefix
+        selectedAid
+    );
+    const didWebsReadyByAid = useMemo(
+        () =>
+            new Map(
+                Object.entries(didWebsByAid).map(([aid, did]) => [
+                    aid,
+                    did.loadState === 'ready' && did.did !== null,
+                ])
+            ),
+        [didWebsByAid]
+    );
+    const presentationProjectors = useMemo(
+        () =>
+            identifiers.filter((identifier) =>
+                selectedAidHeldCredentials.some(
+                    (credential) => credential.issuerAid === identifier.prefix
+                )
+            ),
+        [identifiers, selectedAidHeldCredentials]
     );
     const selectedAidGrants = grantsForAid(
         grantNotifications,
-        selectedIdentifier.prefix
+        selectedAid
     );
     const walletStats = walletStatsForAid({
-        aid: selectedIdentifier.prefix,
+        aid: selectedAid,
         heldCredentials,
         grants: grantNotifications,
     });
@@ -85,6 +103,28 @@ export const CredentialWalletRoute = () => {
         '';
     const unresolvedWalletCredentialType =
         credentialTypes.find((type) => type.schemaStatus !== 'resolved') ?? null;
+
+    useEffect(() => {
+        if (presentationProjectors.length === 0) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        for (const projector of presentationProjectors) {
+            void runtime.didwebs
+                .refreshIdentifierDid(projector.name, projector.prefix, {
+                    signal: controller.signal,
+                    track: false,
+                })
+                .catch(() => undefined);
+        }
+
+        return () => controller.abort();
+    }, [runtime, presentationProjectors]);
+
+    if (selectedIdentifier === null) {
+        return null;
+    }
 
     const submitAdmit = (notificationId: string, grantSaid: string) => {
         const formData = new FormData();
@@ -100,17 +140,21 @@ export const CredentialWalletRoute = () => {
         navigate(credentialDetailPath(credentialSaid));
     };
 
-    const submitProject = (credential: CredentialSummaryRecord) => {
-        if (effectiveVerifierId.length === 0) {
+    const submitPresent = (
+        credential: CredentialSummaryRecord,
+        projector: IdentifierSummary,
+        verifierId: string
+    ) => {
+        if (verifierId.length === 0) {
             return;
         }
 
         const formData = new FormData();
-        formData.set('intent', 'projectCredential');
-        formData.set('holderAlias', selectedIdentifier.name);
-        formData.set('holderAid', selectedIdentifier.prefix);
+        formData.set('intent', 'presentCredential');
+        formData.set('projectorAlias', projector.name);
+        formData.set('projectorAid', projector.prefix);
         formData.set('credentialSaid', credential.said);
-        formData.set('verifierId', effectiveVerifierId);
+        formData.set('verifierId', verifierId);
         submitCredentialForm(formData);
     };
 
@@ -126,6 +170,19 @@ export const CredentialWalletRoute = () => {
                     Back
                 </Button>
             </Box>
+            <HeldCredentialsPanel
+                credentials={selectedAidHeldCredentials}
+                credentialTypesBySchema={credentialTypesBySchema}
+                schemasBySaid={schemasBySaid}
+                identifiers={identifiers}
+                didWebsReadyByAid={didWebsReadyByAid}
+                verifiers={w3cVerifiers}
+                selectedVerifierId={effectiveVerifierId}
+                actionRunning={actionRunning}
+                onOpenCredential={openHeldCredential}
+                onVerifierChange={setSelectedVerifierId}
+                onPresent={submitPresent}
+            />
             <WalletCredentialTypesPanel
                 selectedIdentifierName={selectedIdentifier.name}
                 credentialTypes={credentialTypes}
@@ -143,21 +200,6 @@ export const CredentialWalletRoute = () => {
                 credentialTypesBySchema={credentialTypesBySchema}
                 schemasBySaid={schemasBySaid}
                 onAdmit={submitAdmit}
-            />
-            <HeldCredentialsPanel
-                credentials={selectedAidHeldCredentials}
-                credentialTypesBySchema={credentialTypesBySchema}
-                schemasBySaid={schemasBySaid}
-                verifiers={w3cVerifiers}
-                selectedVerifierId={effectiveVerifierId}
-                didWebsReady={
-                    didWebsDid?.loadState === 'ready' &&
-                    didWebsDid.did !== null
-                }
-                actionRunning={actionRunning}
-                onOpenCredential={openHeldCredential}
-                onVerifierChange={setSelectedVerifierId}
-                onProject={submitProject}
             />
         </Stack>
     );

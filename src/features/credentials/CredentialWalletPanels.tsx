@@ -1,16 +1,11 @@
 import {
     Box,
     Button,
-    FormControl,
-    InputLabel,
-    MenuItem,
-    Select,
     Stack,
     Typography,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import SendIcon from '@mui/icons-material/Send';
 import { ConsolePanel, EmptyState, StatusPill, TelemetryRow } from '../../app/Console';
 import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
@@ -20,6 +15,7 @@ import type {
     CredentialSummaryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { W3CVerifier } from 'signify-ts';
 import type { CredentialWalletStats } from './credentialViewModels';
 import {
@@ -27,6 +23,7 @@ import {
     schemaStatusTone,
     statusTone,
 } from './credentialDisplay';
+import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
 
 /**
  * Holder-side credential type readiness panel.
@@ -270,61 +267,38 @@ export const InboundGrantsPanel = ({
 
 /**
  * Holder-side admitted credential list. Rows navigate to the full dashboard
- * credential detail route; the Project action remains a row-local command.
+ * credential detail route; W3C Present remains a row-local command.
  */
 export const HeldCredentialsPanel = ({
     credentials,
     credentialTypesBySchema,
     schemasBySaid,
+    identifiers,
+    didWebsReadyByAid,
     verifiers,
     selectedVerifierId,
-    didWebsReady,
     actionRunning,
     onOpenCredential,
     onVerifierChange,
-    onProject,
+    onPresent,
 }: {
     credentials: readonly CredentialSummaryRecord[];
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
+    identifiers: readonly IdentifierSummary[];
+    didWebsReadyByAid: ReadonlyMap<string, boolean>;
     verifiers: readonly W3CVerifier[];
     selectedVerifierId: string;
-    didWebsReady: boolean;
     actionRunning: boolean;
     onOpenCredential: (credentialSaid: string) => void;
     onVerifierChange: (verifierId: string) => void;
-    onProject: (credential: CredentialSummaryRecord) => void;
+    onPresent: (
+        credential: CredentialSummaryRecord,
+        projector: IdentifierSummary,
+        verifierId: string
+    ) => void;
 }) => (
-    <ConsolePanel
-        title="Held credentials"
-        actions={
-            verifiers.length === 0 ? null : (
-                <FormControl size="small" sx={{ minWidth: 220 }}>
-                    <InputLabel id="w3c-verifier-label">Verifier</InputLabel>
-                    <Select
-                        labelId="w3c-verifier-label"
-                        label="Verifier"
-                        value={
-                            verifiers.some(
-                                (verifier) => verifier.id === selectedVerifierId
-                            )
-                                ? selectedVerifierId
-                                : ''
-                        }
-                        onChange={(event) =>
-                            onVerifierChange(event.target.value)
-                        }
-                    >
-                        {verifiers.map((verifier) => (
-                            <MenuItem key={verifier.id} value={verifier.id}>
-                                {verifier.label}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-            )
-        }
-    >
+    <ConsolePanel title="Held credentials">
         {credentials.length === 0 ? (
             <EmptyState
                 title="No held credentials"
@@ -332,91 +306,69 @@ export const HeldCredentialsPanel = ({
             />
         ) : (
             <Stack spacing={1.5}>
-                {credentials.map((credential) => {
-                    const isProjectable =
-                        credential.status === 'admitted' &&
-                        credential.schemaSaid !== null &&
-                        credentialTypesBySchema.has(credential.schemaSaid);
-                    const canProject =
-                        isProjectable &&
-                        didWebsReady &&
-                        selectedVerifierId.length > 0 &&
-                        !actionRunning;
-                    const showProject =
-                        isProjectable && didWebsReady && verifiers.length > 0;
-                    return (
-                        <Box
-                            key={credential.said}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => onOpenCredential(credential.said)}
-                            onKeyDown={(event) => {
-                                if (
-                                    event.key === 'Enter' ||
-                                    event.key === ' '
-                                ) {
-                                    event.preventDefault();
-                                    onOpenCredential(credential.said);
-                                }
-                            }}
-                            sx={[
-                                {
-                                    border: 1,
-                                    borderColor: 'divider',
-                                    borderRadius: 1,
-                                    p: 1.5,
-                                    bgcolor: 'rgba(13, 23, 34, 0.72)',
-                                },
-                                clickablePanelSx,
-                            ]}
-                        >
-                            <Stack spacing={1}>
-                                <Stack
-                                    direction={{ xs: 'column', sm: 'row' }}
-                                    spacing={1}
-                                    sx={{
-                                        justifyContent: 'space-between',
-                                        alignItems: {
-                                            xs: 'stretch',
-                                            sm: 'center',
-                                        },
-                                    }}
-                                >
-                                    <Typography sx={{ fontWeight: 800 }}>
-                                        {schemaLabel(
-                                            credential.schemaSaid,
-                                            credentialTypesBySchema,
-                                            schemasBySaid
-                                        )}
-                                    </Typography>
-                                    <StatusPill
-                                        label={credential.status}
-                                        tone={statusTone(credential.status)}
-                                    />
-                                    {showProject && (
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<SendIcon />}
-                                            disabled={!canProject}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                onProject(credential);
-                                            }}
-                                            onKeyDown={(event) => {
-                                                event.stopPropagation();
-                                            }}
-                                        >
-                                            Project
-                                        </Button>
+                {credentials.map((credential) => (
+                    <Box
+                        key={credential.said}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onOpenCredential(credential.said)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                onOpenCredential(credential.said);
+                            }
+                        }}
+                        sx={[
+                            {
+                                border: 1,
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                p: 1.5,
+                                bgcolor: 'rgba(13, 23, 34, 0.72)',
+                            },
+                            clickablePanelSx,
+                        ]}
+                    >
+                        <Stack spacing={1}>
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={1}
+                                sx={{
+                                    justifyContent: 'space-between',
+                                    alignItems: {
+                                        xs: 'stretch',
+                                        sm: 'center',
+                                    },
+                                }}
+                            >
+                                <Typography sx={{ fontWeight: 800 }}>
+                                    {schemaLabel(
+                                        credential.schemaSaid,
+                                        credentialTypesBySchema,
+                                        schemasBySaid
                                     )}
-                                </Stack>
-                                <Typography variant="body2" sx={monoValueSx}>
-                                    {abbreviateMiddle(credential.said, 28)}
                                 </Typography>
+                                <StatusPill
+                                    label={credential.status}
+                                    tone={statusTone(credential.status)}
+                                />
                             </Stack>
-                        </Box>
-                    );
-                })}
+                            <Typography variant="body2" sx={monoValueSx}>
+                                {abbreviateMiddle(credential.said, 28)}
+                            </Typography>
+                            <CredentialW3CPresentationControls
+                                credential={credential}
+                                identifiers={identifiers}
+                                didWebsReadyByAid={didWebsReadyByAid}
+                                verifiers={verifiers}
+                                selectedVerifierId={selectedVerifierId}
+                                actionRunning={actionRunning}
+                                onVerifierChange={onVerifierChange}
+                                onPresent={onPresent}
+                            />
+                        </Stack>
+                    </Box>
+                ))}
             </Stack>
         )}
     </ConsolePanel>
