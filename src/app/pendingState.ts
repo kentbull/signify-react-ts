@@ -80,7 +80,7 @@ const intentLabel = (intent: string): string | null => {
         return 'Admitting credential...';
     }
 
-    if (intent === 'present') {
+    if (intent === 'present' || intent === 'presentCredential') {
         return 'Presenting credential...';
     }
 

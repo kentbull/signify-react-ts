@@ -139,7 +139,7 @@ describe('dashboard credential detail', () => {
         const markup = renderToStaticMarkup(
             <MemoryRouter>
                 <CredentialRecordDetail
-                    loaderData={{ status: 'ready' }}
+                    loaderData={{ status: 'ready', verifiers: [] }}
                     credential={credential}
                     acdc={rootAcdc}
                     chainGraph={graph}
@@ -182,7 +182,7 @@ describe('dashboard credential detail', () => {
         const markup = renderToStaticMarkup(
             <MemoryRouter>
                 <CredentialRecordDetail
-                    loaderData={{ status: 'ready' }}
+                    loaderData={{ status: 'ready', verifiers: [] }}
                     credential={credential}
                     acdc={{ ...rootAcdc, rules: null }}
                     chainGraph={graph}

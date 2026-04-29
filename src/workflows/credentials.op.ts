@@ -11,7 +11,7 @@ import {
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
     listW3CVerifiersService,
-    projectCredentialService,
+    presentCredentialService,
     resolveCredentialSchemaService,
 } from '../services/credentials.service';
 import {
@@ -37,7 +37,7 @@ import type {
     CreateCredentialRegistryInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
-    ProjectCredentialInput,
+    PresentCredentialInput,
     ResolveCredentialSchemaInput,
 } from '../domain/credentials/credentialCommands';
 import { localIdentifierAids, syncSessionInventoryOp } from './contacts.op';
@@ -47,7 +47,7 @@ export type {
     CreateCredentialRegistryInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
-    ProjectCredentialInput,
+    PresentCredentialInput,
     ResolveCredentialSchemaInput,
 } from '../domain/credentials/credentialCommands';
 
@@ -224,17 +224,16 @@ export function* admitCredentialGrantOp(
 }
 
 /**
- * Workflow for projecting a VRD credential into a short-lived W3C VC-JWT
- * presentation session.
+ * Workflow for presenting a VRD credential through the W3C VC-JWT path.
  */
-export function* projectCredentialOp(
-    input: ProjectCredentialInput
+export function* presentCredentialOp(
+    input: PresentCredentialInput
 ): EffectionOperation<W3CProjectionSession> {
     const services = yield* AppServicesContext.expect();
-    return yield* projectCredentialService({
+    return yield* presentCredentialService({
         client: services.runtime.requireConnectedClient(),
-        holderAlias: input.holderAlias,
-        holderAid: input.holderAid,
+        projectorAlias: input.projectorAlias,
+        projectorAid: input.projectorAid,
         credentialSaid: input.credentialSaid,
         verifierId: input.verifierId,
         timeoutMs: services.config.operations.timeoutMs,

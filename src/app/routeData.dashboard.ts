@@ -17,17 +17,21 @@ export const loadDashboard = async (
             .refreshState({ signal: request?.signal })
             .catch(() => null);
         await runtime.identifiers.list({ signal: request?.signal });
-        await Promise.all([
+        const [, , , , verifiers] = await Promise.all([
             runtime.contacts.syncInventory({ signal: request?.signal }),
             runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
             runtime.credentials.syncRegistries({ signal: request?.signal }),
             runtime.credentials.syncInventory({ signal: request?.signal }),
+            runtime.credentials.listW3CVerifiers({
+                signal: request?.signal,
+            }),
         ]);
         await runtime.credentials.syncIpexActivity({ signal: request?.signal });
-        return { status: 'ready' };
+        return { status: 'ready', verifiers };
     } catch (error) {
         return {
             status: 'error',
+            verifiers: [],
             message: `Unable to refresh dashboard inventory: ${toRouteError(error).message}`,
         };
     }

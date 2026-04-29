@@ -44,8 +44,8 @@ export type IdentifiersLoaderData =
  * Loader data for `/dashboard`.
  */
 export type DashboardLoaderData =
-    | { status: 'ready' }
-    | { status: 'error'; message: string }
+    | { status: 'ready'; verifiers: W3CVerifier[] }
+    | { status: 'error'; message: string; verifiers: W3CVerifier[] }
     | BlockedRouteData;
 
 /**
@@ -185,7 +185,7 @@ export type CredentialActionData =
               | 'issueCredential'
               | 'grantCredential'
               | 'admitCredentialGrant'
-              | 'projectCredential'
+              | 'presentCredential'
               | 'refreshCredentials';
           ok: true;
           message: string;
@@ -199,7 +199,7 @@ export type CredentialActionData =
               | 'issueCredential'
               | 'grantCredential'
               | 'admitCredentialGrant'
-              | 'projectCredential'
+              | 'presentCredential'
               | 'refreshCredentials'
               | 'unsupported';
           ok: false;

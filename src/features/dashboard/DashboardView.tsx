@@ -1,13 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+    useFetcher,
     useLoaderData,
     useLocation,
     useNavigate,
     useParams,
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
-import { useAppSession } from '../../app/runtimeHooks';
-import type { DashboardLoaderData } from '../../app/routeData';
+import { useAppRuntime, useAppSession } from '../../app/runtimeHooks';
+import type {
+    CredentialActionData,
+    DashboardLoaderData,
+} from '../../app/routeData';
+import { submitCredentialAction } from '../../app/credentialActionSubmit';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
@@ -18,6 +23,7 @@ import {
     selectCredentialRegistries,
     selectDashboardCounts,
     selectCredentialGrantNotifications,
+    selectDidWebsDidsByAid,
     selectHeldCredentials,
     selectIdentifiers,
     selectIssuedCredentials,
@@ -41,12 +47,17 @@ import {
     credentialDetailPath,
     dashboardModeForPath,
 } from './dashboardViewModels';
+import { CredentialW3CPresentationControls } from '../credentials/CredentialW3CPresentationControls';
+import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 
 /**
  * Route view that summarizes session health, activity, and credential inventory.
  */
 export const DashboardView = () => {
     const loaderData = useLoaderData() as DashboardLoaderData;
+    const fetcher = useFetcher<CredentialActionData>();
+    const runtime = useAppRuntime();
     const location = useLocation();
     const navigate = useNavigate();
     const { credentialSaid = '' } = useParams();
@@ -80,7 +91,14 @@ export const DashboardView = () => {
     const registries = useAppSelector(selectCredentialRegistries);
     const contacts = useAppSelector(selectContacts);
     const identifiers = useAppSelector(selectIdentifiers);
+    const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const connection = runtimeSnapshot.connection;
+    const w3cVerifiers =
+        loaderData.status === 'blocked' ? [] : loaderData.verifiers;
+    const [selectedVerifierId, setSelectedVerifierId] = useState(
+        w3cVerifiers[0]?.id ?? ''
+    );
+    const actionRunning = fetcher.state !== 'idle';
     const connectionUrl =
         connection.status === 'connected' ? connection.client.url : null;
     const registriesById = useMemo(
@@ -98,6 +116,16 @@ export const DashboardView = () => {
     const schemasBySaid = useMemo(
         () => new Map(resolvedSchemas.map((schema) => [schema.said, schema])),
         [resolvedSchemas]
+    );
+    const didWebsReadyByAid = useMemo(
+        () =>
+            new Map(
+                Object.entries(didWebsByAid).map(([aid, did]) => [
+                    aid,
+                    did.loadState === 'ready' && did.did !== null,
+                ])
+            ),
+        [didWebsByAid]
     );
     const selectedCredential = useMemo(
         () =>
@@ -131,8 +159,54 @@ export const DashboardView = () => {
             selectedCredentialExchangeActivities,
         ]
     );
+    const selectedPresentationProjector = useMemo(
+        () =>
+            selectedCredential?.direction === 'held'
+                ? (identifiers.find(
+                      (identifier) =>
+                          identifier.prefix === selectedCredential.issuerAid
+                  ) ?? null)
+                : null,
+        [identifiers, selectedCredential]
+    );
+    useEffect(() => {
+        if (selectedPresentationProjector === null) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        void runtime.didwebs
+            .refreshIdentifierDid(
+                selectedPresentationProjector.name,
+                selectedPresentationProjector.prefix,
+                {
+                    signal: controller.signal,
+                    track: false,
+                }
+            )
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [runtime, selectedPresentationProjector]);
     const openCredential = (said: string) => {
         navigate(credentialDetailPath(said));
+    };
+    const submitPresent = (
+        credential: CredentialSummaryRecord,
+        projector: IdentifierSummary,
+        verifierId: string
+    ) => {
+        if (verifierId.length === 0) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.set('intent', 'presentCredential');
+        formData.set('projectorAlias', projector.name);
+        formData.set('projectorAid', projector.prefix);
+        formData.set('credentialSaid', credential.said);
+        formData.set('verifierId', verifierId);
+        submitCredentialAction(fetcher, formData);
     };
 
     if (loaderData.status === 'blocked') {
@@ -189,6 +263,20 @@ export const DashboardView = () => {
                 chainGraph={selectedCredentialChainGraph}
                 acdcsBySaid={credentialAcdcsBySaid}
                 schemasBySaid={schemasBySaid}
+                presentationControls={
+                    selectedCredential?.direction === 'held' ? (
+                        <CredentialW3CPresentationControls
+                            credential={selectedCredential}
+                            identifiers={identifiers}
+                            didWebsReadyByAid={didWebsReadyByAid}
+                            verifiers={w3cVerifiers}
+                            selectedVerifierId={selectedVerifierId}
+                            actionRunning={actionRunning}
+                            onVerifierChange={setSelectedVerifierId}
+                            onPresent={submitPresent}
+                        />
+                    ) : null
+                }
             />
         );
     }
