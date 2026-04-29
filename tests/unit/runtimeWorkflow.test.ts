@@ -65,7 +65,6 @@ const connectRuntimeForTest = (
             state: {
                 controllerPre: 'Econtroller',
                 agentPre: 'Eagent',
-                agentDws: null,
                 ridx: 0,
                 pidx: 0,
                 state: {},

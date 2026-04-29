@@ -29,7 +29,6 @@ import { multisigGroupDetailsFromIdentifier } from '../../src/domain/multisig/mu
 const summary: SignifyStateSummary = {
     controllerPre: 'Econtroller',
     agentPre: 'Eagent',
-    agentDws: 'did:webs:example:dws:Eagent',
     ridx: 0,
     pidx: 0,
     state: {
@@ -244,7 +243,8 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
             startAcceptInteraction: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'accept-interaction-multisig-request-1',
-                operationRoute: '/operations/accept-interaction-multisig-request-1',
+                operationRoute:
+                    '/operations/accept-interaction-multisig-request-1',
             })),
             startRotateGroup: vi.fn(() => ({
                 status: 'accepted',
@@ -254,7 +254,8 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
             startAcceptRotation: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'accept-rotation-multisig-request-1',
-                operationRoute: '/operations/accept-rotation-multisig-request-1',
+                operationRoute:
+                    '/operations/accept-rotation-multisig-request-1',
             })),
             startJoinRotation: vi.fn(() => ({
                 status: 'accepted',
@@ -437,10 +438,7 @@ describe('route loaders', () => {
                     multisigGroupDetailsFromIdentifier({
                         identifier,
                         membersResponse: {
-                            signing: [
-                                { prefix: 'Ealice' },
-                                { prefix: 'Ebob' },
-                            ],
+                            signing: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
                             rotation: [
                                 { prefix: 'Ealice' },
                                 { prefix: 'Ebob' },

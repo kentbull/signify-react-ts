@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { didWebsAssetUrlsFromDid } from '../../src/domain/didwebs/didWebsUrls';
 import { DidWebsPublicationDetails } from '../../src/features/didwebs/DidWebsPublicationDetails';
-import type { DidWebsStatusRecord } from '../../src/state/didwebs.slice';
+import type { DidWebsDidRecord } from '../../src/state/didwebs.slice';
 
-const readyRecord: DidWebsStatusRecord = {
+const readyRecord: DidWebsDidRecord = {
     aid: 'Eaid',
     loadState: 'ready',
     did: 'did:webs:example.com:dws:Eaid',
@@ -32,13 +32,13 @@ describe('did:webs URL derivation', () => {
     });
 });
 
-describe('did:webs publication details', () => {
+describe('did:webs DID details', () => {
     it('renders pending values without copy actions before a DID is available', () => {
         const markup = renderToStaticMarkup(
             <DidWebsPublicationDetails
                 record={{
                     ...readyRecord,
-                    loadState: 'unavailable',
+                    loadState: 'pending',
                     did: null,
                 }}
                 testIdPrefix="identifier"

@@ -31,7 +31,7 @@ import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectActiveOperations,
     selectContacts,
-    selectDidWebsStatusByAid,
+    selectDidWebsDidByAid,
     selectIdentifiers,
 } from '../../state/selectors';
 import { walletAidSelected } from '../../state/walletSelection.slice';
@@ -108,8 +108,8 @@ export const IdentifiersView = () => {
             : (identifiers.find(
                   (identifier) => identifier.name === selectedIdentifierName
               ) ?? null);
-    const selectedDidWebsStatus = useAppSelector(
-        selectDidWebsStatusByAid(selectedIdentifier?.prefix)
+    const selectedDidWebsDid = useAppSelector(
+        selectDidWebsDidByAid(selectedIdentifier?.prefix)
     );
 
     useEffect(() => {
@@ -399,6 +399,7 @@ export const IdentifiersView = () => {
                         disabled={actionRunning}
                         sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
                         data-ui-sound={UI_SOUND_HOVER_VALUE}
+                        data-testid="identifier-create-open"
                     >
                         Create Identifier
                     </Button>
@@ -459,6 +460,7 @@ export const IdentifiersView = () => {
                             disabled={actionRunning}
                             sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
                             data-ui-sound={UI_SOUND_HOVER_VALUE}
+                            data-testid="identifier-create-open"
                         >
                             Create Identifier
                         </Button>
@@ -489,7 +491,7 @@ export const IdentifiersView = () => {
                 refreshMessage={detailRefresh.message}
                 oobiState={detailOobis}
                 delegationChain={delegationChain}
-                didWebsStatus={selectedDidWebsStatus}
+                didWebsDid={selectedDidWebsDid}
                 actionRunning={
                     selectedIdentifierName === null
                         ? false

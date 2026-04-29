@@ -3,7 +3,7 @@ import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import { StatusPill } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import { didWebsAssetUrlsFromDid } from '../../domain/didwebs/didWebsUrls';
-import type { DidWebsStatusRecord } from '../../state/didwebs.slice';
+import type { DidWebsDidRecord } from '../../state/didwebs.slice';
 
 const PENDING_VALUE = '...pending...';
 
@@ -11,7 +11,7 @@ const copyText = (value: string): void => {
     void globalThis.navigator?.clipboard?.writeText(value);
 };
 
-const displayState = (record: DidWebsStatusRecord | null): string => {
+const displayState = (record: DidWebsDidRecord | null): string => {
     if (record?.did !== null && record?.did !== undefined) {
         return 'ready';
     }
@@ -25,7 +25,7 @@ const displayState = (record: DidWebsStatusRecord | null): string => {
 };
 
 const statusTone = (
-    record: DidWebsStatusRecord | null
+    record: DidWebsDidRecord | null
 ): 'neutral' | 'success' | 'warning' | 'error' | 'info' => {
     if (record?.did !== null && record?.did !== undefined) {
         return 'success';
@@ -96,11 +96,11 @@ const DetailRow = ({
 );
 
 export interface DidWebsPublicationDetailsProps {
-    record: DidWebsStatusRecord | null;
+    record: DidWebsDidRecord | null;
     testIdPrefix: string;
 }
 
-/** Render copyable did:webs publication material once a DID is available. */
+/** Render copyable did:webs material once a DID is available. */
 export const DidWebsPublicationDetails = ({
     record,
     testIdPrefix,
@@ -124,7 +124,7 @@ export const DidWebsPublicationDetails = ({
                     color="text.secondary"
                     sx={{ fontWeight: 700 }}
                 >
-                    Publication state
+                    Status
                 </Typography>
                 <StatusPill label={displayState(record)} tone={statusTone(record)} />
             </Box>

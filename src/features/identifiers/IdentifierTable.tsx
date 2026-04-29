@@ -261,7 +261,9 @@ export const IdentifierTable = ({
                         >
                             <OobiCopyButton
                                 identifier={identifier}
-                                copyStatus={agentOobiCopyStatus[identifier.name]}
+                                copyStatus={
+                                    agentOobiCopyStatus[identifier.name]
+                                }
                                 onCopy={copyAgentOobi}
                             />
                             <AuthorizeAgentButton
@@ -337,7 +339,10 @@ export const IdentifierTable = ({
                             >
                                 OOBI
                             </TableCell>
-                            <TableCell align="right" sx={stickyActionHeadCellSx}>
+                            <TableCell
+                                align="right"
+                                sx={stickyActionHeadCellSx}
+                            >
                                 Actions
                             </TableCell>
                         </TableRow>
@@ -453,7 +458,10 @@ export const IdentifierTable = ({
                                                         identifier
                                                     )}
                                                     onClick={(event) =>
-                                                        rotate(event, identifier)
+                                                        rotate(
+                                                            event,
+                                                            identifier
+                                                        )
                                                     }
                                                 >
                                                     <RotateRightIcon fontSize="small" />
@@ -510,6 +518,7 @@ const AuthorizeAgentButton = ({
                 aria-label={`Authorize agent for ${identifier.name}`}
                 disabled={disabled}
                 onClick={(event) => onAuthorize(event, identifier)}
+                data-testid={`identifier-authorize-agent-${identifier.name}`}
             >
                 <ManageAccountsIcon
                     fontSize={size === 'small' ? 'small' : 'medium'}
@@ -547,6 +556,7 @@ const OobiCopyButton = ({
                           : 'default'
                 }
                 onClick={(event) => onCopy(event, identifier)}
+                data-testid={`identifier-copy-agent-oobi-${identifier.name}`}
             >
                 <ContentCopyIcon
                     fontSize={size === 'small' ? 'small' : 'medium'}

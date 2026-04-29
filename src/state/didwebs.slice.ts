@@ -10,11 +10,11 @@ export type DidWebsLoadState =
     | 'idle'
     | 'loading'
     | 'ready'
-    | 'unavailable'
+    | 'pending'
     | 'error';
 
 /** Serializable did:webs DID facts keyed by AID. */
-export interface DidWebsStatusRecord {
+export interface DidWebsDidRecord {
     aid: string;
     loadState: DidWebsLoadState;
     did: string | null;
@@ -24,7 +24,7 @@ export interface DidWebsStatusRecord {
 
 /** did:webs DID cache normalized by AID. */
 export interface DidWebsState {
-    byAid: Record<string, DidWebsStatusRecord>;
+    byAid: Record<string, DidWebsDidRecord>;
 }
 
 export interface DidWebsDidPayload {
@@ -39,7 +39,7 @@ const createInitialState = (): DidWebsState => ({
 
 const initialState = createInitialState();
 
-const emptyRecord = (aid: string): DidWebsStatusRecord => ({
+const emptyRecord = (aid: string): DidWebsDidRecord => ({
     aid,
     loadState: 'idle',
     did: null,
@@ -50,16 +50,16 @@ const emptyRecord = (aid: string): DidWebsStatusRecord => ({
 const recordFor = (
     state: DidWebsState,
     aid: string
-): DidWebsStatusRecord => {
+): DidWebsDidRecord => {
     state.byAid[aid] ??= emptyRecord(aid);
     return state.byAid[aid];
 };
 
 const applyDidPayload = (
-    record: DidWebsStatusRecord,
+    record: DidWebsDidRecord,
     payload: DidWebsDidPayload
 ): void => {
-    record.loadState = payload.did === null ? 'unavailable' : 'ready';
+    record.loadState = payload.did === null ? 'pending' : 'ready';
     record.did = payload.did;
     record.error = null;
     record.updatedAt = payload.updatedAt;
@@ -116,7 +116,7 @@ export const didWebsSlice = createSlice({
         ) {
             const record = recordFor(state, payload.aid);
             if (record.did === null) {
-                record.loadState = 'unavailable';
+                record.loadState = 'pending';
             }
             record.error = null;
             record.updatedAt = payload.updatedAt;
