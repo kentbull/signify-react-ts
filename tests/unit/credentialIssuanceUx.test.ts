@@ -14,6 +14,7 @@ import {
     registryTilesForIssuer,
     walletStatsForAid,
 } from '../../src/features/credentials/credentialViewModels';
+import { schemaLabel } from '../../src/features/credentials/credentialDisplay';
 import { credentialRecorded } from '../../src/state/credentials.slice';
 import { registryInventoryLoaded } from '../../src/state/registry.slice';
 import { schemaRecorded } from '../../src/state/schema.slice';
@@ -143,6 +144,7 @@ describe('credential issuance UX selectors', () => {
                 status: 'resolved',
                 title: 'SEDI Voter ID Credential',
                 description: 'Schema',
+                credentialType: 'SEDIVoterCredential',
                 version: '1.0.0',
                 error: null,
                 updatedAt: now,
@@ -178,6 +180,66 @@ describe('credential issuance UX selectors', () => {
                 lastIssuedAt: now,
             }
         );
+    });
+
+    it('prefers resolved schema names over catalog labels and schema SAIDs', () => {
+        const types = selectIssueableCredentialTypeViews(createAppStore().getState());
+        const credentialTypesBySchema = new Map(
+            types.map((type) => [type.schemaSaid, type])
+        );
+        const schemaSaid = types[0]?.schemaSaid ?? 'Eschema';
+
+        expect(
+            schemaLabel(
+                schemaSaid,
+                credentialTypesBySchema,
+                new Map([
+                    [
+                        schemaSaid,
+                        {
+                            said: schemaSaid,
+                            oobi: null,
+                            status: 'resolved',
+                            title: 'Resolved Credential Title',
+                            description: null,
+                            credentialType: 'ResolvedCredentialType',
+                            version: null,
+                            error: null,
+                            updatedAt: now,
+                        },
+                    ],
+                ])
+            )
+        ).toBe('Resolved Credential Title');
+        expect(
+            schemaLabel(
+                'Evrdschemaaaaaaaaaaaaaaaaaaaaa',
+                new Map(),
+                new Map([
+                    [
+                        'Evrdschemaaaaaaaaaaaaaaaaaaaaa',
+                        {
+                            said: 'Evrdschemaaaaaaaaaaaaaaaaaaaaa',
+                            oobi: null,
+                            status: 'resolved',
+                            title: null,
+                            description: null,
+                            credentialType: 'VRDCredential',
+                            version: null,
+                            error: null,
+                            updatedAt: now,
+                        },
+                    ],
+                ])
+            )
+        ).toBe('VRDCredential');
+        expect(
+            schemaLabel(
+                'EunknownSchemaSaidValue',
+                new Map(),
+                new Map()
+            )
+        ).not.toBe('Credential schema');
     });
 
     it('stores multiple registry inventory records keyed by registry id', () => {
@@ -273,6 +335,7 @@ describe('credential issuance UX selectors', () => {
                 status: 'resolved',
                 title: 'SEDI Voter ID Credential',
                 description: 'Schema',
+                credentialType: 'SEDIVoterCredential',
                 version: '1.0.0',
                 error: null,
                 updatedAt: now,

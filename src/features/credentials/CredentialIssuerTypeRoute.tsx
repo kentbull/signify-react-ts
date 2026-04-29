@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
     selectCredentialRegistries,
+    selectCredentialSchemas,
     selectIssueableCredentialTypeViews,
     selectIssuedCredentials,
     selectSelectedWalletRegistry,
@@ -71,6 +72,7 @@ export const CredentialIssuerTypeRoute = () => {
     const dispatch = useAppDispatch();
     const contacts = useAppSelector(selectContacts);
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
+    const schemas = useAppSelector(selectCredentialSchemas);
     const registries = useAppSelector(selectCredentialRegistries);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const walletSelectedRegistry = useAppSelector(selectSelectedWalletRegistry);
@@ -92,6 +94,9 @@ export const CredentialIssuerTypeRoute = () => {
             credentialType.schemaSaid,
             credentialType,
         ])
+    );
+    const schemasBySaid = new Map(
+        schemas.map((schema) => [schema.said, schema])
     );
     const resolvedHolderContacts = resolvedCredentialHolderContacts(contacts);
     const activeHolderContact =
@@ -350,6 +355,7 @@ export const CredentialIssuerTypeRoute = () => {
                 credentials={selectedTypeIssuedCredentials}
                 actionRunning={actionRunning}
                 credentialTypesBySchema={credentialTypesBySchema}
+                schemasBySaid={schemasBySaid}
                 onGrant={submitGrant}
             />
         </Stack>

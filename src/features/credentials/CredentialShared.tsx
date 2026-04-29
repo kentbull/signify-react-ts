@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import { Box, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import { StatusPill, TelemetryRow } from '../../app/Console';
 import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
-import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type {
+    CredentialSummaryRecord,
+    SchemaRecord,
+} from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
@@ -17,15 +20,28 @@ import { aidLabel, schemaLabel, timestampText } from './credentialDisplay';
 export const CredentialRecordRows = ({
     credential,
     credentialTypesBySchema,
+    schemasBySaid = new Map(),
 }: {
     credential: CredentialSummaryRecord;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid?: ReadonlyMap<string, SchemaRecord>;
 }) => (
     <Stack spacing={0.5}>
         <TelemetryRow
             label="Type"
-            value={schemaLabel(credential.schemaSaid, credentialTypesBySchema)}
+            value={schemaLabel(
+                credential.schemaSaid,
+                credentialTypesBySchema,
+                schemasBySaid
+            )}
         />
+        {credential.schemaSaid !== null && (
+            <TelemetryRow
+                label="Schema SAID"
+                value={credential.schemaSaid}
+                mono
+            />
+        )}
         <TelemetryRow
             label="Credential"
             value={aidLabel(credential.said)}
@@ -95,9 +111,11 @@ export const AidSelector = ({
 export const WalletStackPreview = ({
     credentials,
     credentialTypesBySchema,
+    schemasBySaid = new Map(),
 }: {
     credentials: readonly CredentialSummaryRecord[];
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid?: ReadonlyMap<string, SchemaRecord>;
 }) => {
     const previewCredentials = credentials.slice(0, 3);
 
@@ -146,7 +164,8 @@ export const WalletStackPreview = ({
                         <Typography sx={{ fontWeight: 800 }}>
                             {schemaLabel(
                                 credential.schemaSaid,
-                                credentialTypesBySchema
+                                credentialTypesBySchema,
+                                schemasBySaid
                             )}
                         </Typography>
                         <Typography

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
     approvePendingDidWebsRequests,
+    approvePendingW3CProjectionRequests,
     consumeDidWebsSignalStream,
     SseJsonEnvelopeParser,
 } from '../../src/workflows/didwebs.op';
@@ -9,6 +10,8 @@ import type {
     DidWebsAutoApproveResult,
     SignifyClient,
     SignedReplyEnvelope,
+    W3CProjectionAutoApprover,
+    W3CProjectionAutoApproveResult,
 } from 'signify-ts';
 
 const envelope = (agent = 'Eagent'): SignedReplyEnvelope => ({
@@ -191,6 +194,52 @@ describe('did:webs workflow SSE parsing', () => {
         );
     });
 
+    it('routes W3C projection envelopes to the W3C approver', async () => {
+        const signal = publicationEnvelope('/w3c/signing/request', {
+            d: 'w3c-request-id',
+            aid: 'Eaid',
+            name: 'holder',
+        });
+        const response = new Response(
+            new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(
+                        new TextEncoder().encode(
+                            `data: ${JSON.stringify(signal)}\n\n`
+                        )
+                    );
+                    controller.close();
+                },
+            })
+        );
+        const client = {
+            signals: () => ({
+                stream: vi.fn(async () => response),
+                verifyReplyEnvelope: vi.fn(() => true),
+            }),
+        } as unknown as SignifyClient;
+        const approver = {
+            handleEnvelope: vi.fn(async () => ({
+                outcome: 'submitted',
+            })),
+        } as unknown as DidWebsAutoApprover;
+        const w3cApprover = {
+            handleEnvelope: vi.fn(async () => ({
+                outcome: 'submitted',
+            })),
+        } as unknown as W3CProjectionAutoApprover;
+
+        await consumeDidWebsSignalStream({
+            client,
+            approver,
+            w3cApprover,
+            signal: new AbortController().signal,
+        });
+
+        expect(approver.handleEnvelope).not.toHaveBeenCalled();
+        expect(w3cApprover.handleEnvelope).toHaveBeenCalledWith(signal);
+    });
+
     it('polls pending requests and reconciles completion through one approver', async () => {
         const approver = {
             pollOnce: vi.fn(async () => [
@@ -208,6 +257,34 @@ describe('did:webs workflow SSE parsing', () => {
         } as unknown as DidWebsAutoApprover;
 
         await expect(approvePendingDidWebsRequests(approver)).resolves.toEqual({
+            pollResults: [{ outcome: 'submitted' }],
+            reconciled: 1,
+        });
+        expect(approver.pollOnce).toHaveBeenCalledTimes(1);
+        expect(approver.reconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('polls pending W3C projection requests and reconciles completion', async () => {
+        const approver = {
+            pollOnce: vi.fn(async () => [
+                {
+                    outcome: 'submitted',
+                } satisfies W3CProjectionAutoApproveResult,
+            ]),
+            reconcile: vi.fn(async () => [
+                {
+                    id: 'w3c-request-id',
+                    aid: 'Eaid',
+                    kind: 'vc_jwt',
+                    status: 'complete',
+                    updated: '2026-04-29T00:00:00.000Z',
+                },
+            ]),
+        } as unknown as W3CProjectionAutoApprover;
+
+        await expect(
+            approvePendingW3CProjectionRequests(approver)
+        ).resolves.toEqual({
             pollResults: [{ outcome: 'submitted' }],
             reconciled: 1,
         });

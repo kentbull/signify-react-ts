@@ -36,6 +36,7 @@ const credentialIntentFromString = (value: string): CredentialIntent =>
     value === 'issueCredential' ||
     value === 'grantCredential' ||
     value === 'admitCredentialGrant' ||
+    value === 'projectCredential' ||
     value === 'refreshCredentials'
         ? value
         : 'resolveSchema';
@@ -59,14 +60,17 @@ export const loadCredentials = async (
 
     try {
         await runtime.identifiers.list({ signal: request?.signal });
-        await Promise.all([
+        const [, , , , verifiers] = await Promise.all([
             runtime.contacts.syncInventory({ signal: request?.signal }),
             runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
             runtime.credentials.syncRegistries({ signal: request?.signal }),
             runtime.credentials.syncInventory({ signal: request?.signal }),
+            runtime.credentials.listW3CVerifiers({
+                signal: request?.signal,
+            }),
         ]);
         await runtime.credentials.syncIpexActivity({ signal: request?.signal });
-        return { status: 'ready' };
+        return { status: 'ready', verifiers };
     } catch (error) {
         return {
             status: 'error',
@@ -363,6 +367,42 @@ const admitCredentialGrantAction = ({
 };
 
 /**
+ * Starts holder-side W3C projection for an admitted VRD credential.
+ */
+const projectCredentialAction = ({
+    runtime,
+    formData,
+    requestId,
+}: CredentialActionContext): CredentialActionData => {
+    const intent = 'projectCredential';
+    const input = {
+        holderAlias: formString(formData, 'holderAlias').trim(),
+        holderAid: formString(formData, 'holderAid').trim(),
+        credentialSaid: formString(formData, 'credentialSaid').trim(),
+        verifierId: formString(formData, 'verifierId').trim(),
+    };
+    if (
+        input.holderAlias.length === 0 ||
+        input.holderAid.length === 0 ||
+        input.credentialSaid.length === 0 ||
+        input.verifierId.length === 0
+    ) {
+        return {
+            intent,
+            ok: false,
+            message: 'Holder, credential, and verifier are required.',
+            requestId,
+        };
+    }
+
+    return credentialStartedResult(
+        intent,
+        runtime.credentials.startProject(input, requestIdOption(requestId)),
+        `Projecting credential ${input.credentialSaid}`
+    );
+};
+
+/**
  * Dispatches credential route intents to named handlers. The explicit switch
  * is the local command map for this route family and should stay small enough
  * that each new credential workflow has to justify a branch.
@@ -383,6 +423,8 @@ const runCredentialIntentAction = (
             return grantCredentialAction(context);
         case 'admitCredentialGrant':
             return admitCredentialGrantAction(context);
+        case 'projectCredential':
+            return projectCredentialAction(context);
         default:
             return {
                 intent: 'unsupported',

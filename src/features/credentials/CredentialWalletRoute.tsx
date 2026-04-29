@@ -5,14 +5,17 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
+    selectDidWebsDidByAid,
     selectHeldCredentials,
     selectIssueableCredentialTypeViews,
+    selectCredentialSchemas,
 } from '../../state/selectors';
 import {
     grantsForAid,
     heldCredentialsForAid,
     walletStatsForAid,
 } from './credentialViewModels';
+import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import { credentialPath } from './credentialDisplay';
 import { useCredentialsRouteContext } from './CredentialsRouteContext';
 import {
@@ -34,11 +37,19 @@ export const CredentialWalletRoute = () => {
         selectedIdentifier,
         submitResolveSchema,
         submitCredentialForm,
+        w3cVerifiers,
     } = useCredentialsRouteContext();
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
+    const schemas = useAppSelector(selectCredentialSchemas);
     const heldCredentials = useAppSelector(selectHeldCredentials);
     const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
+    const didWebsDid = useAppSelector(
+        selectDidWebsDidByAid(selectedIdentifier?.prefix)
+    );
     const [expandedCredentialSaid, setExpandedCredentialSaid] = useState('');
+    const [selectedVerifierId, setSelectedVerifierId] = useState(
+        w3cVerifiers[0]?.id ?? ''
+    );
 
     if (selectedIdentifier === null) {
         return null;
@@ -49,6 +60,9 @@ export const CredentialWalletRoute = () => {
             credentialType.schemaSaid,
             credentialType,
         ])
+    );
+    const schemasBySaid = new Map(
+        schemas.map((schema) => [schema.said, schema])
     );
     const selectedAidHeldCredentials = heldCredentialsForAid(
         heldCredentials,
@@ -63,6 +77,11 @@ export const CredentialWalletRoute = () => {
         heldCredentials,
         grants: grantNotifications,
     });
+    const effectiveVerifierId =
+        w3cVerifiers.find((verifier) => verifier.id === selectedVerifierId)
+            ?.id ??
+        w3cVerifiers[0]?.id ??
+        '';
     const unresolvedWalletCredentialType =
         credentialTypes.find((type) => type.schemaStatus !== 'resolved') ?? null;
 
@@ -80,6 +99,20 @@ export const CredentialWalletRoute = () => {
         setExpandedCredentialSaid((current) =>
             current === credentialSaid ? '' : credentialSaid
         );
+    };
+
+    const submitProject = (credential: CredentialSummaryRecord) => {
+        if (effectiveVerifierId.length === 0) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.set('intent', 'projectCredential');
+        formData.set('holderAlias', selectedIdentifier.name);
+        formData.set('holderAid', selectedIdentifier.prefix);
+        formData.set('credentialSaid', credential.said);
+        formData.set('verifierId', effectiveVerifierId);
+        submitCredentialForm(formData);
     };
 
     return (
@@ -109,13 +142,24 @@ export const CredentialWalletRoute = () => {
                 grants={selectedAidGrants}
                 actionRunning={actionRunning}
                 credentialTypesBySchema={credentialTypesBySchema}
+                schemasBySaid={schemasBySaid}
                 onAdmit={submitAdmit}
             />
             <HeldCredentialsPanel
                 credentials={selectedAidHeldCredentials}
                 expandedCredentialSaid={expandedCredentialSaid}
                 credentialTypesBySchema={credentialTypesBySchema}
+                schemasBySaid={schemasBySaid}
+                verifiers={w3cVerifiers}
+                selectedVerifierId={effectiveVerifierId}
+                didWebsReady={
+                    didWebsDid?.loadState === 'ready' &&
+                    didWebsDid.did !== null
+                }
+                actionRunning={actionRunning}
                 onToggleCredential={toggleHeldCredential}
+                onVerifierChange={setSelectedVerifierId}
+                onProject={submitProject}
             />
         </Stack>
     );

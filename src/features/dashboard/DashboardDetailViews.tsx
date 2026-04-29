@@ -213,10 +213,12 @@ export const ResolvedSchemasDetail = ({
  */
 const CredentialDetailMobileRows = ({
     credentials,
+    schemasBySaid,
     aidAliases,
     onOpenCredential,
 }: {
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
     onOpenCredential: (said: string) => void;
 }) => (
@@ -255,7 +257,10 @@ const CredentialDetailMobileRows = ({
                         mb: 1,
                     }}
                 >
-                    <CredentialTypeValue credential={credential} />
+                    <CredentialTypeValue
+                        credential={credential}
+                        schemasBySaid={schemasBySaid}
+                    />
                 </Stack>
                 <TelemetryRow
                     label="Credential SAID"
@@ -295,11 +300,13 @@ const CredentialDetailMobileRows = ({
  */
 const CredentialDetailTable = ({
     credentials,
+    schemasBySaid,
     aidAliases,
     kind,
     onOpenCredential,
 }: {
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
     kind: 'issued' | 'held';
     onOpenCredential: (said: string) => void;
@@ -336,7 +343,10 @@ const CredentialDetailTable = ({
                             sx={{ cursor: 'pointer' }}
                         >
                             <TableCell>
-                                <CredentialTypeValue credential={credential} />
+                                <CredentialTypeValue
+                                    credential={credential}
+                                    schemasBySaid={schemasBySaid}
+                                />
                             </TableCell>
                             <TableCell>
                                 <AidValue
@@ -371,12 +381,14 @@ const CredentialDetailTable = ({
 export const CredentialsDetail = ({
     loaderData,
     credentials,
+    schemasBySaid,
     aidAliases,
     kind,
     onOpenCredential,
 }: {
     loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
     kind: 'issued' | 'held';
     onOpenCredential: (said: string) => void;
@@ -426,12 +438,14 @@ export const CredentialsDetail = ({
                     <>
                         <CredentialDetailTable
                             credentials={credentials}
+                            schemasBySaid={schemasBySaid}
                             aidAliases={aidAliases}
                             kind={kind}
                             onOpenCredential={onOpenCredential}
                         />
                         <CredentialDetailMobileRows
                             credentials={credentials}
+                            schemasBySaid={schemasBySaid}
                             aidAliases={aidAliases}
                             onOpenCredential={onOpenCredential}
                         />
@@ -554,7 +568,7 @@ export const CredentialRecordDetail = ({
         >
             <PageHeader
                 eyebrow="Credential"
-                title={credentialTypeLabel(credential)}
+                title={credentialTypeLabel(credential, schema)}
                 summary={credential.said}
                 actions={
                     <Button
@@ -590,7 +604,7 @@ export const CredentialRecordDetail = ({
                     <Stack spacing={0.5}>
                         <TelemetryRow
                             label="Type"
-                            value={credentialTypeLabel(credential)}
+                            value={credentialTypeLabel(credential, schema)}
                         />
                         <TelemetryRow
                             label="Credential SAID"

@@ -3,6 +3,7 @@ import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import type {
     CredentialSummaryRecord,
     RegistryRecord,
+    SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 
@@ -75,13 +76,17 @@ export const walletPath = (aid: string): string => `${credentialPath(aid)}/walle
  */
 export const schemaLabel = (
     schemaSaid: string | null,
-    credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>
+    credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>,
+    schemasBySaid: ReadonlyMap<string, SchemaRecord> = new Map()
 ): string => {
     if (schemaSaid === null) {
         return 'Not available';
     }
 
+    const schema = schemasBySaid.get(schemaSaid);
     return (
+        schema?.title ??
+        schema?.credentialType ??
         credentialTypesBySchema.get(schemaSaid)?.label ??
         abbreviateMiddle(schemaSaid, 18)
     );

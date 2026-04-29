@@ -32,7 +32,15 @@ export const schemaSlice = createSlice({
     initialState,
     reducers: {
         schemaRecorded(state, { payload }: PayloadAction<SchemaRecord>) {
-            state.bySaid[payload.said] = payload;
+            const existing = state.bySaid[payload.said];
+            state.bySaid[payload.said] =
+                existing === undefined
+                    ? payload
+                    : {
+                          ...existing,
+                          ...payload,
+                          oobi: payload.oobi ?? existing.oobi,
+                      };
             if (!state.saids.includes(payload.said)) {
                 state.saids.push(payload.said);
             }

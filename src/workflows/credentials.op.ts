@@ -10,6 +10,8 @@ import {
     listCredentialInventoryService,
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
+    listW3CVerifiersService,
+    projectCredentialService,
     resolveCredentialSchemaService,
 } from '../services/credentials.service';
 import {
@@ -28,12 +30,14 @@ import type {
     RegistryRecord,
     SchemaRecord,
 } from '../domain/credentials/credentialTypes';
+import type { W3CProjectionSession, W3CVerifier } from 'signify-ts';
 import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
 import type {
     AdmitCredentialGrantInput,
     CreateCredentialRegistryInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
+    ProjectCredentialInput,
     ResolveCredentialSchemaInput,
 } from '../domain/credentials/credentialCommands';
 import { localIdentifierAids, syncSessionInventoryOp } from './contacts.op';
@@ -43,6 +47,7 @@ export type {
     CreateCredentialRegistryInput,
     GrantCredentialInput,
     IssueSediCredentialInput,
+    ProjectCredentialInput,
     ResolveCredentialSchemaInput,
 } from '../domain/credentials/credentialCommands';
 
@@ -67,6 +72,7 @@ export function* resolveCredentialSchemaOp(
             status: 'resolving',
             title: null,
             description: null,
+            credentialType: null,
             version: null,
             rules: null,
             error: null,
@@ -91,6 +97,7 @@ export function* resolveCredentialSchemaOp(
                 status: 'error',
                 title: null,
                 description: null,
+                credentialType: null,
                 version: null,
                 rules: null,
                 error: toErrorText(error),
@@ -217,17 +224,40 @@ export function* admitCredentialGrantOp(
 }
 
 /**
+ * Workflow for projecting a VRD credential into a short-lived W3C VC-JWT
+ * presentation session.
+ */
+export function* projectCredentialOp(
+    input: ProjectCredentialInput
+): EffectionOperation<W3CProjectionSession> {
+    const services = yield* AppServicesContext.expect();
+    return yield* projectCredentialService({
+        client: services.runtime.requireConnectedClient(),
+        holderAlias: input.holderAlias,
+        holderAid: input.holderAid,
+        credentialSaid: input.credentialSaid,
+        verifierId: input.verifierId,
+        timeoutMs: services.config.operations.timeoutMs,
+    });
+}
+
+/**
  * Synchronize issued and held credential inventory for local identifiers.
  */
 export function* syncCredentialInventoryOp(): EffectionOperation<
     CredentialSummaryRecord[]
 > {
     const services = yield* AppServicesContext.expect();
-    const credentials = yield* listCredentialInventoryService({
+    const inventory = yield* listCredentialInventoryService({
         client: services.runtime.requireConnectedClient(),
         localAids: localIdentifierAids(services.store),
     });
 
+    for (const schema of inventory.schemas) {
+        services.store.dispatch(schemaRecorded(schema));
+    }
+
+    const credentials = inventory.credentials;
     services.store.dispatch(credentialInventoryLoaded({ credentials }));
     return credentials;
 }
@@ -308,4 +338,18 @@ export function* syncKnownCredentialSchemasOp(): EffectionOperation<
     }
 
     return schemas;
+}
+
+/**
+ * Load KERIA's configured short-lived W3C verifier allowlist.
+ */
+export function* listW3CVerifiersOp(): EffectionOperation<W3CVerifier[]> {
+    const services = yield* AppServicesContext.expect();
+    try {
+        return yield* listW3CVerifiersService({
+            client: services.runtime.requireConnectedClient(),
+        });
+    } catch {
+        return [];
+    }
 }

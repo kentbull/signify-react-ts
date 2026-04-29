@@ -6,10 +6,13 @@ import {
     type CredentialSubject,
     type Operation as KeriaOperation,
     type SignifyClient,
+    type W3CProjectionSession,
+    type W3CVerifier,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import type { OperationLogger } from '../signify/client';
 import type {
+    CredentialInventorySnapshot,
     CredentialRegistryInventorySnapshot,
     CredentialRegistryOwner,
     CredentialIpexActivityRecord,
@@ -23,6 +26,7 @@ import {
     credentialGrantFromExchange,
     credentialRecordFromKeriaCredential,
     credentialSad,
+    credentialSchema,
     credentialSaid,
     exchangeExn,
     exchangeItemsFromResponse,
@@ -53,6 +57,7 @@ const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
 const CREDENTIAL_FETCH_RETRIES = 10;
 const CREDENTIAL_FETCH_RETRY_MS = 1000;
 const EXCHANGE_QUERY_LIMIT = 200;
+const W3C_PROJECTION_POLL_MS = 1000;
 
 const keriaTimestamp = (): string =>
     new Date().toISOString().replace('Z', '000+00:00');
@@ -696,6 +701,70 @@ export function* admitCredentialGrantService({
 }
 
 /**
+ * Start an ephemeral KERIA W3C projection session and wait until KERIA has
+ * either submitted the assembled VC-JWT to the configured verifier or failed.
+ *
+ * The edge signatures are supplied by the live W3C auto-approver running on
+ * the generic KERIA signal stream; this foreground workflow only creates the
+ * session and observes KERIA's short-lived session state.
+ */
+export function* projectCredentialService({
+    client,
+    holderAlias,
+    holderAid,
+    credentialSaid,
+    verifierId,
+    timeoutMs,
+}: {
+    client: SignifyClient;
+    holderAlias: string;
+    holderAid: string;
+    credentialSaid: string;
+    verifierId: string;
+    timeoutMs: number;
+}): EffectionOperation<W3CProjectionSession> {
+    const name = requireNonEmpty(holderAlias, 'Holder identifier');
+    requireNonEmpty(holderAid, 'Holder AID');
+    const said = requireNonEmpty(credentialSaid, 'Credential SAID');
+    const verifier = requireNonEmpty(verifierId, 'Verifier');
+    const session = yield* callPromise(() =>
+        client.w3c().project(name, said, verifier)
+    );
+    const timeoutAt = Date.now() + timeoutMs;
+
+    let current = session;
+    while (Date.now() < timeoutAt) {
+        if (current.state === 'complete') {
+            return current;
+        }
+        if (current.state === 'failed' || current.state === 'expired') {
+            throw new Error(
+                current.error ??
+                    `W3C projection ${current.d} ended as ${current.state}.`
+            );
+        }
+
+        yield* sleep(W3C_PROJECTION_POLL_MS);
+        current = yield* callPromise(() =>
+            client.w3c().projection(name, current.d)
+        );
+    }
+
+    throw new Error(`Timed out waiting for W3C projection ${session.d}.`);
+}
+
+/**
+ * Load the verifier allowlist exposed by KERIA.
+ */
+export function* listW3CVerifiersService({
+    client,
+}: {
+    client: SignifyClient;
+}): EffectionOperation<W3CVerifier[]> {
+    return yield* callPromise(() => client.w3c().verifiers());
+}
+
+/**
  * Load issued and held credentials for local AIDs and project them into
  * serializable credential summary records.
  */
@@ -705,20 +774,41 @@ export function* listCredentialInventoryService({
 }: {
     client: SignifyClient;
     localAids: readonly string[];
-}): EffectionOperation<CredentialSummaryRecord[]> {
+}): EffectionOperation<CredentialInventorySnapshot> {
     const localAidSet = new Set(
         localAids.map((aid) => aid.trim()).filter((aid) => aid.length > 0)
     );
     if (localAidSet.size === 0) {
-        return [];
+        return { credentials: [], schemas: [] };
     }
 
     const records = new Map<string, CredentialSummaryRecord>();
+    const schemas = new Map<string, SchemaRecord>();
+    const recordEmbeddedSchema = (credential: CredentialResult) => {
+        const sad = credentialSad(credential);
+        const schemaSaid = recordString(sad, 's');
+        const schema = credentialSchema(credential);
+        if (schemaSaid === null || schema === null) {
+            return;
+        }
+
+        schemas.set(
+            schemaSaid,
+            schemaRecordFromKeriaSchema({
+                schema,
+                said: schemaSaid,
+                oobi: null,
+                updatedAt: new Date().toISOString(),
+            })
+        );
+    };
+
     for (const localAid of localAidSet) {
         const issuedCredentials = yield* callPromise(() =>
             client.credentials().list({ filter: { '-i': localAid } })
         );
         for (const credential of issuedCredentials) {
+            recordEmbeddedSchema(credential);
             const said = credentialSaid(credential);
             const sad = credentialSad(credential);
             const ri = recordString(sad, 'ri');
@@ -748,6 +838,7 @@ export function* listCredentialInventoryService({
             client.credentials().list({ filter: { '-a-i': localAid } })
         );
         for (const credential of heldCredentials) {
+            recordEmbeddedSchema(credential);
             const said = credentialSaid(credential);
             const sad = credentialSad(credential);
             const ri = recordString(sad, 'ri');
@@ -774,5 +865,8 @@ export function* listCredentialInventoryService({
         }
     }
 
-    return Array.from(records.values());
+    return {
+        credentials: Array.from(records.values()),
+        schemas: Array.from(schemas.values()),
+    };
 }
