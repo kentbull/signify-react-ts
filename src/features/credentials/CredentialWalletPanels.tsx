@@ -294,7 +294,7 @@ export const HeldCredentialsPanel = ({
     onVerifierChange: (verifierId: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
-        projector: IdentifierSummary,
+        presenter: IdentifierSummary,
         verifierId: string
     ) => void;
 }) => (

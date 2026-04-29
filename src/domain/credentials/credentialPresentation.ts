@@ -1,4 +1,5 @@
 import type { CredentialSummaryRecord } from './credentialTypes';
+import type { IdentifierSummary } from '../identifiers/identifierTypes';
 
 /**
  * KERIA's current W3C projection path supports the Isomer VRD credential only.
@@ -13,3 +14,25 @@ export const W3C_PRESENTABLE_VRD_SCHEMA_SAID =
 export const isW3CPresentableVrdCredential = (
     credential: CredentialSummaryRecord
 ): boolean => credential.schemaSaid === W3C_PRESENTABLE_VRD_SCHEMA_SAID;
+
+/** Select the local AID that should run W3C Present for this credential. */
+export const selectCredentialW3CPresenter = (
+    credential: CredentialSummaryRecord,
+    identifiers: readonly IdentifierSummary[]
+): IdentifierSummary | null => {
+    const localByAid = new Map(
+        identifiers.map((identifier) => [identifier.prefix, identifier])
+    );
+    const issuer =
+        credential.issuerAid === null
+            ? null
+            : (localByAid.get(credential.issuerAid) ?? null);
+    const holder =
+        credential.holderAid === null
+            ? null
+            : (localByAid.get(credential.holderAid) ?? null);
+
+    return credential.direction === 'held'
+        ? (holder ?? issuer)
+        : (issuer ?? holder);
+};

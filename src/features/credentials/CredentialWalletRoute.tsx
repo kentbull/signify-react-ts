@@ -27,6 +27,7 @@ import {
     WalletStatsPanel,
 } from './CredentialWalletPanels';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
+import { selectCredentialW3CPresenter } from '../../domain/credentials/credentialPresentation';
 
 /**
  * Wallet route for one selected local AID.
@@ -64,9 +65,9 @@ export const CredentialWalletRoute = () => {
         schemas.map((schema) => [schema.said, schema])
     );
     const selectedAid = selectedIdentifier?.prefix ?? '';
-    const selectedAidHeldCredentials = heldCredentialsForAid(
-        heldCredentials,
-        selectedAid
+    const selectedAidHeldCredentials = useMemo(
+        () => heldCredentialsForAid(heldCredentials, selectedAid),
+        [heldCredentials, selectedAid]
     );
     const didWebsReadyByAid = useMemo(
         () =>
@@ -78,14 +79,32 @@ export const CredentialWalletRoute = () => {
             ),
         [didWebsByAid]
     );
-    const presentationProjectors = useMemo(
+    const presentationPresenters = useMemo(
         () =>
-            identifiers.filter((identifier) =>
-                selectedAidHeldCredentials.some(
-                    (credential) => credential.issuerAid === identifier.prefix
-                )
+            Array.from(
+                new Map(
+                    selectedAidHeldCredentials
+                        .map((credential) =>
+                            selectCredentialW3CPresenter(
+                                credential,
+                                identifiers
+                            )
+                        )
+                        .filter(
+                            (
+                                presenter
+                            ): presenter is IdentifierSummary =>
+                                presenter !== null
+                        )
+                        .map((presenter) => [presenter.prefix, presenter])
+                ).values()
             ),
         [identifiers, selectedAidHeldCredentials]
+    );
+    const presentationPresenterRefreshKey = JSON.stringify(
+        presentationPresenters
+            .map(({ name, prefix }) => ({ name, prefix }))
+            .sort((left, right) => left.prefix.localeCompare(right.prefix))
     );
     const selectedAidGrants = grantsForAid(
         grantNotifications,
@@ -105,14 +124,18 @@ export const CredentialWalletRoute = () => {
         credentialTypes.find((type) => type.schemaStatus !== 'resolved') ?? null;
 
     useEffect(() => {
-        if (presentationProjectors.length === 0) {
+        const presenters = JSON.parse(presentationPresenterRefreshKey) as Array<
+            Pick<IdentifierSummary, 'name' | 'prefix'>
+        >;
+
+        if (presenters.length === 0) {
             return undefined;
         }
 
         const controller = new AbortController();
-        for (const projector of presentationProjectors) {
+        for (const presenter of presenters) {
             void runtime.didwebs
-                .refreshIdentifierDid(projector.name, projector.prefix, {
+                .refreshIdentifierDid(presenter.name, presenter.prefix, {
                     signal: controller.signal,
                     track: false,
                 })
@@ -120,7 +143,7 @@ export const CredentialWalletRoute = () => {
         }
 
         return () => controller.abort();
-    }, [runtime, presentationProjectors]);
+    }, [runtime, presentationPresenterRefreshKey]);
 
     if (selectedIdentifier === null) {
         return null;
@@ -142,7 +165,7 @@ export const CredentialWalletRoute = () => {
 
     const submitPresent = (
         credential: CredentialSummaryRecord,
-        projector: IdentifierSummary,
+        presenter: IdentifierSummary,
         verifierId: string
     ) => {
         if (verifierId.length === 0) {
@@ -151,8 +174,8 @@ export const CredentialWalletRoute = () => {
 
         const formData = new FormData();
         formData.set('intent', 'presentCredential');
-        formData.set('projectorAlias', projector.name);
-        formData.set('projectorAid', projector.prefix);
+        formData.set('presenterAlias', presenter.name);
+        formData.set('presenterAid', presenter.prefix);
         formData.set('credentialSaid', credential.said);
         formData.set('verifierId', verifierId);
         submitCredentialForm(formData);

@@ -232,8 +232,8 @@ export function* presentCredentialOp(
     const services = yield* AppServicesContext.expect();
     return yield* presentCredentialService({
         client: services.runtime.requireConnectedClient(),
-        projectorAlias: input.projectorAlias,
-        projectorAid: input.projectorAid,
+        presenterAlias: input.presenterAlias,
+        presenterAid: input.presenterAid,
         credentialSaid: input.credentialSaid,
         verifierId: input.verifierId,
         timeoutMs: services.config.operations.timeoutMs,

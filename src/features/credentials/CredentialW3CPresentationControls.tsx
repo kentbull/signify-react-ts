@@ -10,7 +10,10 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import type { W3CVerifier } from 'signify-ts';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
-import { isW3CPresentableVrdCredential } from '../../domain/credentials/credentialPresentation';
+import {
+    isW3CPresentableVrdCredential,
+    selectCredentialW3CPresenter,
+} from '../../domain/credentials/credentialPresentation';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 
@@ -24,7 +27,7 @@ interface CredentialW3CPresentationControlsProps {
     onVerifierChange: (verifierId: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
-        projector: IdentifierSummary,
+        presenter: IdentifierSummary,
         verifierId: string
     ) => void;
 }
@@ -49,10 +52,7 @@ export const CredentialW3CPresentationControls = ({
     onVerifierChange,
     onPresent,
 }: CredentialW3CPresentationControlsProps) => {
-    const projector =
-        identifiers.find(
-            (identifier) => identifier.prefix === credential.issuerAid
-        ) ?? null;
+    const presenter = selectCredentialW3CPresenter(credential, identifiers);
     const effectiveVerifierId =
         verifiers.find((verifier) => verifier.id === selectedVerifierId)?.id ??
         verifiers[0]?.id ??
@@ -62,22 +62,26 @@ export const CredentialW3CPresentationControls = ({
         null;
     const verifierLabelId = controlId(credential.said);
     const schemaSupported = isW3CPresentableVrdCredential(credential);
+    const statusPresentable =
+        credential.status === 'admitted' ||
+        credential.status === 'issued' ||
+        credential.status === 'grantSent';
     const didWebsReady =
-        projector !== null && didWebsReadyByAid.get(projector.prefix) === true;
+        presenter !== null && didWebsReadyByAid.get(presenter.prefix) === true;
 
     const blocker =
-        credential.status !== 'admitted'
-            ? `Credential status is ${credential.status}; W3C Present requires an admitted VRD credential.`
+        !statusPresentable
+            ? `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`
             : !schemaSupported
               ? 'Only supported VRD credentials can be presented through W3C.'
-              : projector === null
-                ? 'This wallet does not control the credential issuer AID required for W3C Present.'
+              : presenter === null
+                ? 'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
                 : verifiers.length === 0
                     ? 'No W3C verifier is configured.'
                     : effectiveVerifierId.length === 0
                       ? 'Select a W3C verifier.'
                       : !didWebsReady
-                        ? 'The credential issuer did:webs DID is not ready.'
+                        ? 'The presenter did:webs DID is not ready.'
                         : actionRunning
                           ? 'A credential command is already running.'
                           : null;
@@ -130,12 +134,12 @@ export const CredentialW3CPresentationControls = ({
                     onClick={() => {
                         if (
                             blocker === null &&
-                            projector !== null &&
+                            presenter !== null &&
                             effectiveVerifierId.length > 0
                         ) {
                             onPresent(
                                 credential,
-                                projector,
+                                presenter,
                                 effectiveVerifierId
                             );
                         }

@@ -301,6 +301,45 @@ export const approvePendingW3CProjectionRequests = async (
 };
 
 /**
+ * Poll did:webs and W3C signing queues independently.
+ *
+ * KERIA can expose or fail these queues independently, so one branch must not
+ * starve the other foreground/background auto-approval path.
+ */
+export const approvePendingDidWebsAndW3CRequests = async ({
+    approver,
+    w3cApprover,
+}: {
+    approver: DidWebsAutoApprover;
+    w3cApprover: W3CProjectionAutoApprover;
+}): Promise<{
+    didWebs:
+        | { ok: true; value: Awaited<ReturnType<typeof approvePendingDidWebsRequests>> }
+        | { ok: false; error: unknown };
+    w3c:
+        | { ok: true; value: Awaited<ReturnType<typeof approvePendingW3CProjectionRequests>> }
+        | { ok: false; error: unknown };
+}> => {
+    const didWebs = await settlePollingStep(() =>
+        approvePendingDidWebsRequests(approver)
+    );
+    const w3c = await settlePollingStep(() =>
+        approvePendingW3CProjectionRequests(w3cApprover)
+    );
+    return { didWebs, w3c };
+};
+
+const settlePollingStep = async <T>(
+    step: () => Promise<T>
+): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> => {
+    try {
+        return { ok: true, value: await step() };
+    } catch (error) {
+        return { ok: false, error };
+    }
+};
+
+/**
  * Refresh one managed identifier did:webs DID into Redux.
  */
 export function* refreshIdentifierDidWebsOp({
@@ -452,27 +491,41 @@ function* didWebsPollingLoop(
     w3cApprover: W3CProjectionAutoApprover
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
-    let consecutiveFailures = 0;
-    let warned = false;
+    let didWebsConsecutiveFailures = 0;
+    let w3cConsecutiveFailures = 0;
+    let didWebsWarned = false;
+    let w3cWarned = false;
 
     while (true) {
-        try {
-            yield* callPromise(async () => {
-                await approvePendingDidWebsRequests(approver);
-                await approvePendingW3CProjectionRequests(w3cApprover);
-            });
-            consecutiveFailures = 0;
-        } catch (error) {
-            if (!isOptionalDidWebsEndpointUnavailable(error)) {
-                consecutiveFailures += 1;
-                if (consecutiveFailures >= 3 && !warned) {
-                    warned = true;
-                    recordDidWebsWarning(
-                        services,
-                        'did:webs publication polling stalled',
-                        error
-                    );
-                }
+        const results = yield* callPromise(() =>
+            approvePendingDidWebsAndW3CRequests({ approver, w3cApprover })
+        );
+
+        if (results.didWebs.ok) {
+            didWebsConsecutiveFailures = 0;
+        } else if (!isOptionalDidWebsEndpointUnavailable(results.didWebs.error)) {
+            didWebsConsecutiveFailures += 1;
+            if (didWebsConsecutiveFailures >= 3 && !didWebsWarned) {
+                didWebsWarned = true;
+                recordDidWebsWarning(
+                    services,
+                    'did:webs publication polling stalled',
+                    results.didWebs.error
+                );
+            }
+        }
+
+        if (results.w3c.ok) {
+            w3cConsecutiveFailures = 0;
+        } else if (!isOptionalDidWebsEndpointUnavailable(results.w3c.error)) {
+            w3cConsecutiveFailures += 1;
+            if (w3cConsecutiveFailures >= 3 && !w3cWarned) {
+                w3cWarned = true;
+                recordDidWebsWarning(
+                    services,
+                    'W3C projection signing polling stalled',
+                    results.w3c.error
+                );
             }
         }
 

@@ -263,16 +263,16 @@ export const TelemetryRow = ({
         >
             {label}
         </Typography>
-        <Typography
-            variant="body2"
+        <Box
             sx={{
+                typography: 'body2',
                 ...(mono ? monoValueSx : {}),
                 minWidth: 0,
                 color: 'text.primary',
             }}
         >
             {value}
-        </Typography>
+        </Box>
     </Box>
 );
 

@@ -50,6 +50,7 @@ import {
 import { CredentialW3CPresentationControls } from '../credentials/CredentialW3CPresentationControls';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
+import { selectCredentialW3CPresenter } from '../../domain/credentials/credentialPresentation';
 
 /**
  * Route view that summarizes session health, activity, and credential inventory.
@@ -159,26 +160,30 @@ export const DashboardView = () => {
             selectedCredentialExchangeActivities,
         ]
     );
-    const selectedPresentationProjector = useMemo(
+    const selectedPresentationPresenter = useMemo(
         () =>
-            selectedCredential?.direction === 'held'
-                ? (identifiers.find(
-                      (identifier) =>
-                          identifier.prefix === selectedCredential.issuerAid
-                  ) ?? null)
-                : null,
+            selectedCredential === null
+                ? null
+                : selectCredentialW3CPresenter(selectedCredential, identifiers),
         [identifiers, selectedCredential]
     );
+    const selectedPresentationPresenterName =
+        selectedPresentationPresenter?.name ?? '';
+    const selectedPresentationPresenterPrefix =
+        selectedPresentationPresenter?.prefix ?? '';
     useEffect(() => {
-        if (selectedPresentationProjector === null) {
+        if (
+            selectedPresentationPresenterName.length === 0 ||
+            selectedPresentationPresenterPrefix.length === 0
+        ) {
             return undefined;
         }
 
         const controller = new AbortController();
         void runtime.didwebs
             .refreshIdentifierDid(
-                selectedPresentationProjector.name,
-                selectedPresentationProjector.prefix,
+                selectedPresentationPresenterName,
+                selectedPresentationPresenterPrefix,
                 {
                     signal: controller.signal,
                     track: false,
@@ -187,13 +192,17 @@ export const DashboardView = () => {
             .catch(() => undefined);
 
         return () => controller.abort();
-    }, [runtime, selectedPresentationProjector]);
+    }, [
+        runtime,
+        selectedPresentationPresenterName,
+        selectedPresentationPresenterPrefix,
+    ]);
     const openCredential = (said: string) => {
         navigate(credentialDetailPath(said));
     };
     const submitPresent = (
         credential: CredentialSummaryRecord,
-        projector: IdentifierSummary,
+        presenter: IdentifierSummary,
         verifierId: string
     ) => {
         if (verifierId.length === 0) {
@@ -202,8 +211,8 @@ export const DashboardView = () => {
 
         const formData = new FormData();
         formData.set('intent', 'presentCredential');
-        formData.set('projectorAlias', projector.name);
-        formData.set('projectorAid', projector.prefix);
+        formData.set('presenterAlias', presenter.name);
+        formData.set('presenterAid', presenter.prefix);
         formData.set('credentialSaid', credential.said);
         formData.set('verifierId', verifierId);
         submitCredentialAction(fetcher, formData);
@@ -264,7 +273,7 @@ export const DashboardView = () => {
                 acdcsBySaid={credentialAcdcsBySaid}
                 schemasBySaid={schemasBySaid}
                 presentationControls={
-                    selectedCredential?.direction === 'held' ? (
+                    selectedCredential === null ? null : (
                         <CredentialW3CPresentationControls
                             credential={selectedCredential}
                             identifiers={identifiers}
@@ -275,7 +284,7 @@ export const DashboardView = () => {
                             onVerifierChange={setSelectedVerifierId}
                             onPresent={submitPresent}
                         />
-                    ) : null
+                    )
                 }
             />
         );

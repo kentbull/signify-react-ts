@@ -375,8 +375,8 @@ describe('runtime command adapters', () => {
             grantSaid: 'Egrant',
         });
         commands.startPresent({
-            projectorAlias: 'issuer',
-            projectorAid: 'Eissuer',
+            presenterAlias: 'issuer',
+            presenterAid: 'Eissuer',
             credentialSaid: 'Ecredential',
             verifierId: 'isomer-python',
         });

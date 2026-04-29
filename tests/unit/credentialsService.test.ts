@@ -3,14 +3,19 @@ import type {
     CredentialResult,
     Operation as KeriaOperation,
     SignifyClient,
+    W3CProjectionAutoApprover,
+    W3CProjectionSession,
+    W3CSigningRequest,
 } from 'signify-ts';
 import { createAppRuntime } from '../../src/app/runtime';
 import {
     admitCredentialGrantService,
+    approveW3CProjectionSigningRequests,
     listCredentialIpexActivityService,
     listCredentialInventoryService,
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
+    presentCredentialService,
 } from '../../src/services/credentials.service';
 import {
     credentialGrantFromExchange,
@@ -103,6 +108,41 @@ const admittedCredential = {
     status: { s: '0' },
 } as unknown as CredentialResult;
 
+const projectionSession = (
+    overrides: Partial<W3CProjectionSession> = {}
+): W3CProjectionSession => ({
+    d: 'session-1',
+    aid: 'Epresenter',
+    name: 'presenter',
+    credentialSaid: 'Ecredential',
+    issuerDid: 'did:webs:example:dws:Epresenter',
+    verifierId: 'verifier-1',
+    state: 'pending_proof_signature',
+    created: loadedAt,
+    updated: loadedAt,
+    expires: '2026-04-22T00:10:00.000Z',
+    ...overrides,
+});
+
+const w3cSigningRequest = (
+    overrides: Partial<W3CSigningRequest> = {}
+): W3CSigningRequest => ({
+    d: 'request-1',
+    session: 'session-1',
+    type: 'w3c_projection',
+    kind: 'data_integrity_proof',
+    agent: 'Eagent',
+    aid: 'Epresenter',
+    name: 'presenter',
+    credentialSaid: 'Ecredential',
+    signingInputB64: 'YQ',
+    encoding: 'base64url',
+    verificationMethod: 'did:webs:example:dws:Epresenter#key-0',
+    created: loadedAt,
+    expires: '2026-04-22T00:10:00.000Z',
+    ...overrides,
+});
+
 const makeAdmitClient = () => {
     const notifications = {
         mark: vi.fn(async () => ''),
@@ -147,6 +187,220 @@ const makeAdmitClient = () => {
 };
 
 describe('credential service helpers', () => {
+    it('presents a W3C credential by signing only requests for the current session', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const submitted: Array<{ path: string; body: unknown }> = [];
+        const w3c = {
+            project: vi.fn(async () => projectionSession()),
+            requests: vi.fn(async () => [
+                w3cSigningRequest({ d: 'request-1', session: 'session-1' }),
+                w3cSigningRequest({ d: 'request-other', session: 'other' }),
+            ]),
+            projection: vi.fn(async () =>
+                projectionSession({ state: 'complete' })
+            ),
+        };
+        const client = {
+            w3c: () => w3c,
+            identifiers: () => ({
+                get: vi.fn(async () => ({ prefix: 'Epresenter' })),
+            }),
+            manager: {
+                get: vi.fn(() => ({
+                    sign: vi.fn(async () => ['signature-1']),
+                })),
+            },
+            fetch: vi.fn(async (path: string, _method: string, body: unknown) => {
+                submitted.push({ path, body });
+                return {
+                    json: async () => w3cSigningRequest({ state: 'complete' }),
+                };
+            }),
+        } as unknown as SignifyClient;
+
+        try {
+            const result = await runtime.runWorkflow(
+                () =>
+                    presentCredentialService({
+                        client,
+                        presenterAlias: 'presenter',
+                        presenterAid: 'Epresenter',
+                        credentialSaid: 'Ecredential',
+                        verifierId: 'verifier-1',
+                        timeoutMs: 1000,
+                        pollMs: 0,
+                    }),
+                {
+                    scope: 'app',
+                    track: false,
+                    kind: 'presentCredential',
+                }
+            );
+
+            expect(w3c.project).toHaveBeenCalledWith(
+                'presenter',
+                'Ecredential',
+                'verifier-1'
+            );
+            expect(result.state).toBe('complete');
+            expect(submitted).toEqual([
+                {
+                    path: '/identifiers/presenter/w3c/signing-requests/request-1/signatures',
+                    body: { signature: 'signature-1' },
+                },
+            ]);
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
+    it('continues W3C Present approval from proof signing to JWT signing', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const signedRequests: string[] = [];
+        const w3c = {
+            project: vi.fn(async () => projectionSession()),
+            requests: vi
+                .fn()
+                .mockResolvedValueOnce([
+                    w3cSigningRequest({
+                        d: 'proof-request',
+                        kind: 'data_integrity_proof',
+                    }),
+                ])
+                .mockResolvedValueOnce([
+                    w3cSigningRequest({
+                        d: 'jwt-request',
+                        kind: 'vc_jwt',
+                    }),
+                ]),
+            projection: vi
+                .fn()
+                .mockResolvedValueOnce(
+                    projectionSession({ state: 'pending_jwt_signature' })
+                )
+                .mockResolvedValueOnce(
+                    projectionSession({ state: 'complete' })
+                ),
+        };
+        const client = {
+            w3c: () => w3c,
+            identifiers: () => ({
+                get: vi.fn(async () => ({ prefix: 'Epresenter' })),
+            }),
+            manager: {
+                get: vi.fn(() => ({
+                    sign: vi.fn(async () => ['signature']),
+                })),
+            },
+            fetch: vi.fn(async (path: string) => {
+                signedRequests.push(path);
+                return {
+                    json: async () => w3cSigningRequest({ state: 'complete' }),
+                };
+            }),
+        } as unknown as SignifyClient;
+
+        try {
+            await runtime.runWorkflow(
+                () =>
+                    presentCredentialService({
+                        client,
+                        presenterAlias: 'presenter',
+                        presenterAid: 'Epresenter',
+                        credentialSaid: 'Ecredential',
+                        verifierId: 'verifier-1',
+                        timeoutMs: 1000,
+                        pollMs: 0,
+                    }),
+                {
+                    scope: 'app',
+                    track: false,
+                    kind: 'presentCredential',
+                }
+            );
+
+            expect(signedRequests).toEqual([
+                '/identifiers/presenter/w3c/signing-requests/proof-request/signatures',
+                '/identifiers/presenter/w3c/signing-requests/jwt-request/signatures',
+            ]);
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
+    it('fails Present immediately when W3C auto-approval fails', async () => {
+        const client = {
+            w3c: () => ({
+                requests: vi.fn(async () => [w3cSigningRequest()]),
+            }),
+        } as unknown as SignifyClient;
+        const approver = {
+            handleRequest: vi.fn(async () => ({
+                outcome: 'failed',
+                requestId: 'request-1',
+                error: 'signing failed',
+            })),
+        } as unknown as W3CProjectionAutoApprover;
+
+        await expect(
+            approveW3CProjectionSigningRequests({
+                client,
+                approver,
+                presenterAlias: 'presenter',
+                presenterAid: 'Epresenter',
+                sessionId: 'session-1',
+            })
+        ).rejects.toThrow('W3C signing request request-1 failed: signing failed');
+    });
+
+    it('reports projection timeout state and pending request ids', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const w3c = {
+            project: vi.fn(async () =>
+                projectionSession({ state: 'pending_proof_signature' })
+            ),
+            requests: vi.fn(async () => [w3cSigningRequest({ d: 'request-1' })]),
+            projection: vi.fn(async () =>
+                projectionSession({ state: 'pending_proof_signature' })
+            ),
+        };
+        const client = {
+            w3c: () => w3c,
+        } as unknown as SignifyClient;
+
+        try {
+            const error = await runtime
+                .runWorkflow(
+                    () =>
+                        presentCredentialService({
+                            client,
+                            presenterAlias: 'presenter',
+                            presenterAid: 'Epresenter',
+                            credentialSaid: 'Ecredential',
+                            verifierId: 'verifier-1',
+                            timeoutMs: 0,
+                            pollMs: 0,
+                        }),
+                    {
+                        scope: 'app',
+                        track: false,
+                        kind: 'presentCredential',
+                    }
+                )
+                .catch((caught: unknown) => caught);
+
+            expect(error).toBeInstanceOf(Error);
+            expect((error as Error).message).toContain(
+                'Timed out waiting for W3C projection session-1. Last state: pending_proof_signature.'
+            );
+            expect((error as Error).message).toContain(
+                'Pending signing requests: none observed.'
+            );
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
     it('normalizes SEDI voter credential attributes', () => {
         expect(
             normalizeSediVoterAttributes({
