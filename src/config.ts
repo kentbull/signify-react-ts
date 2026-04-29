@@ -79,6 +79,8 @@ export interface OperationConfig {
     maxSleepMs: number;
     /** Session inventory polling interval for dashboard/contact facts. */
     liveRefreshMs: number;
+    /** did:webs signing request polling/reconcile interval. */
+    didWebsPollingMs: number;
 }
 
 /**
@@ -315,6 +317,14 @@ export const buildAppConfig = (runtimeEnv: RuntimeEnv): AppConfig => {
                 'VITE_LIVE_REFRESH_MS',
                 runtimeEnv.VITE_LIVE_REFRESH_MS,
                 3000
+            ),
+            didWebsPollingMs: Math.max(
+                7000,
+                numberFromEnv(
+                    'VITE_DIDWEBS_POLLING_MS',
+                    runtimeEnv.VITE_DIDWEBS_POLLING_MS,
+                    7000
+                )
             ),
         },
         witnesses: {
