@@ -6,6 +6,8 @@ import type {
     Schema,
 } from 'signify-ts';
 import {
+    credentialAcdcRecordFromKeriaCredential,
+    credentialChainGraphFromKeriaCredential,
     credentialAdmitFromExchange,
     credentialGrantFromExchange,
     credentialRecordFromKeriaCredential,
@@ -134,6 +136,68 @@ describe('credential domain mappings', () => {
         });
     });
 
+    it('extracts schema-level ACDC rules from the credential r property', () => {
+        expect(
+            schemaRecordFromKeriaSchema({
+                schema: {
+                    title: 'Verifiable Reference Data (VRD) Credential',
+                    credentialType: 'VRDCredential',
+                    properties: {
+                        r: {
+                            oneOf: [
+                                {
+                                    description: 'Rules block SAID',
+                                    type: 'string',
+                                },
+                                {
+                                    description: 'Rules block',
+                                    type: 'object',
+                                    properties: {
+                                        d: {
+                                            description: 'Rules block SAID',
+                                            type: 'string',
+                                        },
+                                        usageDisclaimer: {
+                                            description: 'Usage Disclaimer',
+                                            type: 'object',
+                                            properties: {
+                                                l: {
+                                                    description:
+                                                        'Associated legal language',
+                                                    type: 'string',
+                                                    const: '',
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                } as unknown as Schema,
+                said: 'EresolvedSchema',
+                oobi: null,
+                updatedAt: loadedAt,
+            }).rules
+        ).toEqual({
+            d: {
+                description: 'Rules block SAID',
+                type: 'string',
+            },
+            usageDisclaimer: {
+                description: 'Usage Disclaimer',
+                type: 'object',
+                properties: {
+                    l: {
+                        description: 'Associated legal language',
+                        type: 'string',
+                        const: '',
+                    },
+                },
+            },
+        });
+    });
+
     it('projects KERIA credentials and credential state into local records', () => {
         const record = credentialRecordFromKeriaCredential({
             credential: {
@@ -174,6 +238,185 @@ describe('credential domain mappings', () => {
                 true
             )
         ).toBe('revoked');
+    });
+
+    it('projects generic ACDC data, rules, and chained source graph records', () => {
+        const root = {
+            sad: {
+                d: 'Eroot',
+                s: 'ErootSchema',
+                i: 'Eissuer',
+                ri: 'Eregistry',
+                a: {
+                    d: 'ErootSubject',
+                    i: 'Eholder',
+                    LEI: '5493001KJTIIGC8Y1R12',
+                    dt: loadedAt,
+                },
+                r: {
+                    usage: {
+                        value: 'demo',
+                    },
+                },
+                e: {
+                    legalEntity: {
+                        n: 'Ele',
+                        o: 'I2I',
+                    },
+                    missingSource: {
+                        n: 'Emissing',
+                    },
+                },
+            },
+            chains: [
+                {
+                    sad: {
+                        d: 'Ele',
+                        s: 'Eleschema',
+                        i: 'Eqvi',
+                        ri: 'EleRegistry',
+                        a: {
+                            d: 'EleSubject',
+                            i: 'Eholder',
+                            dt: loadedAt,
+                        },
+                        e: {
+                            gleif: {
+                                n: 'Egleif',
+                            },
+                        },
+                    },
+                    chains: [
+                        {
+                            sad: {
+                                d: 'Egleif',
+                                s: 'EgleifSchema',
+                                i: 'Egleif',
+                                a: {
+                                    d: 'EgleifSubject',
+                                    i: 'Egleif',
+                                    dt: loadedAt,
+                                },
+                            },
+                            chains: [],
+                            status: { et: 'iss' },
+                        },
+                    ],
+                    status: { et: 'iss' },
+                },
+            ],
+            status: { et: 'iss' },
+        } as unknown as CredentialResult;
+
+        expect(
+            credentialAcdcRecordFromKeriaCredential({
+                credential: root,
+                status: 'issued',
+                updatedAt: loadedAt,
+            })
+        ).toMatchObject({
+            said: 'Eroot',
+            schemaSaid: 'ErootSchema',
+            issuerAid: 'Eissuer',
+            holderAid: 'Eholder',
+            rules: { usage: { value: 'demo' } },
+            edges: [
+                {
+                    label: 'legalEntity',
+                    said: 'Ele',
+                    operator: 'I2I',
+                },
+                {
+                    label: 'missingSource',
+                    said: 'Emissing',
+                    operator: null,
+                },
+            ],
+        });
+
+        const graph = credentialChainGraphFromKeriaCredential({
+            credential: root,
+            updatedAt: loadedAt,
+        });
+
+        expect(graph.rootSaid).toBe('Eroot');
+        expect(graph.nodes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ said: 'Eroot', unresolved: false }),
+                expect.objectContaining({ said: 'Ele', unresolved: false }),
+                expect.objectContaining({ said: 'Egleif', unresolved: false }),
+                expect.objectContaining({ said: 'Emissing', unresolved: true }),
+            ])
+        );
+        expect(graph.edges).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    from: 'Ele',
+                    to: 'Eroot',
+                    label: 'legalEntity',
+                }),
+                expect.objectContaining({
+                    from: 'Egleif',
+                    to: 'Ele',
+                    label: 'gleif',
+                }),
+                expect.objectContaining({
+                    from: 'Emissing',
+                    to: 'Eroot',
+                    label: 'missingSource',
+                }),
+            ])
+        );
+        expect(graph.nodes.find((node) => node.said === 'Eroot')?.depth).toBe(0);
+        expect(graph.nodes.find((node) => node.said === 'Egleif')?.depth).toBe(2);
+    });
+
+    it('de-dupes shared chained credentials and ignores graph cycles', () => {
+        const shared = {
+            sad: {
+                d: 'Eshared',
+                s: 'EsharedSchema',
+                i: 'Eissuer',
+                a: { i: 'Eholder' },
+                e: {
+                    backToRoot: {
+                        n: 'Eroot',
+                    },
+                },
+            },
+            chains: [],
+        };
+        const root = {
+            sad: {
+                d: 'Eroot',
+                s: 'ErootSchema',
+                i: 'Eissuer',
+                a: { i: 'Eholder' },
+                e: {
+                    first: {
+                        n: 'Eshared',
+                    },
+                    second: {
+                        n: 'Eshared',
+                    },
+                },
+            },
+            chains: [shared, shared],
+        } as unknown as CredentialResult;
+
+        const graph = credentialChainGraphFromKeriaCredential({
+            credential: root,
+            updatedAt: loadedAt,
+        });
+
+        expect(graph.nodes.filter((node) => node.said === 'Eshared')).toHaveLength(1);
+        expect(graph.nodes.find((node) => node.said === 'Eroot')?.depth).toBe(0);
+        expect(graph.edges).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ from: 'Eshared', to: 'Eroot' }),
+                expect.objectContaining({ from: 'Eroot', to: 'Eshared' }),
+            ])
+        );
     });
 
     it('projects credential subjects through the schema-aware boundary', () => {

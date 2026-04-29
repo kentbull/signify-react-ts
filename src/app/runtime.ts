@@ -37,6 +37,12 @@ import {
     type AppStateStorage,
 } from '../state/persistence';
 import {
+    createBrowserWalletSelectionPersistenceStore,
+    installWalletSelectionPersistence,
+    rehydrateWalletSelection as rehydratePersistedWalletSelection,
+    type WalletSelectionPersistenceStore,
+} from '../state/walletSelectionPersistence';
+import {
     sessionConnected,
     sessionConnectionFailed,
     sessionConnecting,
@@ -44,6 +50,7 @@ import {
     sessionStateRefreshed,
 } from '../state/session.slice';
 import { appStore, type AppStore } from '../state/store';
+import { walletAidCleared } from '../state/walletSelection.slice';
 import {
     bootOrConnectOp,
     getSignifyStateOp,
@@ -135,6 +142,8 @@ export interface AppRuntimeOptions {
     logger?: OperationLogger;
     /** Optional persistence storage override; `null` disables persistence. */
     storage?: AppStateStorage | null;
+    /** Optional selected-wallet-AID persistence override; `null` disables it. */
+    walletSelectionStorage?: WalletSelectionPersistenceStore | null;
 }
 
 /**
@@ -239,11 +248,23 @@ export class AppRuntime {
     /** Optional storage override for tests; `undefined` means browser default. */
     private readonly storage: AppStateStorage | null | undefined;
 
+    /** IndexedDB-backed selected-wallet-AID storage. */
+    private readonly walletSelectionStorage: WalletSelectionPersistenceStore | null;
+
     /** Controller AID selecting the current persisted app-state bucket. */
     private currentControllerAid: string | null = null;
 
+    /** Controller AID currently allowed to save selected-wallet-AID changes. */
+    private currentWalletSelectionControllerAid: string | null = null;
+
+    /** Monotonic guard for async selected-wallet-AID rehydration. */
+    private walletSelectionHydrationToken = 0;
+
     /** Store subscription cleanup for controller-scoped persistence writes. */
     private readonly uninstallPersistence: () => void;
+
+    /** Store subscription cleanup for controller-scoped wallet selection writes. */
+    private readonly uninstallWalletSelectionPersistence: () => void;
 
     /**
      * Current runtime snapshot exposed to React and route functions.
@@ -288,11 +309,21 @@ export class AppRuntime {
 
         this.storage =
             options.storage === undefined ? undefined : options.storage;
+        this.walletSelectionStorage =
+            options.walletSelectionStorage === undefined
+                ? createBrowserWalletSelectionPersistenceStore()
+                : options.walletSelectionStorage;
         this.uninstallPersistence = installAppStatePersistence(
             this.store,
             () => this.currentControllerAid,
             this.storage
         );
+        this.uninstallWalletSelectionPersistence =
+            installWalletSelectionPersistence(
+                this.store,
+                () => this.currentWalletSelectionControllerAid,
+                this.walletSelectionStorage
+            );
     }
 
     /**
@@ -346,6 +377,10 @@ export class AppRuntime {
         config: SignifyClientConfig,
         options: WorkflowRunOptions = {}
     ): Promise<ConnectedSignifyClient | null> => {
+        this.flushPersistence();
+        this.currentControllerAid = null;
+        this.currentWalletSelectionControllerAid = null;
+        this.walletSelectionHydrationToken += 1;
         this.store.dispatch(sessionConnecting());
         this.setConnection({
             status: 'connecting',
@@ -412,9 +447,11 @@ export class AppRuntime {
         void this.stopDidWebsPublicationSync();
         this.flushPersistence();
         void this.scopes.haltSession();
+        this.currentControllerAid = null;
+        this.currentWalletSelectionControllerAid = null;
+        this.walletSelectionHydrationToken += 1;
         this.store.dispatch(sessionDisconnected());
         this.setConnection(idleConnection);
-        this.currentControllerAid = null;
     };
 
     /**
@@ -468,7 +505,10 @@ export class AppRuntime {
      */
     clearAllLocalState = (): number => {
         const previousControllerAid = this.currentControllerAid;
+        const previousWalletSelectionControllerAid =
+            this.currentWalletSelectionControllerAid;
         this.currentControllerAid = null;
+        this.currentWalletSelectionControllerAid = null;
         try {
             this.store.dispatch(
                 operationsRehydrated({
@@ -491,9 +531,13 @@ export class AppRuntime {
                     records: [],
                 })
             );
+            this.store.dispatch(walletAidCleared());
+            void this.walletSelectionStorage?.clearAll().catch(() => undefined);
             return clearAllPersistedAppStates(this.storage);
         } finally {
             this.currentControllerAid = previousControllerAid;
+            this.currentWalletSelectionControllerAid =
+                previousWalletSelectionControllerAid;
         }
     };
 
@@ -803,9 +847,12 @@ export class AppRuntime {
 
         await this.scopes.destroy();
         this.uninstallPersistence();
+        this.uninstallWalletSelectionPersistence();
+        this.currentControllerAid = null;
+        this.currentWalletSelectionControllerAid = null;
+        this.walletSelectionHydrationToken += 1;
         this.store.dispatch(sessionDisconnected());
         this.setConnection(idleConnection);
-        this.currentControllerAid = null;
     };
 
     /**
@@ -973,8 +1020,43 @@ export class AppRuntime {
         // Persist under the old controller before loading a different bucket.
         this.flushPersistence();
         this.currentControllerAid = controllerAid;
+        this.currentWalletSelectionControllerAid = null;
+        this.walletSelectionHydrationToken += 1;
         if (controllerAid !== null) {
             rehydratePersistedAppState(this.store, controllerAid, this.storage);
+            void this.rehydrateWalletSelection(controllerAid);
+        }
+    };
+
+    /**
+     * Load the last selected wallet AID only after the controller bucket is known.
+     */
+    private rehydrateWalletSelection = async (
+        controllerAid: string
+    ): Promise<void> => {
+        const token = this.walletSelectionHydrationToken;
+        try {
+            await rehydratePersistedWalletSelection({
+                store: this.store,
+                controllerAid,
+                storage: this.walletSelectionStorage,
+                canApply: () =>
+                    this.currentControllerAid === controllerAid &&
+                    this.walletSelectionHydrationToken === token,
+            });
+        } finally {
+            if (
+                this.currentControllerAid === controllerAid &&
+                this.walletSelectionHydrationToken === token
+            ) {
+                this.currentWalletSelectionControllerAid = controllerAid;
+                void this.walletSelectionStorage
+                    ?.save(
+                        controllerAid,
+                        this.store.getState().walletSelection.selectedAid
+                    )
+                    .catch(() => undefined);
+            }
         }
     };
 

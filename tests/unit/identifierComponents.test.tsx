@@ -13,6 +13,7 @@ describe('identifier UI actions', () => {
         const markup = renderToStaticMarkup(
             <IdentifierTable
                 identifiers={[identifier]}
+                selectedAid={null}
                 onSelect={vi.fn()}
                 onRotate={vi.fn()}
                 isRotateDisabled={() => false}
@@ -26,4 +27,21 @@ describe('identifier UI actions', () => {
         expect(markup).toContain('aria-label="Authorize agent for alice"');
     });
 
+    it('marks the globally selected identifier row', () => {
+        const markup = renderToStaticMarkup(
+            <IdentifierTable
+                identifiers={[identifier]}
+                selectedAid="Ealice"
+                onSelect={vi.fn()}
+                onRotate={vi.fn()}
+                isRotateDisabled={() => false}
+                onAuthorizeAgent={vi.fn()}
+                isAuthorizeAgentDisabled={() => false}
+                onCopyAgentOobi={vi.fn()}
+                agentOobiCopyStatus={{}}
+            />
+        );
+
+        expect(markup).toContain('aria-selected="true"');
+    });
 });

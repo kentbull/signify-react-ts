@@ -20,6 +20,8 @@ import {
     selectChallenges,
     selectChallengesForContact,
     selectDashboardCounts,
+    selectCredentialAcdc,
+    selectCredentialChainGraph,
     selectCredentialIpexActivity,
     selectActionableChallengeRequestNotifications,
     selectActionableCredentialGrantNotifications,
@@ -54,6 +56,7 @@ import {
     appNotificationRecorded,
 } from '../../src/state/appNotifications.slice';
 import {
+    credentialInventoryLoaded,
     credentialIpexActivityLoaded,
     credentialRecorded,
 } from '../../src/state/credentials.slice';
@@ -506,6 +509,108 @@ describe('RTK state foundation', () => {
             expect.objectContaining({ exchangeSaid: 'Egrant' }),
             expect.objectContaining({ exchangeSaid: 'Eadmit' }),
         ]);
+    });
+
+    it('stores generic ACDC details and chain graphs from inventory sync', () => {
+        const store = createAppStore();
+
+        store.dispatch(
+            credentialInventoryLoaded({
+                credentials: [
+                    {
+                        said: 'credential-root',
+                        schemaSaid: 'schema-root',
+                        registryId: 'registry-1',
+                        issuerAid: 'Eissuer',
+                        holderAid: 'Eholder',
+                        direction: 'held',
+                        status: 'admitted',
+                        grantSaid: null,
+                        admitSaid: null,
+                        notificationId: null,
+                        issuedAt: null,
+                        grantedAt: null,
+                        admittedAt: null,
+                        revokedAt: null,
+                        error: null,
+                        attributes: null,
+                        updatedAt: '2026-04-21T00:00:00.000Z',
+                    },
+                ],
+                acdcs: [
+                    {
+                        said: 'credential-root',
+                        schemaSaid: 'schema-root',
+                        registryId: 'registry-1',
+                        issuerAid: 'Eissuer',
+                        holderAid: 'Eholder',
+                        subject: { i: 'Eholder', LEI: '5493001KJTIIGC8Y1R12' },
+                        rules: { usage: 'demo' },
+                        edges: [
+                            {
+                                label: 'source',
+                                said: 'credential-source',
+                                operator: null,
+                                data: { n: 'credential-source' },
+                            },
+                        ],
+                        status: 'admitted',
+                        updatedAt: '2026-04-21T00:00:00.000Z',
+                    },
+                ],
+                chainGraphs: [
+                    {
+                        rootSaid: 'credential-root',
+                        nodes: [
+                            {
+                                said: 'credential-source',
+                                schemaSaid: 'schema-source',
+                                issuerAid: 'Eissuer',
+                                holderAid: 'Eholder',
+                                unresolved: false,
+                                depth: 1,
+                            },
+                            {
+                                said: 'credential-root',
+                                schemaSaid: 'schema-root',
+                                issuerAid: 'Eissuer',
+                                holderAid: 'Eholder',
+                                unresolved: false,
+                                depth: 0,
+                            },
+                        ],
+                        edges: [
+                            {
+                                id: 'credential-source->credential-root:source',
+                                from: 'credential-source',
+                                to: 'credential-root',
+                                label: 'source',
+                                operator: null,
+                            },
+                        ],
+                        updatedAt: '2026-04-21T00:00:00.000Z',
+                    },
+                ],
+            })
+        );
+
+        expect(
+            selectCredentialAcdc('credential-root')(store.getState())
+        ).toMatchObject({
+            said: 'credential-root',
+            subject: { i: 'Eholder', LEI: '5493001KJTIIGC8Y1R12' },
+        });
+        expect(
+            selectCredentialChainGraph('credential-root')(store.getState())
+        ).toMatchObject({
+            rootSaid: 'credential-root',
+            edges: [
+                expect.objectContaining({
+                    from: 'credential-source',
+                    to: 'credential-root',
+                }),
+            ],
+        });
     });
 
     it('preserves workflow challenge records across inventory refreshes', () => {

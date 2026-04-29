@@ -45,15 +45,19 @@ const flattenSchemaRuleEntries = (
 };
 
 export const schemaRuleViews = (
-    rules: Record<string, unknown> | null | undefined
+    rules: unknown | null | undefined
 ): SchemaRuleView[] => {
     if (rules === undefined || rules === null) {
         return [];
     }
 
     const rows: SchemaRuleView[] = [];
-    for (const [key, value] of Object.entries(rules)) {
-        flattenSchemaRuleEntries(value, key, rows);
+    if (isPlainRecord(rules)) {
+        for (const [key, value] of Object.entries(rules)) {
+            flattenSchemaRuleEntries(value, key, rows);
+        }
+    } else {
+        flattenSchemaRuleEntries(rules, 'rules', rows);
     }
     return rows;
 };

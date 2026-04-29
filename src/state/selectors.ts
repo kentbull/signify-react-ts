@@ -221,6 +221,22 @@ export const selectContactsByOobi = (state: RootState) => {
 export const selectCredentialStatus = (said: string) => (state: RootState) =>
     state.credentials.bySaid[said]?.status ?? null;
 
+/** Select one generic raw ACDC detail record by credential SAID. */
+export const selectCredentialAcdc =
+    (said: string) =>
+    (state: RootState) =>
+        state.credentials.acdcBySaid[said] ?? null;
+
+/** Select all generic raw ACDC detail records keyed by credential SAID. */
+export const selectCredentialAcdcsBySaid = (state: RootState) =>
+    state.credentials.acdcBySaid;
+
+/** Select the normalized chained ACDC DAG for one root credential SAID. */
+export const selectCredentialChainGraph =
+    (rootSaid: string) =>
+    (state: RootState) =>
+        state.credentials.chainGraphByRootSaid[rootSaid] ?? null;
+
 /** Select credential records newest first. */
 export const selectCredentials = (state: RootState) =>
     state.credentials.saids

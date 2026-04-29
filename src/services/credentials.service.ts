@@ -15,6 +15,8 @@ import type {
     CredentialInventorySnapshot,
     CredentialRegistryInventorySnapshot,
     CredentialRegistryOwner,
+    CredentialAcdcRecord,
+    CredentialChainGraphRecord,
     CredentialIpexActivityRecord,
     CredentialSummaryRecord,
     RegistryRecord,
@@ -24,6 +26,9 @@ import type { IssueableCredentialTypeRecord } from '../domain/credentials/creden
 import type { SediVoterCredentialAttributes } from '../domain/credentials/sediVoterId';
 import {
     credentialGrantFromExchange,
+    credentialAcdcRecordFromKeriaCredential,
+    credentialChainGraphFromKeriaCredential,
+    credentialChains,
     credentialRecordFromKeriaCredential,
     credentialSad,
     credentialSchema,
@@ -779,10 +784,12 @@ export function* listCredentialInventoryService({
         localAids.map((aid) => aid.trim()).filter((aid) => aid.length > 0)
     );
     if (localAidSet.size === 0) {
-        return { credentials: [], schemas: [] };
+        return { credentials: [], acdcs: [], chainGraphs: [], schemas: [] };
     }
 
     const records = new Map<string, CredentialSummaryRecord>();
+    const acdcs = new Map<string, CredentialAcdcRecord>();
+    const chainGraphs = new Map<string, CredentialChainGraphRecord>();
     const schemas = new Map<string, SchemaRecord>();
     const recordEmbeddedSchema = (credential: CredentialResult) => {
         const sad = credentialSad(credential);
@@ -802,16 +809,54 @@ export function* listCredentialInventoryService({
             })
         );
     };
+    const recordCredentialTree = ({
+        credential,
+        status,
+    }: {
+        credential: CredentialResult;
+        status: CredentialSummaryRecord['status'];
+    }) => {
+        const updatedAt = new Date().toISOString();
+        const pending = [credential];
+        const visited = new Set<string>();
+        while (pending.length > 0) {
+            const current = pending.shift();
+            if (current === undefined) {
+                continue;
+            }
+
+            const said = credentialSaid(current);
+            if (visited.has(said)) {
+                continue;
+            }
+
+            visited.add(said);
+            recordEmbeddedSchema(current);
+            acdcs.set(
+                said,
+                credentialAcdcRecordFromKeriaCredential({
+                    credential: current,
+                    status: current === credential ? status : null,
+                    updatedAt,
+                })
+            );
+            pending.push(...credentialChains(current));
+        }
+
+        chainGraphs.set(
+            credentialSaid(credential),
+            credentialChainGraphFromKeriaCredential({ credential, updatedAt })
+        );
+    };
 
     for (const localAid of localAidSet) {
         const issuedCredentials = yield* callPromise(() =>
             client.credentials().list({ filter: { '-i': localAid } })
         );
         for (const credential of issuedCredentials) {
-            recordEmbeddedSchema(credential);
             const said = credentialSaid(credential);
             const sad = credentialSad(credential);
-            const ri = recordString(sad, 'ri');
+            const ri = recordString(sad, 'ri') ?? recordString(sad, 'rd');
             let state: CredentialState | null = null;
             if (ri !== null) {
                 try {
@@ -822,6 +867,8 @@ export function* listCredentialInventoryService({
                     state = null;
                 }
             }
+            const status = statusFromCredentialState(state, false);
+            recordCredentialTree({ credential, status });
 
             records.set(
                 `issued:${said}`,
@@ -829,7 +876,7 @@ export function* listCredentialInventoryService({
                     credential,
                     credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
                     direction: 'issued',
-                    status: statusFromCredentialState(state, false),
+                    status,
                 })
             );
         }
@@ -838,10 +885,9 @@ export function* listCredentialInventoryService({
             client.credentials().list({ filter: { '-a-i': localAid } })
         );
         for (const credential of heldCredentials) {
-            recordEmbeddedSchema(credential);
             const said = credentialSaid(credential);
             const sad = credentialSad(credential);
-            const ri = recordString(sad, 'ri');
+            const ri = recordString(sad, 'ri') ?? recordString(sad, 'rd');
             let state: CredentialState | null = null;
             if (ri !== null) {
                 try {
@@ -852,6 +898,8 @@ export function* listCredentialInventoryService({
                     state = null;
                 }
             }
+            const status = statusFromCredentialState(state, true);
+            recordCredentialTree({ credential, status });
 
             records.set(
                 `held:${said}`,
@@ -859,7 +907,7 @@ export function* listCredentialInventoryService({
                     credential,
                     credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
                     direction: 'held',
-                    status: statusFromCredentialState(state, true),
+                    status,
                 })
             );
         }
@@ -867,6 +915,8 @@ export function* listCredentialInventoryService({
 
     return {
         credentials: Array.from(records.values()),
+        acdcs: Array.from(acdcs.values()),
+        chainGraphs: Array.from(chainGraphs.values()),
         schemas: Array.from(schemas.values()),
     };
 }

@@ -6,6 +6,11 @@ import type {
     Schema,
 } from 'signify-ts';
 import type {
+    CredentialAcdcEdgeReference,
+    CredentialAcdcRecord,
+    CredentialChainGraphEdgeRecord,
+    CredentialChainGraphNodeRecord,
+    CredentialChainGraphRecord,
     CredentialAdmitNotification,
     CredentialExchangeNotificationReference,
     CredentialGrantNotification,
@@ -115,10 +120,55 @@ export const exchangeRoute = (exchange: unknown): string | null =>
 export const schemaText = (schema: Schema, key: string): string | null =>
     stringValue((schema as Record<string, unknown>)[key]);
 
+const schemaObjectBranch = (
+    value: Record<string, unknown>
+): Record<string, unknown> | null => {
+    const oneOf = value.oneOf;
+    if (!Array.isArray(oneOf)) {
+        return null;
+    }
+
+    for (const candidate of oneOf) {
+        if (
+            isRecord(candidate) &&
+            (candidate.type === 'object' || isRecord(candidate.properties))
+        ) {
+            return candidate;
+        }
+    }
+
+    return null;
+};
+
 /** Preserve schema rules as data without cloning the full schema payload. */
 export const schemaRules = (schema: Schema): Record<string, unknown> | null => {
     const rules = (schema as Record<string, unknown>).rules;
-    return isRecord(rules) ? rules : null;
+    if (isRecord(rules)) {
+        return rules;
+    }
+
+    const properties = schemaProperties(schema);
+    const acdcRules = properties?.r;
+    if (!isRecord(acdcRules)) {
+        return null;
+    }
+
+    const objectBranch = schemaObjectBranch(acdcRules);
+    if (objectBranch !== null) {
+        const ruleProperties = objectBranch.properties;
+        return isRecord(ruleProperties) ? ruleProperties : objectBranch;
+    }
+
+    const ruleProperties = acdcRules.properties;
+    return isRecord(ruleProperties) ? ruleProperties : acdcRules;
+};
+
+/** Preserve schema properties for generic ACDC data display. */
+export const schemaProperties = (
+    schema: Schema
+): Record<string, unknown> | null => {
+    const properties = (schema as Record<string, unknown>).properties;
+    return isRecord(properties) ? properties : null;
 };
 
 /**
@@ -134,18 +184,22 @@ export const schemaRecordFromKeriaSchema = ({
     said: string;
     oobi: string | null;
     updatedAt: string;
-}): SchemaRecord => ({
-    said,
-    oobi,
-    status: 'resolved',
-    title: schemaText(schema, 'title'),
-    description: schemaText(schema, 'description'),
-    credentialType: schemaText(schema, 'credentialType'),
-    version: schemaText(schema, 'version'),
-    rules: schemaRules(schema),
-    error: null,
-    updatedAt,
-});
+}): SchemaRecord => {
+    const properties = schemaProperties(schema);
+    return {
+        said,
+        oobi,
+        status: 'resolved',
+        title: schemaText(schema, 'title'),
+        description: schemaText(schema, 'description'),
+        credentialType: schemaText(schema, 'credentialType'),
+        version: schemaText(schema, 'version'),
+        ...(properties === null ? {} : { properties }),
+        rules: schemaRules(schema),
+        error: null,
+        updatedAt,
+    };
+};
 
 /** Read a string field from KERIA registry records. */
 export const registryString = (
@@ -206,6 +260,16 @@ const credentialSubject = (
     return isRecord(sad.a) ? sad.a : null;
 };
 
+const credentialRegistryId = (
+    sad: Record<string, unknown>
+): string | null => recordString(sad, 'ri') ?? recordString(sad, 'rd');
+
+const credentialRules = (sad: Record<string, unknown>): unknown | null =>
+    sad.r === undefined ? null : sad.r;
+
+const credentialEdgeBlock = (sad: Record<string, unknown>): unknown | null =>
+    sad.e === undefined ? null : sad.e;
+
 /** Require the credential SAID from a KERIA credential result. */
 export const credentialSaid = (credential: CredentialResult): string => {
     const said = recordString(credentialSad(credential), 'd');
@@ -214,6 +278,87 @@ export const credentialSaid = (credential: CredentialResult): string => {
     }
 
     return said;
+};
+
+const isCredentialResult = (value: unknown): value is CredentialResult =>
+    isRecord(value) && isRecord(value.sad);
+
+/** Return recursive chained credentials from a KERIA credential result. */
+export const credentialChains = (
+    credential: CredentialResult
+): CredentialResult[] => {
+    const chains = (credential as Record<string, unknown>).chains;
+    return Array.isArray(chains) ? chains.filter(isCredentialResult) : [];
+};
+
+const edgeOperator = (
+    source: Record<string, unknown>,
+    inheritedOperator: string | null
+): string | null => recordString(source, 'o') ?? inheritedOperator;
+
+const edgeSaid = (source: Record<string, unknown>): string | null =>
+    recordString(source, 'n') ?? recordString(source, 'd');
+
+const collectEdgeReferences = ({
+    value,
+    prefix,
+    inheritedOperator,
+    refs,
+}: {
+    value: unknown;
+    prefix: string | null;
+    inheritedOperator: string | null;
+    refs: CredentialAcdcEdgeReference[];
+}) => {
+    if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+            collectEdgeReferences({
+                value: item,
+                prefix: prefix === null ? String(index) : `${prefix}.${index}`,
+                inheritedOperator,
+                refs,
+            });
+        });
+        return;
+    }
+
+    if (!isRecord(value)) {
+        return;
+    }
+
+    const groupOperator = recordString(value, 'o') ?? inheritedOperator;
+    for (const [key, source] of Object.entries(value)) {
+        if (key === 'd' || key === 'o') {
+            continue;
+        }
+
+        const label = prefix === null ? key : `${prefix}.${key}`;
+        if (!isRecord(source)) {
+            continue;
+        }
+
+        const said = edgeSaid(source);
+        refs.push({
+            label,
+            said,
+            operator: edgeOperator(source, groupOperator),
+            data: source,
+        });
+    }
+};
+
+/** Extract all source credential references from a raw ACDC edge block. */
+export const credentialEdgeReferences = (
+    sad: Record<string, unknown>
+): CredentialAcdcEdgeReference[] => {
+    const refs: CredentialAcdcEdgeReference[] = [];
+    collectEdgeReferences({
+        value: credentialEdgeBlock(sad),
+        prefix: null,
+        inheritedOperator: null,
+        refs,
+    });
+    return refs;
 };
 
 /**
@@ -257,6 +402,198 @@ export const statusFromCredentialState = (
     return admitted ? 'admitted' : 'issued';
 };
 
+const credentialStateFromResult = (
+    credential: CredentialResult
+): CredentialState | null => {
+    const status = (credential as Record<string, unknown>).status;
+    return isRecord(status) ? (status as CredentialState) : null;
+};
+
+/**
+ * Project a KERIA credential result into generic raw ACDC detail state.
+ */
+export const credentialAcdcRecordFromKeriaCredential = ({
+    credential,
+    status = null,
+    updatedAt = new Date().toISOString(),
+}: {
+    credential: CredentialResult;
+    status?: CredentialSummaryRecord['status'] | null;
+    updatedAt?: string;
+}): CredentialAcdcRecord => {
+    const sad = credentialSad(credential);
+    const subject = credentialSubject(credential);
+
+    return {
+        said: credentialSaid(credential),
+        schemaSaid: recordString(sad, 's'),
+        registryId: credentialRegistryId(sad),
+        issuerAid: recordString(sad, 'i'),
+        holderAid: subject === null ? null : recordString(subject, 'i'),
+        subject,
+        rules: credentialRules(sad),
+        edges: credentialEdgeReferences(sad),
+        status,
+        updatedAt,
+    };
+};
+
+/**
+ * Flatten one credential plus its recursive chained credentials, de-duping by SAID.
+ */
+export const flattenCredentialChain = (
+    credential: CredentialResult
+): CredentialResult[] => {
+    const bySaid = new Map<string, CredentialResult>();
+    const visit = (candidate: CredentialResult) => {
+        const said = credentialSaid(candidate);
+        if (bySaid.has(said)) {
+            return;
+        }
+
+        bySaid.set(said, candidate);
+        for (const chain of credentialChains(candidate)) {
+            visit(chain);
+        }
+    };
+
+    visit(credential);
+    return Array.from(bySaid.values());
+};
+
+const graphNodeFromAcdc = (
+    acdc: CredentialAcdcRecord
+): CredentialChainGraphNodeRecord => ({
+    said: acdc.said,
+    schemaSaid: acdc.schemaSaid,
+    issuerAid: acdc.issuerAid,
+    holderAid: acdc.holderAid,
+    unresolved: false,
+    depth: 0,
+});
+
+const unresolvedGraphNode = (
+    said: string
+): CredentialChainGraphNodeRecord => ({
+    said,
+    schemaSaid: null,
+    issuerAid: null,
+    holderAid: null,
+    unresolved: true,
+    depth: 0,
+});
+
+const assignGraphDepths = ({
+    rootSaid,
+    nodes,
+    edges,
+}: {
+    rootSaid: string;
+    nodes: Map<string, CredentialChainGraphNodeRecord>;
+    edges: readonly CredentialChainGraphEdgeRecord[];
+}) => {
+    const incomingByTarget = new Map<string, CredentialChainGraphEdgeRecord[]>();
+    for (const edge of edges) {
+        incomingByTarget.set(edge.to, [
+            ...(incomingByTarget.get(edge.to) ?? []),
+            edge,
+        ]);
+    }
+
+    const queue: Array<{ said: string; depth: number }> = [
+        { said: rootSaid, depth: 0 },
+    ];
+    const bestDepth = new Map<string, number>();
+    while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === undefined) {
+            continue;
+        }
+
+        if (bestDepth.has(current.said)) {
+            continue;
+        }
+
+        bestDepth.set(current.said, current.depth);
+        const node = nodes.get(current.said);
+        if (node !== undefined) {
+            node.depth = current.depth;
+        }
+
+        for (const edge of incomingByTarget.get(current.said) ?? []) {
+            queue.push({ said: edge.from, depth: current.depth + 1 });
+        }
+    }
+};
+
+/**
+ * Normalize one root credential's source credentials into a visual DAG record.
+ */
+export const credentialChainGraphFromKeriaCredential = ({
+    credential,
+    updatedAt = new Date().toISOString(),
+}: {
+    credential: CredentialResult;
+    updatedAt?: string;
+}): CredentialChainGraphRecord => {
+    const rootSaid = credentialSaid(credential);
+    const credentials = flattenCredentialChain(credential);
+    const acdcs = credentials.map((item) =>
+        credentialAcdcRecordFromKeriaCredential({
+            credential: item,
+            status: statusFromCredentialState(
+                credentialStateFromResult(item),
+                false
+            ),
+            updatedAt,
+        })
+    );
+    const nodes = new Map<string, CredentialChainGraphNodeRecord>();
+    for (const acdc of acdcs) {
+        nodes.set(acdc.said, graphNodeFromAcdc(acdc));
+    }
+
+    const edges: CredentialChainGraphEdgeRecord[] = [];
+    const edgeIds = new Set<string>();
+    for (const acdc of acdcs) {
+        for (const ref of acdc.edges) {
+            if (ref.said === null) {
+                continue;
+            }
+
+            if (!nodes.has(ref.said)) {
+                nodes.set(ref.said, unresolvedGraphNode(ref.said));
+            }
+
+            const id = `${ref.said}->${acdc.said}:${ref.label}`;
+            if (edgeIds.has(id)) {
+                continue;
+            }
+
+            edgeIds.add(id);
+            edges.push({
+                id,
+                from: ref.said,
+                to: acdc.said,
+                label: ref.label,
+                operator: ref.operator,
+            });
+        }
+    }
+
+    assignGraphDepths({ rootSaid, nodes, edges });
+
+    return {
+        rootSaid,
+        nodes: Array.from(nodes.values()).sort(
+            (left, right) =>
+                right.depth - left.depth || left.said.localeCompare(right.said)
+        ),
+        edges,
+        updatedAt,
+    };
+};
+
 /**
  * Project a KERIA credential result into the app's credential summary record.
  *
@@ -298,7 +635,7 @@ export const credentialRecordFromKeriaCredential = ({
     return {
         said,
         schemaSaid,
-        registryId: recordString(sad, 'ri'),
+        registryId: credentialRegistryId(sad),
         issuerAid: recordString(sad, 'i'),
         holderAid: subject === null ? null : recordString(subject, 'i'),
         direction,

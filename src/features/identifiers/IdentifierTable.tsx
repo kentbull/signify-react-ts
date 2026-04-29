@@ -34,6 +34,7 @@ import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
  */
 export interface IdentifierTableProps {
     identifiers: readonly IdentifierSummary[];
+    selectedAid: string | null;
     onSelect: (identifier: IdentifierSummary) => void;
     onRotate: (name: string) => void;
     isRotateDisabled: (identifier: IdentifierSummary) => boolean;
@@ -141,6 +142,7 @@ const CopyableMonoValue = ({
  */
 export const IdentifierTable = ({
     identifiers,
+    selectedAid,
     onSelect,
     onRotate,
     isRotateDisabled,
@@ -188,105 +190,118 @@ export const IdentifierTable = ({
     return (
         <Box data-testid="identifier-table">
             <Stack spacing={1.5} sx={{ display: { xs: 'flex', sm: 'none' } }}>
-                {identifiers.map((identifier) => (
-                    <Card
-                        key={identifier.name}
-                        variant="outlined"
-                        data-testid={`identifier-row-${identifier.name}`}
-                        sx={{
-                            bgcolor: 'background.paper',
-                            borderColor: 'divider',
-                            '&:hover': {
-                                borderColor: 'primary.main',
-                            },
-                        }}
-                    >
-                        <CardContent>
-                            <Stack
-                                spacing={0.75}
-                                onClick={() => onSelect(identifier)}
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                                sx={{ cursor: 'pointer' }}
-                            >
-                                <Typography variant="subtitle1">
-                                    {identifier.name}
-                                </Typography>
-                                <Box>
-                                    <CopyableMonoValue
-                                        value={identifier.prefix}
-                                        label="full AID"
-                                        copied={
-                                            copiedValue === identifier.prefix
-                                        }
-                                        onCopy={copyValue}
-                                    />
-                                </Box>
-                                <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                >
-                                    {identifierType(identifier)}
-                                </Typography>
-                                <Stack direction="row" spacing={2}>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                    >
-                                        KIDX:{' '}
-                                        {formatIdentifierMetadata(
-                                            identifierKeyIndex(identifier)
-                                        )}
-                                    </Typography>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                    >
-                                        PIDX:{' '}
-                                        {formatIdentifierMetadata(
-                                            identifierIdentifierIndex(
-                                                identifier
-                                            )
-                                        )}
-                                    </Typography>
-                                </Stack>
-                            </Stack>
-                        </CardContent>
-                        <CardActions
+                {identifiers.map((identifier) => {
+                    const selected = selectedAid === identifier.prefix;
+                    return (
+                        <Card
+                            key={identifier.name}
+                            variant="outlined"
+                            aria-selected={selected}
+                            data-testid={`identifier-row-${identifier.name}`}
                             sx={{
-                                justifyContent: 'flex-end',
-                                minHeight: 48,
-                                pt: 0,
-                                flexWrap: 'nowrap',
+                                bgcolor: selected
+                                    ? 'rgba(39, 215, 255, 0.08)'
+                                    : 'background.paper',
+                                borderColor: selected
+                                    ? 'primary.main'
+                                    : 'divider',
+                                '&:hover': {
+                                    borderColor: 'primary.main',
+                                },
                             }}
                         >
-                            <OobiCopyButton
-                                identifier={identifier}
-                                copyStatus={
-                                    agentOobiCopyStatus[identifier.name]
-                                }
-                                onCopy={copyAgentOobi}
-                            />
-                            <AuthorizeAgentButton
-                                identifier={identifier}
-                                disabled={isAuthorizeAgentDisabled(identifier)}
-                                onAuthorize={authorizeAgent}
-                            />
-                            <Tooltip title="Rotate identifier">
-                                <span>
-                                    <IconButton
-                                        aria-label={`Rotate identifier ${identifier.name}`}
-                                        disabled={isRotateDisabled(identifier)}
-                                        onClick={(event) =>
-                                            rotate(event, identifier)
-                                        }
+                            <CardContent>
+                                <Stack
+                                    spacing={0.75}
+                                    onClick={() => onSelect(identifier)}
+                                    data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                    sx={{ cursor: 'pointer' }}
+                                >
+                                    <Typography variant="subtitle1">
+                                        {identifier.name}
+                                    </Typography>
+                                    <Box>
+                                        <CopyableMonoValue
+                                            value={identifier.prefix}
+                                            label="full AID"
+                                            copied={
+                                                copiedValue ===
+                                                identifier.prefix
+                                            }
+                                            onCopy={copyValue}
+                                        />
+                                    </Box>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
                                     >
-                                        <RotateRightIcon />
-                                    </IconButton>
-                                </span>
-                            </Tooltip>
-                        </CardActions>
-                    </Card>
-                ))}
+                                        {identifierType(identifier)}
+                                    </Typography>
+                                    <Stack direction="row" spacing={2}>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                        >
+                                            KIDX:{' '}
+                                            {formatIdentifierMetadata(
+                                                identifierKeyIndex(identifier)
+                                            )}
+                                        </Typography>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                        >
+                                            PIDX:{' '}
+                                            {formatIdentifierMetadata(
+                                                identifierIdentifierIndex(
+                                                    identifier
+                                                )
+                                            )}
+                                        </Typography>
+                                    </Stack>
+                                </Stack>
+                            </CardContent>
+                            <CardActions
+                                sx={{
+                                    justifyContent: 'flex-end',
+                                    minHeight: 48,
+                                    pt: 0,
+                                    flexWrap: 'nowrap',
+                                }}
+                            >
+                                <OobiCopyButton
+                                    identifier={identifier}
+                                    copyStatus={
+                                        agentOobiCopyStatus[identifier.name]
+                                    }
+                                    onCopy={copyAgentOobi}
+                                />
+                                <AuthorizeAgentButton
+                                    identifier={identifier}
+                                    disabled={isAuthorizeAgentDisabled(
+                                        identifier
+                                    )}
+                                    onAuthorize={authorizeAgent}
+                                />
+                                <Tooltip title="Rotate identifier">
+                                    <span>
+                                        <IconButton
+                                            aria-label={`Rotate identifier ${identifier.name}`}
+                                            disabled={isRotateDisabled(
+                                                identifier
+                                            )}
+                                            onClick={(event) =>
+                                                rotate(event, identifier)
+                                            }
+                                        >
+                                            <RotateRightIcon />
+                                        </IconButton>
+                                    </span>
+                                </Tooltip>
+                            </CardActions>
+                        </Card>
+                    );
+                })}
             </Stack>
             <TableContainer
                 component={Paper}
@@ -348,130 +363,148 @@ export const IdentifierTable = ({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {identifiers.map((identifier) => (
-                            <TableRow
-                                key={identifier.name}
-                                data-testid={`identifier-table-row-${identifier.name}`}
-                                data-ui-sound={UI_SOUND_HOVER_VALUE}
-                                sx={{
-                                    cursor: 'pointer',
-                                    '&:hover': {
-                                        bgcolor: 'action.hover',
-                                    },
-                                    '&:hover .identifier-actions-cell': {
-                                        bgcolor: 'rgba(39, 215, 255, 0.1)',
-                                    },
-                                    '&:last-child td, &:last-child th': {
-                                        border: 0,
-                                    },
-                                }}
-                                onClick={() => onSelect(identifier)}
-                            >
-                                <TableCell
-                                    component="th"
-                                    scope="row"
-                                    sx={{ minWidth: 0 }}
+                        {identifiers.map((identifier) => {
+                            const selected = selectedAid === identifier.prefix;
+                            return (
+                                <TableRow
+                                    key={identifier.name}
+                                    selected={selected}
+                                    aria-selected={selected}
+                                    data-testid={`identifier-table-row-${identifier.name}`}
+                                    data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                    sx={{
+                                        cursor: 'pointer',
+                                        bgcolor: selected
+                                            ? 'rgba(39, 215, 255, 0.08)'
+                                            : undefined,
+                                        '&:hover': {
+                                            bgcolor: 'action.hover',
+                                        },
+                                        '&:hover .identifier-actions-cell': {
+                                            bgcolor: 'rgba(39, 215, 255, 0.1)',
+                                        },
+                                        '&:last-child td, &:last-child th': {
+                                            border: 0,
+                                        },
+                                    }}
+                                    onClick={() => onSelect(identifier)}
                                 >
-                                    <Typography
-                                        variant="body2"
+                                    <TableCell
+                                        component="th"
+                                        scope="row"
+                                        sx={{ minWidth: 0 }}
+                                    >
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {identifier.name}
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell sx={{ minWidth: 0 }}>
+                                        <CopyableMonoValue
+                                            value={identifier.prefix}
+                                            label="full AID"
+                                            copied={
+                                                copiedValue ===
+                                                identifier.prefix
+                                            }
+                                            onCopy={copyValue}
+                                        />
+                                    </TableCell>
+                                    <TableCell sx={mdUpCellSx}>
+                                        {identifierType(identifier)}
+                                    </TableCell>
+                                    <TableCell sx={lgUpCellSx}>
+                                        {formatIdentifierMetadata(
+                                            identifierKeyIndex(identifier)
+                                        )}
+                                    </TableCell>
+                                    <TableCell sx={lgUpCellSx}>
+                                        {formatIdentifierMetadata(
+                                            identifierIdentifierIndex(
+                                                identifier
+                                            )
+                                        )}
+                                    </TableCell>
+                                    <TableCell align="center" sx={lgUpCellSx}>
+                                        <OobiCopyButton
+                                            identifier={identifier}
+                                            copyStatus={
+                                                agentOobiCopyStatus[
+                                                    identifier.name
+                                                ]
+                                            }
+                                            onCopy={copyAgentOobi}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        className="identifier-actions-cell"
                                         sx={{
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
+                                            ...stickyActionCellSx,
+                                            bgcolor: selected
+                                                ? 'rgba(39, 215, 255, 0.08)'
+                                                : stickyActionCellSx.bgcolor,
                                         }}
                                     >
-                                        {identifier.name}
-                                    </Typography>
-                                </TableCell>
-                                <TableCell sx={{ minWidth: 0 }}>
-                                    <CopyableMonoValue
-                                        value={identifier.prefix}
-                                        label="full AID"
-                                        copied={
-                                            copiedValue === identifier.prefix
-                                        }
-                                        onCopy={copyValue}
-                                    />
-                                </TableCell>
-                                <TableCell sx={mdUpCellSx}>
-                                    {identifierType(identifier)}
-                                </TableCell>
-                                <TableCell sx={lgUpCellSx}>
-                                    {formatIdentifierMetadata(
-                                        identifierKeyIndex(identifier)
-                                    )}
-                                </TableCell>
-                                <TableCell sx={lgUpCellSx}>
-                                    {formatIdentifierMetadata(
-                                        identifierIdentifierIndex(identifier)
-                                    )}
-                                </TableCell>
-                                <TableCell align="center" sx={lgUpCellSx}>
-                                    <OobiCopyButton
-                                        identifier={identifier}
-                                        copyStatus={
-                                            agentOobiCopyStatus[identifier.name]
-                                        }
-                                        onCopy={copyAgentOobi}
-                                    />
-                                </TableCell>
-                                <TableCell
-                                    align="right"
-                                    className="identifier-actions-cell"
-                                    sx={stickyActionCellSx}
-                                >
-                                    <Stack
-                                        direction="row"
-                                        spacing={0.25}
-                                        sx={{
-                                            alignItems: 'center',
-                                            flexWrap: 'nowrap',
-                                            justifyContent: 'flex-end',
-                                        }}
-                                    >
-                                        <Box sx={compactOnlyActionSx}>
-                                            <OobiCopyButton
+                                        <Stack
+                                            direction="row"
+                                            spacing={0.25}
+                                            sx={{
+                                                alignItems: 'center',
+                                                flexWrap: 'nowrap',
+                                                justifyContent: 'flex-end',
+                                            }}
+                                        >
+                                            <Box sx={compactOnlyActionSx}>
+                                                <OobiCopyButton
+                                                    identifier={identifier}
+                                                    copyStatus={
+                                                        agentOobiCopyStatus[
+                                                            identifier.name
+                                                        ]
+                                                    }
+                                                    onCopy={copyAgentOobi}
+                                                    size="small"
+                                                />
+                                            </Box>
+                                            <AuthorizeAgentButton
                                                 identifier={identifier}
-                                                copyStatus={
-                                                    agentOobiCopyStatus[
-                                                        identifier.name
-                                                    ]
-                                                }
-                                                onCopy={copyAgentOobi}
+                                                disabled={isAuthorizeAgentDisabled(
+                                                    identifier
+                                                )}
+                                                onAuthorize={authorizeAgent}
                                                 size="small"
                                             />
-                                        </Box>
-                                        <AuthorizeAgentButton
-                                            identifier={identifier}
-                                            disabled={isAuthorizeAgentDisabled(
-                                                identifier
-                                            )}
-                                            onAuthorize={authorizeAgent}
-                                            size="small"
-                                        />
-                                        <Tooltip title="Rotate identifier">
-                                            <span>
-                                                <IconButton
-                                                    size="small"
-                                                    aria-label={`Rotate identifier ${identifier.name}`}
-                                                    disabled={isRotateDisabled(
-                                                        identifier
-                                                    )}
-                                                    onClick={(event) =>
-                                                        rotate(
-                                                            event,
+                                            <Tooltip title="Rotate identifier">
+                                                <span>
+                                                    <IconButton
+                                                        size="small"
+                                                        aria-label={`Rotate identifier ${identifier.name}`}
+                                                        disabled={isRotateDisabled(
                                                             identifier
-                                                        )
-                                                    }
-                                                >
-                                                    <RotateRightIcon fontSize="small" />
-                                                </IconButton>
-                                            </span>
-                                        </Tooltip>
-                                    </Stack>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                                                        )}
+                                                        onClick={(event) =>
+                                                            rotate(
+                                                                event,
+                                                                identifier
+                                                            )
+                                                        }
+                                                    >
+                                                        <RotateRightIcon fontSize="small" />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                        </Stack>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </TableContainer>
