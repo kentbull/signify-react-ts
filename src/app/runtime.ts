@@ -49,6 +49,7 @@ import {
     getSignifyStateOp,
     randomPasscodeOp,
 } from '../workflows/signify.op';
+import { liveDidWebsPublicationOp } from '../workflows/didwebs.op';
 import {
     createChallengeRuntimeCommands,
     createContactRuntimeCommands,
@@ -227,6 +228,9 @@ export class AppRuntime {
     /** Session-scoped live inventory poller; halted on disconnect/reconnect. */
     private liveSyncTask: Task<void> | null = null;
 
+    /** Session-scoped did:webs auto-approval coordinator. */
+    private didWebsPublicationTask: Task<void> | null = null;
+
     /** Optional storage override for tests; `undefined` means browser default. */
     private readonly storage: AppStateStorage | null | undefined;
 
@@ -271,8 +275,7 @@ export class AppRuntime {
         this.identifiers = createIdentifierRuntimeCommands(commandContext);
         this.contacts = createContactRuntimeCommands(commandContext);
         this.challenges = createChallengeRuntimeCommands(commandContext);
-        this.notifications =
-            createNotificationRuntimeCommands(commandContext);
+        this.notifications = createNotificationRuntimeCommands(commandContext);
         this.delegations = createDelegationRuntimeCommands(commandContext);
         this.credentials = createCredentialRuntimeCommands(commandContext);
         this.multisig = createMultisigRuntimeCommands(commandContext);
@@ -374,6 +377,7 @@ export class AppRuntime {
                 })
             );
             this.startLiveSync();
+            this.startDidWebsPublicationSync();
             return connected;
         } catch (error) {
             const normalized = toError(error);
@@ -399,6 +403,7 @@ export class AppRuntime {
             })
         );
         void this.stopLiveSync();
+        void this.stopDidWebsPublicationSync();
         this.flushPersistence();
         void this.scopes.haltSession();
         this.store.dispatch(sessionDisconnected());
@@ -784,6 +789,7 @@ export class AppRuntime {
         this.flushPersistence();
 
         await this.stopLiveSync();
+        await this.stopDidWebsPublicationSync();
         for (const task of this.activeTasks.values()) {
             await task.halt();
         }
@@ -837,32 +843,37 @@ export class AppRuntime {
         const task = this.scopes.run(this.contacts.liveInventory, 'session');
         this.liveSyncTask = task;
 
-        void (async () => {
-            try {
-                await task;
-            } catch (error) {
-                if (!isHaltedOrAborted(error)) {
-                    this.store.dispatch(
-                        appNotificationRecorded({
-                            id: `live-sync-failed-${Date.now()}`,
-                            severity: 'warning',
-                            status: 'unread',
-                            title: 'Live inventory sync stopped',
-                            message: toErrorText(error),
-                            createdAt: new Date().toISOString(),
-                            readAt: null,
-                            operationId: null,
-                            links: [],
-                            payloadDetails: [],
-                        })
-                    );
-                }
-            } finally {
-                if (this.liveSyncTask === task) {
-                    this.liveSyncTask = null;
-                }
+        void this.watchLiveSyncTask(task);
+    };
+
+    /**
+     * Record unexpected live-inventory failures and clear the retained handle.
+     */
+    private watchLiveSyncTask = async (task: Task<void>): Promise<void> => {
+        try {
+            await task;
+        } catch (error) {
+            if (!isHaltedOrAborted(error)) {
+                this.store.dispatch(
+                    appNotificationRecorded({
+                        id: `live-sync-failed-${Date.now()}`,
+                        severity: 'warning',
+                        status: 'unread',
+                        title: 'Live inventory sync stopped',
+                        message: toErrorText(error),
+                        createdAt: new Date().toISOString(),
+                        readAt: null,
+                        operationId: null,
+                        links: [],
+                        payloadDetails: [],
+                    })
+                );
             }
-        })();
+        } finally {
+            if (this.liveSyncTask === task) {
+                this.liveSyncTask = null;
+            }
+        }
     };
 
     /**
@@ -875,6 +886,73 @@ export class AppRuntime {
         }
 
         this.liveSyncTask = null;
+        await task.halt();
+    };
+
+    /**
+     * Start did:webs publication request approval for the connected session.
+     *
+     * KERIA owns request discovery and completion state. The browser client
+     * only auto-approves requests for locally managed AIDs after SignifyTS
+     * verifies KERIA's agent-signed signal envelope or sees the same request
+     * through authenticated polling fallback.
+     */
+    private startDidWebsPublicationSync = (): void => {
+        if (this.didWebsPublicationTask !== null) {
+            void this.didWebsPublicationTask.halt();
+        }
+
+        const task = this.scopes.run(
+            () => liveDidWebsPublicationOp(),
+            'session'
+        );
+        this.didWebsPublicationTask = task;
+
+        void this.watchDidWebsPublicationTask(task);
+    };
+
+    /**
+     * Record unexpected did:webs workflow failures and clear the retained handle.
+     */
+    private watchDidWebsPublicationTask = async (
+        task: Task<void>
+    ): Promise<void> => {
+        try {
+            await task;
+        } catch (error) {
+            if (!isHaltedOrAborted(error)) {
+                this.store.dispatch(
+                    appNotificationRecorded({
+                        id: `didwebs-sync-failed-${Date.now()}`,
+                        severity: 'warning',
+                        status: 'unread',
+                        title: 'did:webs publication sync stopped',
+                        message: toErrorText(error),
+                        createdAt: new Date().toISOString(),
+                        readAt: null,
+                        operationId: null,
+                        links: [],
+                        payloadDetails: [],
+                    })
+                );
+            }
+        } finally {
+            if (this.didWebsPublicationTask === task) {
+                this.didWebsPublicationTask = null;
+            }
+        }
+    };
+
+    /**
+     * Halt the did:webs publication coordinator before session teardown.
+     */
+    private stopDidWebsPublicationSync = async (): Promise<void> => {
+        const task = this.didWebsPublicationTask;
+        if (task === null) {
+            return;
+        }
+
+        this.didWebsPublicationTask = null;
         await task.halt();
     };
 
