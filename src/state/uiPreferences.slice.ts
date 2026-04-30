@@ -1,10 +1,16 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 /**
+ * Explicit visual theme mode selected by the user.
+ */
+export type ThemeMode = 'dark' | 'light';
+
+/**
  * Global, non-secret interface preferences.
  */
 export interface UiPreferencesState {
     hoverSoundMuted: boolean;
+    themeMode: ThemeMode;
 }
 
 /**
@@ -12,6 +18,7 @@ export interface UiPreferencesState {
  */
 export const defaultUiPreferencesState: UiPreferencesState = {
     hoverSoundMuted: false,
+    themeMode: 'dark',
 };
 
 /**
@@ -27,11 +34,21 @@ export const uiPreferencesSlice = createSlice({
         hoverSoundMutedToggled(state) {
             state.hoverSoundMuted = !state.hoverSoundMuted;
         },
+        themeModeSet(state, { payload }: PayloadAction<ThemeMode>) {
+            state.themeMode = payload;
+        },
+        themeModeToggled(state) {
+            state.themeMode = state.themeMode === 'dark' ? 'light' : 'dark';
+        },
     },
 });
 
-export const { hoverSoundMutedSet, hoverSoundMutedToggled } =
-    uiPreferencesSlice.actions;
+export const {
+    hoverSoundMutedSet,
+    hoverSoundMutedToggled,
+    themeModeSet,
+    themeModeToggled,
+} = uiPreferencesSlice.actions;
 
 /**
  * Reducer installed into the root Redux store for interface preferences.

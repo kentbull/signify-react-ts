@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { ButtonProps, SxProps, Theme } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { clickablePanelSx, monoValueSx } from './consoleStyles';
@@ -101,13 +102,15 @@ export const ConsolePanel = ({
                 borderColor: 'divider',
                 borderRadius: 1,
                 bgcolor: 'background.paper',
-                boxShadow: '0 18px 42px rgba(0, 0, 0, 0.2)',
+                boxShadow: (theme) =>
+                    `0 18px 42px ${alpha(theme.palette.common.black, theme.palette.mode === 'dark' ? 0.2 : 0.08)}`,
                 '&:before': {
                     content: '""',
                     position: 'absolute',
                     inset: 0,
                     pointerEvents: 'none',
-                    borderTop: '1px solid rgba(118, 232, 255, 0.16)',
+                    borderTop: (theme) =>
+                        `1px solid ${alpha(theme.palette.primary.light, 0.16)}`,
                 },
             },
             ...(to === undefined ? [] : [clickablePanelSx]),
@@ -171,7 +174,7 @@ export const EmptyState = ({ title, message, action }: EmptyStateProps) => (
             border: 1,
             borderColor: 'divider',
             borderRadius: 1,
-            bgcolor: 'rgba(13, 23, 34, 0.72)',
+            bgcolor: 'background.paper',
             px: { xs: 2, sm: 3 },
             py: { xs: 3, sm: 4 },
             textAlign: { xs: 'left', sm: 'center' },

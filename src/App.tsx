@@ -4,7 +4,9 @@ import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
 import { createAppRouter } from './app/router';
 import { createAppRuntime } from './app/runtime';
-import { appTheme } from './app/theme';
+import { appThemes } from './app/theme';
+import { useAppSelector } from './state/hooks';
+import { selectThemeMode } from './state/selectors';
 import { appStore } from './state/store';
 import { installUiPreferencesPersistence } from './state/uiPreferencesPersistence';
 
@@ -31,13 +33,21 @@ if (import.meta.hot) {
     });
 }
 
+const AppThemeBoundary = () => {
+    const themeMode = useAppSelector(selectThemeMode);
+
+    return (
+        <ThemeProvider theme={appThemes[themeMode]}>
+            <CssBaseline />
+            <RouterProvider router={appRouter} />
+        </ThemeProvider>
+    );
+};
+
 function App() {
     return (
         <Provider store={appStore}>
-            <ThemeProvider theme={appTheme}>
-                <CssBaseline />
-                <RouterProvider router={appRouter} />
-            </ThemeProvider>
+            <AppThemeBoundary />
         </Provider>
     );
 }

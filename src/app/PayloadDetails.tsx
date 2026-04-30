@@ -1,4 +1,5 @@
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { monoValueSx } from './consoleStyles';
 import type { PayloadDetailRecord } from '../state/payloadDetails';
@@ -85,7 +86,8 @@ export const PayloadDetails = ({
                             borderRadius: 1,
                             px: dense ? 0.75 : 1,
                             py: dense ? 0.5 : 0.75,
-                            bgcolor: 'rgba(39, 215, 255, 0.06)',
+                            bgcolor: (theme) =>
+                                alpha(theme.palette.primary.main, 0.06),
                             cursor: detail.copyable ? 'copy' : 'default',
                             minWidth: 0,
                         }}

@@ -15,10 +15,16 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import SendIcon from '@mui/icons-material/Send';
-import { ConsolePanel, EmptyState, StatusPill, TelemetryRow } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import {
@@ -152,8 +158,8 @@ export const CredentialRegistrySelector = ({
                                     borderRadius: 1,
                                     p: 1.5,
                                     bgcolor: selected
-                                        ? 'rgba(118, 232, 255, 0.08)'
-                                        : 'rgba(13, 23, 34, 0.72)',
+                                        ? 'action.selected'
+                                        : 'background.paper',
                                 },
                                 clickablePanelSx,
                             ]}
@@ -223,7 +229,11 @@ export const SediVoterIssueForm = ({
     onIssue: () => void;
 }) => (
     <>
-        <FormControl fullWidth size="small" error={holderSelectionMessage !== null}>
+        <FormControl
+            fullWidth
+            size="small"
+            error={holderSelectionMessage !== null}
+        >
             <InputLabel id="holder-contact-label">Holder contact</InputLabel>
             <Select
                 labelId="holder-contact-label"
@@ -293,9 +303,13 @@ export const SediVoterIssueForm = ({
                 borderColor: issuerReady ? 'success.main' : 'warning.main',
                 borderRadius: 1,
                 p: 1.5,
-                bgcolor: issuerReady
-                    ? 'rgba(31, 122, 77, 0.08)'
-                    : 'rgba(255, 180, 84, 0.08)',
+                bgcolor: (theme) =>
+                    alpha(
+                        issuerReady
+                            ? theme.palette.success.main
+                            : theme.palette.warning.main,
+                        0.08
+                    ),
             }}
         >
             <Stack spacing={1}>
@@ -305,7 +319,8 @@ export const SediVoterIssueForm = ({
                 />
                 {issuerReady ? (
                     <Typography variant="body2">
-                        Schema, registry, holder, and credential fields are ready.
+                        Schema, registry, holder, and credential fields are
+                        ready.
                     </Typography>
                 ) : (
                     <Stack spacing={0.5}>
