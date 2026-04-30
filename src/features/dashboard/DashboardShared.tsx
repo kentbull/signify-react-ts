@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, Button, Stack, Tooltip, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { StatusPill } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
@@ -199,7 +200,7 @@ export const DashboardWarning = ({ message }: { message: string }) => (
             border: 1,
             borderColor: 'warning.main',
             borderRadius: 1,
-            bgcolor: 'rgba(255, 196, 87, 0.08)',
+            bgcolor: (theme) => alpha(theme.palette.warning.main, 0.08),
             px: 2,
             py: 1.25,
         }}

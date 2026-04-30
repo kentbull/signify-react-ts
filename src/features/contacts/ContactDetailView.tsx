@@ -13,6 +13,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
@@ -35,7 +36,12 @@ import {
     TelemetryRow,
 } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
-import { ActionNotice, ChallengeBlock, CopyBlock, FullOobiBlock } from './ContactDetailBlocks';
+import {
+    ActionNotice,
+    ChallengeBlock,
+    CopyBlock,
+    FullOobiBlock,
+} from './ContactDetailBlocks';
 import { formatTimestamp } from '../../app/timeFormat';
 import type {
     ContactActionData,
@@ -54,7 +60,10 @@ import {
     contactOobiGroups,
     contactOobiRoleSummary,
 } from '../../domain/contacts/contactHelpers';
-import { parseChallengeWords, validateChallengeWords } from '../../domain/challenges/challengeWords';
+import {
+    parseChallengeWords,
+    validateChallengeWords,
+} from '../../domain/challenges/challengeWords';
 
 const timestampText = (value: string | null): string =>
     value === null ? 'Not available' : (formatTimestamp(value) ?? value);
@@ -284,7 +293,8 @@ export const ContactDetailView = () => {
                         border: 1,
                         borderColor: 'warning.main',
                         borderRadius: 1,
-                        bgcolor: 'rgba(255, 196, 87, 0.08)',
+                        bgcolor: (theme) =>
+                            alpha(theme.palette.warning.main, 0.08),
                         px: 2,
                         py: 1.25,
                     }}

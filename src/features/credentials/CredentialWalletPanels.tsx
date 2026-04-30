@@ -1,12 +1,12 @@
-import {
-    Box,
-    Button,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { ConsolePanel, EmptyState, StatusPill, TelemetryRow } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
@@ -18,11 +18,7 @@ import type {
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { W3CVerifier } from 'signify-ts';
 import type { CredentialWalletStats } from './credentialViewModels';
-import {
-    schemaLabel,
-    schemaStatusTone,
-    statusTone,
-} from './credentialDisplay';
+import { schemaLabel, schemaStatusTone, statusTone } from './credentialDisplay';
 import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
 
 /**
@@ -324,7 +320,7 @@ export const HeldCredentialsPanel = ({
                                 borderColor: 'divider',
                                 borderRadius: 1,
                                 p: 1.5,
-                                bgcolor: 'rgba(13, 23, 34, 0.72)',
+                                bgcolor: 'background.paper',
                             },
                             clickablePanelSx,
                         ]}

@@ -37,8 +37,7 @@ export const selectDidWebsDidByAid =
             : (state.didwebs.byAid[aid] ?? null);
 
 /** Select did:webs DID facts keyed by local AID. */
-export const selectDidWebsDidsByAid = (state: RootState) =>
-    state.didwebs.byAid;
+export const selectDidWebsDidsByAid = (state: RootState) => state.didwebs.byAid;
 
 /** Select only the session status for shell rendering. */
 export const selectConnectionStatus = (state: RootState) =>
@@ -47,6 +46,10 @@ export const selectConnectionStatus = (state: RootState) =>
 /** Select the persisted interface sound preference. */
 export const selectHoverSoundMuted = (state: RootState): boolean =>
     state.uiPreferences.hoverSoundMuted;
+
+/** Select the persisted visual theme preference. */
+export const selectThemeMode = (state: RootState) =>
+    state.uiPreferences.themeMode;
 
 /** Select operation records in display order. */
 export const selectOperationRecords = (state: RootState) =>
@@ -226,10 +229,8 @@ export const selectCredentialStatus = (said: string) => (state: RootState) =>
     state.credentials.bySaid[said]?.status ?? null;
 
 /** Select one generic raw ACDC detail record by credential SAID. */
-export const selectCredentialAcdc =
-    (said: string) =>
-    (state: RootState) =>
-        state.credentials.acdcBySaid[said] ?? null;
+export const selectCredentialAcdc = (said: string) => (state: RootState) =>
+    state.credentials.acdcBySaid[said] ?? null;
 
 /** Select all generic raw ACDC detail records keyed by credential SAID. */
 export const selectCredentialAcdcsBySaid = (state: RootState) =>
@@ -237,8 +238,7 @@ export const selectCredentialAcdcsBySaid = (state: RootState) =>
 
 /** Select the normalized chained ACDC DAG for one root credential SAID. */
 export const selectCredentialChainGraph =
-    (rootSaid: string) =>
-    (state: RootState) =>
+    (rootSaid: string) => (state: RootState) =>
         state.credentials.chainGraphByRootSaid[rootSaid] ?? null;
 
 /** Select credential records newest first. */

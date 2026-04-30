@@ -93,7 +93,7 @@ const CredentialSubTile = ({
             border: 1,
             borderColor: 'divider',
             borderRadius: 1,
-            bgcolor: 'rgba(13, 23, 34, 0.72)',
+            bgcolor: 'background.paper',
             px: 1.25,
             py: 1,
             minWidth: 0,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Button, Fab, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import { useFetcher, useLoaderData } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
@@ -418,8 +419,10 @@ export const IdentifiersView = () => {
                         borderRadius: 1,
                         bgcolor:
                             actionState.status === 'error'
-                                ? 'rgba(255, 61, 79, 0.08)'
-                                : 'rgba(39, 215, 255, 0.06)',
+                                ? (theme) =>
+                                      alpha(theme.palette.error.main, 0.08)
+                                : (theme) =>
+                                      alpha(theme.palette.primary.main, 0.06),
                         px: 2,
                         py: 1.25,
                     }}

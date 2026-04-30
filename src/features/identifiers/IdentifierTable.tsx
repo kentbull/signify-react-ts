@@ -16,6 +16,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha, type Theme } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
@@ -57,7 +58,7 @@ const monoSx = {
     letterSpacing: 0,
 };
 
-const tableHeadBg = 'rgba(39, 215, 255, 0.06)';
+const tableHeadBg = (theme: Theme) => alpha(theme.palette.primary.main, 0.06);
 
 const compactOnlyActionSx = {
     display: { sm: 'inline-flex', lg: 'none' },
@@ -200,7 +201,7 @@ export const IdentifierTable = ({
                             data-testid={`identifier-row-${identifier.name}`}
                             sx={{
                                 bgcolor: selected
-                                    ? 'rgba(39, 215, 255, 0.08)'
+                                    ? 'action.selected'
                                     : 'background.paper',
                                 borderColor: selected
                                     ? 'primary.main'
@@ -375,13 +376,13 @@ export const IdentifierTable = ({
                                     sx={{
                                         cursor: 'pointer',
                                         bgcolor: selected
-                                            ? 'rgba(39, 215, 255, 0.08)'
+                                            ? 'action.selected'
                                             : undefined,
                                         '&:hover': {
                                             bgcolor: 'action.hover',
                                         },
                                         '&:hover .identifier-actions-cell': {
-                                            bgcolor: 'rgba(39, 215, 255, 0.1)',
+                                            bgcolor: 'action.hover',
                                         },
                                         '&:last-child td, &:last-child th': {
                                             border: 0,
@@ -448,7 +449,7 @@ export const IdentifierTable = ({
                                         sx={{
                                             ...stickyActionCellSx,
                                             bgcolor: selected
-                                                ? 'rgba(39, 215, 255, 0.08)'
+                                                ? 'action.selected'
                                                 : stickyActionCellSx.bgcolor,
                                         }}
                                     >

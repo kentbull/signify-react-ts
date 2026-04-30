@@ -9,6 +9,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Link as RouterLink, useLoaderData } from 'react-router-dom';
 import {
     ConsolePanel,
@@ -73,7 +74,8 @@ export const AppNotificationsView = () => {
                         border: 1,
                         borderColor: 'warning.main',
                         borderRadius: 1,
-                        bgcolor: 'rgba(255, 196, 87, 0.08)',
+                        bgcolor: (theme) =>
+                            alpha(theme.palette.warning.main, 0.08),
                         px: 2,
                         py: 1.25,
                     }}
@@ -208,7 +210,7 @@ export const AppNotificationsView = () => {
                                     borderRadius: 1,
                                     mb: 1,
                                     alignItems: 'flex-start',
-                                    bgcolor: 'rgba(5, 9, 13, 0.4)',
+                                    bgcolor: 'background.paper',
                                 }}
                             >
                                 <ListItemText

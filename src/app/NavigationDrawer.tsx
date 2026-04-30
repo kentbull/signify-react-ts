@@ -10,10 +10,13 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha, type Theme } from '@mui/material/styles';
 import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import ContactsIcon from '@mui/icons-material/Contacts';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import HubIcon from '@mui/icons-material/Hub';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import TerminalIcon from '@mui/icons-material/Terminal';
@@ -48,8 +51,16 @@ const routeIcon = (routeId: AppRouteId) => {
         return <DashboardOutlinedIcon />;
     }
 
+    if (routeId === 'contacts') {
+        return <ContactsIcon />;
+    }
+
     if (routeId === 'identifiers') {
         return <BadgeOutlinedIcon />;
+    }
+
+    if (routeId === 'multisig') {
+        return <HubIcon />;
     }
 
     if (routeId === 'credentials') {
@@ -116,7 +127,7 @@ const clearLocalStateButtonSx = {
     borderColor: 'transparent',
     '&:hover': {
         borderColor: 'error.main',
-        bgcolor: 'rgba(255, 75, 90, 0.08)',
+        bgcolor: (theme: Theme) => alpha(theme.palette.error.main, 0.08),
         color: 'error.main',
     },
     '.MuiListItemIcon-root': {
@@ -168,6 +179,7 @@ export const NavigationDrawer = ({
                 paper: {
                     sx: {
                         width: 'min(80vw, 280px)',
+                        maxHeight: '100dvh',
                         pt: 1,
                     },
                 },
@@ -180,6 +192,8 @@ export const NavigationDrawer = ({
                     display: 'flex',
                     flexDirection: 'column',
                     height: '100%',
+                    minHeight: 0,
+                    overflowY: 'auto',
                 }}
             >
                 <List>
@@ -249,10 +263,12 @@ export const DesktopNavigationRail = ({
                 gap: 0.5,
                 borderRight: 1,
                 borderColor: 'divider',
-                bgcolor: 'rgba(7, 13, 20, 0.9)',
+                bgcolor: (theme) => alpha(theme.palette.background.paper, 0.9),
                 px: 1,
                 py: 2,
                 backdropFilter: 'blur(10px)',
+                minHeight: 0,
+                overflowY: 'auto',
             }}
         >
             {APP_NAV_ITEMS.map((view) => {

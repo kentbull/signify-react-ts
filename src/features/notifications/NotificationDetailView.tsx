@@ -7,6 +7,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import {
@@ -17,11 +18,7 @@ import {
     useParams,
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
-import {
-    EmptyState,
-    PageHeader,
-    StatusPill,
-} from '../../app/Console';
+import { EmptyState, PageHeader, StatusPill } from '../../app/Console';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type {
     ContactActionData,
@@ -236,7 +233,7 @@ export const NotificationDetailView = () => {
                             ? 'Delegation request'
                             : multisigRequest !== null
                               ? 'Multisig request'
-                            : notification.route
+                              : notification.route
                 }
                 summary={notification.id}
                 actions={
@@ -304,7 +301,8 @@ export const NotificationDetailView = () => {
                         border: 1,
                         borderColor: 'warning.main',
                         borderRadius: 1,
-                        bgcolor: 'rgba(255, 196, 87, 0.08)',
+                        bgcolor: (theme) =>
+                            alpha(theme.palette.warning.main, 0.08),
                         px: 2,
                         py: 1.25,
                     }}

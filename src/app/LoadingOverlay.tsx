@@ -1,4 +1,5 @@
 import { Backdrop, Box, CircularProgress, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { PendingSource } from './pendingState';
 
 /**
@@ -30,7 +31,10 @@ export const LoadingOverlay = ({
             sx={(theme) => ({
                 zIndex: theme.zIndex.modal + 2,
                 color: 'text.primary',
-                bgcolor: 'rgba(0, 0, 0, 0.72)',
+                bgcolor:
+                    theme.palette.mode === 'dark'
+                        ? alpha(theme.palette.common.black, 0.72)
+                        : alpha(theme.palette.text.primary, 0.24),
                 px: 2,
             })}
         >
@@ -49,8 +53,14 @@ export const LoadingOverlay = ({
                     borderColor: 'primary.main',
                     bgcolor: 'background.paper',
                     color: 'text.primary',
-                    boxShadow:
-                        '0 20px 56px rgba(0, 0, 0, 0.54), 0 0 28px rgba(39, 215, 255, 0.12)',
+                    boxShadow: (theme) =>
+                        `0 20px 56px ${alpha(
+                            theme.palette.common.black,
+                            theme.palette.mode === 'dark' ? 0.54 : 0.16
+                        )}, 0 0 28px ${alpha(
+                            theme.palette.primary.main,
+                            0.12
+                        )}`,
                     textAlign: 'center',
                 }}
             >

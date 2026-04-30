@@ -18,6 +18,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -122,8 +123,9 @@ export const ContactsView = () => {
     const actionRunning = fetcher.state !== 'idle';
     const activeIdentifier = selectedIdentifier || identifiers[0]?.name || '';
     const activeIdentifierSummary =
-        identifiers.find((identifier) => identifier.name === activeIdentifier) ??
-        null;
+        identifiers.find(
+            (identifier) => identifier.name === activeIdentifier
+        ) ?? null;
     const roleOptions = useMemo(
         () => identifierAvailableOobiRoles(activeIdentifierSummary),
         [activeIdentifierSummary]
@@ -265,9 +267,13 @@ export const ContactsView = () => {
                         border: 1,
                         borderColor: actionStatus.ok ? 'divider' : 'error.main',
                         borderRadius: 1,
-                        bgcolor: actionStatus.ok
-                            ? 'rgba(39, 215, 255, 0.06)'
-                            : 'rgba(255, 61, 79, 0.08)',
+                        bgcolor: (theme) =>
+                            alpha(
+                                actionStatus.ok
+                                    ? theme.palette.primary.main
+                                    : theme.palette.error.main,
+                                actionStatus.ok ? 0.06 : 0.08
+                            ),
                         px: 2,
                         py: 1.25,
                     }}
@@ -276,7 +282,9 @@ export const ContactsView = () => {
                         label={actionStatus.ok ? 'accepted' : 'error'}
                         tone={actionStatus.ok ? 'success' : 'error'}
                     />{' '}
-                    <Typography component="span">{actionStatus.message}</Typography>
+                    <Typography component="span">
+                        {actionStatus.message}
+                    </Typography>
                 </Box>
             )}
             <Box
@@ -323,7 +331,10 @@ export const ContactsView = () => {
                 </ConsolePanel>
                 <ConsolePanel title="Generate OOBI" eyebrow="Local">
                     <Stack spacing={2}>
-                        <FormControl fullWidth disabled={identifiers.length === 0}>
+                        <FormControl
+                            fullWidth
+                            disabled={identifiers.length === 0}
+                        >
                             <InputLabel id="identifier-oobi-label">
                                 Identifier
                             </InputLabel>
@@ -462,8 +473,9 @@ export const ContactsView = () => {
                     <Stack spacing={2}>
                         {regularContacts.length === 0 ? (
                             <Typography color="text.secondary">
-                                Only witness contacts are currently known. Expand
-                                the witnesses section below to inspect them.
+                                Only witness contacts are currently known.
+                                Expand the witnesses section below to inspect
+                                them.
                             </Typography>
                         ) : (
                             <ContactGrid
@@ -480,7 +492,7 @@ export const ContactsView = () => {
                                     border: 1,
                                     borderColor: 'divider',
                                     borderRadius: 1,
-                                    bgcolor: 'rgba(5, 9, 13, 0.34)',
+                                    bgcolor: 'background.paper',
                                     '&:before': { display: 'none' },
                                 }}
                             >
@@ -497,7 +509,8 @@ export const ContactsView = () => {
                                             variant="caption"
                                             color="text.secondary"
                                         >
-                                            {witnessContacts.length} known witness
+                                            {witnessContacts.length} known
+                                            witness
                                             {witnessContacts.length === 1
                                                 ? ''
                                                 : 'es'}
@@ -566,7 +579,8 @@ const ContactCard = ({
 }) => {
     const roleSummary = contactOobiRoleSummary(contact);
     const challengeStatus = contactChallengeStatus(contact);
-    const Shield = challengeStatus.status === 'verified' ? ShieldIcon : ShieldOutlinedIcon;
+    const Shield =
+        challengeStatus.status === 'verified' ? ShieldIcon : ShieldOutlinedIcon;
     const shieldColor =
         challengeStatus.status === 'verified'
             ? 'success.main'
@@ -584,7 +598,7 @@ const ContactCard = ({
                 border: 1,
                 borderColor: 'divider',
                 borderRadius: 1,
-                bgcolor: 'rgba(5, 9, 13, 0.34)',
+                bgcolor: 'background.paper',
                 overflow: 'hidden',
             }}
             data-testid="contact-card"
@@ -641,7 +655,11 @@ const ContactCard = ({
                         <Shield
                             aria-label={challengeStatus.label}
                             fontSize="small"
-                            sx={{ color: shieldColor, flex: '0 0 auto', mt: 0.25 }}
+                            sx={{
+                                color: shieldColor,
+                                flex: '0 0 auto',
+                                mt: 0.25,
+                            }}
                         />
                     </Tooltip>
                 </Stack>

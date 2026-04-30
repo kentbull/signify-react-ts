@@ -20,7 +20,13 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Link as RouterLink } from 'react-router-dom';
-import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
@@ -38,7 +44,10 @@ import {
     credentialSubjectDataRows,
 } from './credentialAcdcDisplay';
 import { schemaRuleViews } from './schemaRules';
-import type { AidAliases, CredentialActivityEntry } from './dashboardViewModels';
+import type {
+    AidAliases,
+    CredentialActivityEntry,
+} from './dashboardViewModels';
 import {
     AidValue,
     BackToDashboard,
@@ -153,7 +162,8 @@ export const ResolvedSchemasDetail = ({
                                                 <Typography variant="body2">
                                                     {schemaTitle(schema)}
                                                 </Typography>
-                                                {schema.description !== null && (
+                                                {schema.description !==
+                                                    null && (
                                                     <Typography
                                                         variant="caption"
                                                         color="text.secondary"
@@ -182,7 +192,9 @@ export const ResolvedSchemasDetail = ({
                                                 {displayText(schema.version)}
                                             </TableCell>
                                             <TableCell>
-                                                {timestampText(schema.updatedAt)}
+                                                {timestampText(
+                                                    schema.updatedAt
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -379,7 +391,10 @@ const CredentialDetailTable = ({
                             data-ui-sound={UI_SOUND_HOVER_VALUE}
                             onClick={() => onOpenCredential(credential.said)}
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
+                                if (
+                                    event.key === 'Enter' ||
+                                    event.key === ' '
+                                ) {
                                     event.preventDefault();
                                     onOpenCredential(credential.said);
                                 }
@@ -535,14 +550,46 @@ const curatedCredentialDataRows = (
 
     return [
         { name: 'i', label: 'Subject AID', value: credential.attributes.i },
-        { name: 'fullName', label: 'Full name', value: credential.attributes.fullName },
-        { name: 'voterId', label: 'Voter ID', value: credential.attributes.voterId },
-        { name: 'precinctId', label: 'Precinct ID', value: credential.attributes.precinctId },
-        { name: 'county', label: 'County', value: credential.attributes.county },
-        { name: 'jurisdiction', label: 'Jurisdiction', value: credential.attributes.jurisdiction },
-        { name: 'electionId', label: 'Election ID', value: credential.attributes.electionId },
-        { name: 'eligible', label: 'Eligible', value: credential.attributes.eligible ? 'Yes' : 'No' },
-        { name: 'expires', label: 'Expires', value: credential.attributes.expires },
+        {
+            name: 'fullName',
+            label: 'Full name',
+            value: credential.attributes.fullName,
+        },
+        {
+            name: 'voterId',
+            label: 'Voter ID',
+            value: credential.attributes.voterId,
+        },
+        {
+            name: 'precinctId',
+            label: 'Precinct ID',
+            value: credential.attributes.precinctId,
+        },
+        {
+            name: 'county',
+            label: 'County',
+            value: credential.attributes.county,
+        },
+        {
+            name: 'jurisdiction',
+            label: 'Jurisdiction',
+            value: credential.attributes.jurisdiction,
+        },
+        {
+            name: 'electionId',
+            label: 'Election ID',
+            value: credential.attributes.electionId,
+        },
+        {
+            name: 'eligible',
+            label: 'Eligible',
+            value: credential.attributes.eligible ? 'Yes' : 'No',
+        },
+        {
+            name: 'expires',
+            label: 'Expires',
+            value: credential.attributes.expires,
+        },
     ];
 };
 
@@ -586,29 +633,41 @@ const graphNodeSx = ({
     border: 1,
     borderStyle: unresolved ? 'dashed' : 'solid',
     borderColor: selected ? 'primary.main' : 'divider',
-    bgcolor: selected ? 'rgba(110, 231, 255, 0.12)' : 'background.paper',
+    bgcolor: selected ? 'action.selected' : 'background.paper',
     color: 'text.primary',
     cursor: 'pointer',
     textAlign: 'left',
     '&:hover': {
         borderColor: 'primary.main',
-        bgcolor: 'rgba(110, 231, 255, 0.08)',
+        bgcolor: 'action.hover',
     },
 });
 
 const graphLayout = (graph: CredentialChainGraphRecord) => {
     const nodesByDepth = new Map<number, CredentialChainGraphNodeRecord[]>();
     for (const node of graph.nodes) {
-        nodesByDepth.set(node.depth, [...(nodesByDepth.get(node.depth) ?? []), node]);
+        nodesByDepth.set(node.depth, [
+            ...(nodesByDepth.get(node.depth) ?? []),
+            node,
+        ]);
     }
 
     const maxDepth = Math.max(0, ...graph.nodes.map((node) => node.depth));
-    const maxRows = Math.max(1, ...Array.from(nodesByDepth.values()).map((nodes) => nodes.length));
+    const maxRows = Math.max(
+        1,
+        ...Array.from(nodesByDepth.values()).map((nodes) => nodes.length)
+    );
     const columnGap = 250;
     const rowGap = 120;
     const margin = 32;
-    const width = Math.max(560, margin * 2 + graphNodeSize.width + maxDepth * columnGap);
-    const height = Math.max(180, margin * 2 + graphNodeSize.height + (maxRows - 1) * rowGap);
+    const width = Math.max(
+        560,
+        margin * 2 + graphNodeSize.width + maxDepth * columnGap
+    );
+    const height = Math.max(
+        180,
+        margin * 2 + graphNodeSize.height + (maxRows - 1) * rowGap
+    );
     const positions = new Map<string, { x: number; y: number }>();
 
     for (const [depth, nodes] of nodesByDepth) {
@@ -660,11 +719,21 @@ const CredentialNodeFacts = ({
                 />
                 <TelemetryRow
                     label="Issuer AID"
-                    value={<FullAidValue aid={node.issuerAid} aliases={aidAliases} />}
+                    value={
+                        <FullAidValue
+                            aid={node.issuerAid}
+                            aliases={aidAliases}
+                        />
+                    }
                 />
                 <TelemetryRow
                     label="Holder AID"
-                    value={<FullAidValue aid={node.holderAid} aliases={aidAliases} />}
+                    value={
+                        <FullAidValue
+                            aid={node.holderAid}
+                            aliases={aidAliases}
+                        />
+                    }
                 />
             </Stack>
             <Divider />
@@ -758,7 +827,8 @@ const CredentialChainGraphPanel = ({
     const selectedAcdc =
         selectedNode === null ? null : (acdcsBySaid[selectedNode.said] ?? null);
     const selectedSchema =
-        selectedNode?.schemaSaid === null || selectedNode?.schemaSaid === undefined
+        selectedNode?.schemaSaid === null ||
+        selectedNode?.schemaSaid === undefined
             ? null
             : (schemasBySaid.get(selectedNode.schemaSaid) ?? null);
 
@@ -773,7 +843,10 @@ const CredentialChainGraphPanel = ({
                 <Box
                     sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.4fr) minmax(360px, 0.8fr)' },
+                        gridTemplateColumns: {
+                            xs: '1fr',
+                            xl: 'minmax(0, 1.4fr) minmax(360px, 0.8fr)',
+                        },
                         gap: 2,
                     }}
                 >
@@ -813,14 +886,20 @@ const CredentialChainGraphPanel = ({
                                     </marker>
                                 </defs>
                                 {graph.edges.map((edge) => {
-                                    const from = layout.positions.get(edge.from);
+                                    const from = layout.positions.get(
+                                        edge.from
+                                    );
                                     const to = layout.positions.get(edge.to);
-                                    if (from === undefined || to === undefined) {
+                                    if (
+                                        from === undefined ||
+                                        to === undefined
+                                    ) {
                                         return null;
                                     }
 
                                     const x1 = from.x + graphNodeSize.width;
-                                    const y1 = from.y + graphNodeSize.height / 2;
+                                    const y1 =
+                                        from.y + graphNodeSize.height / 2;
                                     const x2 = to.x;
                                     const y2 = to.y + graphNodeSize.height / 2;
                                     const labelX = (x1 + x2) / 2;
@@ -848,12 +927,15 @@ const CredentialChainGraphPanel = ({
                                 })}
                             </Box>
                             {graph.nodes.map((node) => {
-                                const position = layout.positions.get(node.said);
+                                const position = layout.positions.get(
+                                    node.said
+                                );
                                 if (position === undefined) {
                                     return null;
                                 }
 
-                                const selected = node.said === selectedNode?.said;
+                                const selected =
+                                    node.said === selectedNode?.said;
                                 const label = credentialGraphNodeLabel({
                                     node,
                                     schemasBySaid,
@@ -897,7 +979,10 @@ const CredentialChainGraphPanel = ({
                                             {node.said}
                                         </Typography>
                                         {node.said === rootSaid && (
-                                            <StatusPill label="selected root" tone="info" />
+                                            <StatusPill
+                                                label="selected root"
+                                                tone="info"
+                                            />
                                         )}
                                     </Box>
                                 );
@@ -1010,7 +1095,8 @@ export const CredentialRecordDetail = ({
                         variant="outlined"
                         data-ui-sound={UI_SOUND_HOVER_VALUE}
                     >
-                        Back to {credential.direction === 'issued' ? 'Issued' : 'Held'}
+                        Back to{' '}
+                        {credential.direction === 'issued' ? 'Issued' : 'Held'}
                     </Button>
                 }
             />
@@ -1049,7 +1135,9 @@ export const CredentialRecordDetail = ({
                                 credential.schemaSaid === null ? (
                                     'Not available'
                                 ) : (
-                                    <FullMonoValue value={credential.schemaSaid} />
+                                    <FullMonoValue
+                                        value={credential.schemaSaid}
+                                    />
                                 )
                             }
                         />
@@ -1136,7 +1224,10 @@ export const CredentialRecordDetail = ({
                 aidAliases={aidAliases}
             />
             <ConsolePanel title="Schema rules" eyebrow="ACDC">
-                <RulesAccordion title="Schema rules" count={schemaRulesRows.length}>
+                <RulesAccordion
+                    title="Schema rules"
+                    count={schemaRulesRows.length}
+                >
                     {schemaRulesRows.length === 0 ? (
                         <EmptyState
                             title="No schema rules"
@@ -1212,7 +1303,10 @@ export const CredentialRecordDetail = ({
                                 <ListItemText
                                     primary={
                                         <Stack
-                                            direction={{ xs: 'column', sm: 'row' }}
+                                            direction={{
+                                                xs: 'column',
+                                                sm: 'row',
+                                            }}
                                             spacing={1}
                                             sx={{
                                                 alignItems: {
@@ -1250,7 +1344,11 @@ export const CredentialRecordDetail = ({
                                         <Stack spacing={0.5} sx={{ mt: 0.75 }}>
                                             <TelemetryRow
                                                 label="Exchange SAID"
-                                                value={<FullMonoValue value={entry.said} />}
+                                                value={
+                                                    <FullMonoValue
+                                                        value={entry.said}
+                                                    />
+                                                }
                                             />
                                             <TelemetryRow
                                                 label="Sender"

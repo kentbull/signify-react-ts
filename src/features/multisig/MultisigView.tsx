@@ -11,6 +11,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HubIcon from '@mui/icons-material/Hub';
@@ -18,8 +19,17 @@ import RotateRightIcon from '@mui/icons-material/RotateRight';
 import SendIcon from '@mui/icons-material/Send';
 import { useFetcher, useLoaderData } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
-import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
-import type { MultisigActionData, MultisigLoaderData } from '../../app/routeData';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
+import type {
+    MultisigActionData,
+    MultisigLoaderData,
+} from '../../app/routeData';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import { useAppSelector } from '../../state/hooks';
 import {
@@ -46,7 +56,11 @@ import {
 import { MultisigCreateDialog } from './MultisigCreateDialog';
 import { MultisigInteractionDialog } from './MultisigInteractionDialog';
 import { MultisigRotationDialog } from './MultisigRotationDialog';
-import { groupStateValue, isGroupIdentifier, memberOptionsFromInventory } from './multisigMemberOptions';
+import {
+    groupStateValue,
+    isGroupIdentifier,
+    memberOptionsFromInventory,
+} from './multisigMemberOptions';
 
 export const MultisigView = () => {
     const loaderData = useLoaderData() as MultisigLoaderData;
@@ -58,9 +72,8 @@ export const MultisigView = () => {
     const [createOpen, setCreateOpen] = useState(false);
     const [interactionGroup, setInteractionGroup] =
         useState<IdentifierSummary | null>(null);
-    const [rotationGroup, setRotationGroup] = useState<IdentifierSummary | null>(
-        null
-    );
+    const [rotationGroup, setRotationGroup] =
+        useState<IdentifierSummary | null>(null);
     const [requestDrafts, setRequestDrafts] = useState<
         Record<string, { groupAlias: string; localMemberName: string }>
     >({});
@@ -72,9 +85,10 @@ export const MultisigView = () => {
 
     const identifiers =
         liveIdentifiers.length > 0 ? liveIdentifiers : loaderData.identifiers;
-    const groups = groupIdentifiers.length > 0
-        ? groupIdentifiers
-        : identifiers.filter(isGroupIdentifier);
+    const groups =
+        groupIdentifiers.length > 0
+            ? groupIdentifiers
+            : identifiers.filter(isGroupIdentifier);
     const groupDetails = new Map(
         (loaderData.status === 'ready' || loaderData.status === 'error'
             ? loaderData.groupDetails
@@ -103,7 +117,8 @@ export const MultisigView = () => {
         const defaults = {
             groupAlias: defaultMultisigRequestGroupAlias(request, identifiers),
             localMemberName:
-                defaultMultisigRequestLocalMember(request, identifiers)?.name ?? '',
+                defaultMultisigRequestLocalMember(request, identifiers)?.name ??
+                '',
         };
         const draft = requestDrafts[request.notificationId] ?? defaults;
         submitDraft(multisigRequestIntent(request), {
@@ -138,35 +153,51 @@ export const MultisigView = () => {
                         border: 1,
                         borderColor: 'warning.main',
                         borderRadius: 1,
-                        bgcolor: 'rgba(255, 196, 87, 0.08)',
+                        bgcolor: (theme) =>
+                            alpha(theme.palette.warning.main, 0.08),
                         px: 2,
                         py: 1.25,
                     }}
                 >
                     <StatusPill label="warning" tone="warning" />{' '}
-                    <Typography component="span">{loaderData.message}</Typography>
+                    <Typography component="span">
+                        {loaderData.message}
+                    </Typography>
                 </Box>
             )}
-            {fetcher.data !== undefined && (
-                <Box
-                    sx={{
-                        border: 1,
-                        borderColor: fetcher.data.ok ? 'divider' : 'error.main',
-                        borderRadius: 1,
-                        bgcolor: fetcher.data.ok
-                            ? 'rgba(39, 215, 255, 0.06)'
-                            : 'rgba(255, 61, 79, 0.08)',
-                        px: 2,
-                        py: 1.25,
-                    }}
-                >
-                    <StatusPill
-                        label={fetcher.data.ok ? 'accepted' : 'error'}
-                        tone={fetcher.data.ok ? 'info' : 'error'}
-                    />{' '}
-                    <Typography component="span">{fetcher.data.message}</Typography>
-                </Box>
-            )}
+            {fetcher.data !== undefined &&
+                (() => {
+                    const actionData = fetcher.data;
+
+                    return (
+                        <Box
+                            sx={{
+                                border: 1,
+                                borderColor: actionData.ok
+                                    ? 'divider'
+                                    : 'error.main',
+                                borderRadius: 1,
+                                bgcolor: (theme) =>
+                                    alpha(
+                                        actionData.ok
+                                            ? theme.palette.primary.main
+                                            : theme.palette.error.main,
+                                        actionData.ok ? 0.06 : 0.08
+                                    ),
+                                px: 2,
+                                py: 1.25,
+                            }}
+                        >
+                            <StatusPill
+                                label={actionData.ok ? 'accepted' : 'error'}
+                                tone={actionData.ok ? 'info' : 'error'}
+                            />{' '}
+                            <Typography component="span">
+                                {actionData.message}
+                            </Typography>
+                        </Box>
+                    );
+                })()}
             <ConsolePanel
                 title="Groups"
                 eyebrow="Managed"
@@ -180,7 +211,8 @@ export const MultisigView = () => {
                 ) : (
                     <Stack spacing={2}>
                         {groups.map((group) => {
-                            const details = groupDetails.get(group.prefix) ?? null;
+                            const details =
+                                groupDetails.get(group.prefix) ?? null;
                             const sequence = groupStateValue(group, 's');
                             const digest = groupStateValue(group, 'd');
                             return (
@@ -195,7 +227,10 @@ export const MultisigView = () => {
                                 >
                                     <Stack spacing={1.25}>
                                         <Stack
-                                            direction={{ xs: 'column', sm: 'row' }}
+                                            direction={{
+                                                xs: 'column',
+                                                sm: 'row',
+                                            }}
                                             sx={{
                                                 justifyContent: 'space-between',
                                                 gap: 1,
@@ -214,7 +249,10 @@ export const MultisigView = () => {
                                                         letterSpacing: 0,
                                                     }}
                                                 >
-                                                    {truncateMiddle(group.prefix, 12)}
+                                                    {truncateMiddle(
+                                                        group.prefix,
+                                                        12
+                                                    )}
                                                 </Typography>
                                             </Box>
                                             <Stack
@@ -222,7 +260,10 @@ export const MultisigView = () => {
                                                 spacing={0.75}
                                                 sx={{ flexWrap: 'wrap' }}
                                             >
-                                                <StatusPill label="group" tone="info" />
+                                                <StatusPill
+                                                    label="group"
+                                                    tone="info"
+                                                />
                                                 <StatusPill
                                                     label={
                                                         details === null
@@ -257,7 +298,8 @@ export const MultisigView = () => {
                                         <TelemetryRow
                                             label="Signing threshold"
                                             value={sithSummary(
-                                                details?.signingThreshold ?? null
+                                                details?.signingThreshold ??
+                                                    null
                                             )}
                                             mono
                                         />
@@ -271,13 +313,17 @@ export const MultisigView = () => {
                                         <TelemetryRow
                                             label="Next threshold"
                                             value={sithSummary(
-                                                details?.rotationThreshold ?? null
+                                                details?.rotationThreshold ??
+                                                    null
                                             )}
                                             mono
                                         />
                                         <Divider />
                                         <Stack
-                                            direction={{ xs: 'column', md: 'row' }}
+                                            direction={{
+                                                xs: 'column',
+                                                md: 'row',
+                                            }}
                                             spacing={1}
                                         >
                                             <Button
@@ -285,11 +331,17 @@ export const MultisigView = () => {
                                                 startIcon={<HubIcon />}
                                                 disabled={actionRunning}
                                                 onClick={() =>
-                                                    submitDraft('authorizeAgents', {
-                                                        groupAlias: group.name,
-                                                    })
+                                                    submitDraft(
+                                                        'authorizeAgents',
+                                                        {
+                                                            groupAlias:
+                                                                group.name,
+                                                        }
+                                                    )
                                                 }
-                                                data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                                data-ui-sound={
+                                                    UI_SOUND_HOVER_VALUE
+                                                }
                                             >
                                                 Authorize agents
                                             </Button>
@@ -300,7 +352,9 @@ export const MultisigView = () => {
                                                 onClick={() =>
                                                     setInteractionGroup(group)
                                                 }
-                                                data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                                data-ui-sound={
+                                                    UI_SOUND_HOVER_VALUE
+                                                }
                                             >
                                                 Interact
                                             </Button>
@@ -308,8 +362,12 @@ export const MultisigView = () => {
                                                 variant="outlined"
                                                 startIcon={<RotateRightIcon />}
                                                 disabled={actionRunning}
-                                                onClick={() => setRotationGroup(group)}
-                                                data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                                onClick={() =>
+                                                    setRotationGroup(group)
+                                                }
+                                                data-ui-sound={
+                                                    UI_SOUND_HOVER_VALUE
+                                                }
                                             >
                                                 Rotate
                                             </Button>
@@ -334,11 +392,14 @@ export const MultisigView = () => {
                 ) : (
                     <Stack spacing={2}>
                         {requests.map((request) => {
-                            const localDefault = defaultMultisigRequestLocalMember(
-                                request,
-                                identifiers
-                            );
-                            const draft = requestDrafts[request.notificationId] ?? {
+                            const localDefault =
+                                defaultMultisigRequestLocalMember(
+                                    request,
+                                    identifiers
+                                );
+                            const draft = requestDrafts[
+                                request.notificationId
+                            ] ?? {
                                 groupAlias: defaultMultisigRequestGroupAlias(
                                     request,
                                     identifiers
@@ -359,7 +420,10 @@ export const MultisigView = () => {
                                 >
                                     <Stack spacing={1.25}>
                                         <Stack
-                                            direction={{ xs: 'column', sm: 'row' }}
+                                            direction={{
+                                                xs: 'column',
+                                                sm: 'row',
+                                            }}
                                             sx={{
                                                 alignItems: {
                                                     xs: 'stretch',
@@ -375,9 +439,11 @@ export const MultisigView = () => {
                                             <StatusPill
                                                 label={request.status}
                                                 tone={
-                                                    request.status === 'actionable'
+                                                    request.status ===
+                                                    'actionable'
                                                         ? 'info'
-                                                        : request.status === 'error'
+                                                        : request.status ===
+                                                            'error'
                                                           ? 'error'
                                                           : request.status ===
                                                               'notForThisWallet'
@@ -388,7 +454,10 @@ export const MultisigView = () => {
                                         </Stack>
                                         <TelemetryRow
                                             label="Group AID"
-                                            value={request.groupAid ?? 'Not available'}
+                                            value={
+                                                request.groupAid ??
+                                                'Not available'
+                                            }
                                             mono
                                         />
                                         <TelemetryRow
@@ -400,7 +469,10 @@ export const MultisigView = () => {
                                         />
                                         <TelemetryRow
                                             label="Sender"
-                                            value={request.senderAid ?? 'Not available'}
+                                            value={
+                                                request.senderAid ??
+                                                'Not available'
+                                            }
                                             mono
                                         />
                                         <TelemetryRow
@@ -431,32 +503,47 @@ export const MultisigView = () => {
                                         />
                                         <TelemetryRow
                                             label="Signing members"
-                                            value={request.signingMemberAids.length}
+                                            value={
+                                                request.signingMemberAids.length
+                                            }
                                         />
                                         <TelemetryRow
                                             label="Signing threshold"
-                                            value={sithSummary(request.signingThreshold)}
+                                            value={sithSummary(
+                                                request.signingThreshold
+                                            )}
                                             mono
                                         />
                                         <TelemetryRow
                                             label="Rotation members"
-                                            value={request.rotationMemberAids.length}
+                                            value={
+                                                request.rotationMemberAids
+                                                    .length
+                                            }
                                         />
                                         <TelemetryRow
                                             label="Rotation threshold"
-                                            value={sithSummary(request.rotationThreshold)}
+                                            value={sithSummary(
+                                                request.rotationThreshold
+                                            )}
                                             mono
                                         />
-                                        {request.embeddedPayloadSummary !== null && (
+                                        {request.embeddedPayloadSummary !==
+                                            null && (
                                             <TelemetryRow
                                                 label="Payload"
-                                                value={request.embeddedPayloadSummary}
+                                                value={
+                                                    request.embeddedPayloadSummary
+                                                }
                                                 mono
                                             />
                                         )}
                                         <Divider />
                                         <Stack
-                                            direction={{ xs: 'column', md: 'row' }}
+                                            direction={{
+                                                xs: 'column',
+                                                md: 'row',
+                                            }}
                                             spacing={1}
                                         >
                                             <TextField
@@ -473,14 +560,19 @@ export const MultisigView = () => {
                                                         : undefined
                                                 }
                                                 onChange={(event) =>
-                                                    setRequestDrafts((current) => ({
-                                                        ...current,
-                                                        [request.notificationId]: {
-                                                            ...draft,
-                                                            groupAlias:
-                                                                event.target.value,
-                                                        },
-                                                    }))
+                                                    setRequestDrafts(
+                                                        (current) => ({
+                                                            ...current,
+                                                            [request.notificationId]:
+                                                                {
+                                                                    ...draft,
+                                                                    groupAlias:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                },
+                                                        })
+                                                    )
                                                 }
                                             />
                                             <FormControl
@@ -495,16 +587,23 @@ export const MultisigView = () => {
                                                 <Select
                                                     labelId={`request-member-${request.notificationId}`}
                                                     label="Local member"
-                                                    value={draft.localMemberName}
+                                                    value={
+                                                        draft.localMemberName
+                                                    }
                                                     onChange={(event) =>
-                                                        setRequestDrafts((current) => ({
-                                                            ...current,
-                                                            [request.notificationId]: {
-                                                                ...draft,
-                                                                localMemberName:
-                                                                    event.target.value,
-                                                            },
-                                                        }))
+                                                        setRequestDrafts(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [request.notificationId]:
+                                                                    {
+                                                                        ...draft,
+                                                                        localMemberName:
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                    },
+                                                            })
+                                                        )
                                                     }
                                                 >
                                                     {localMemberIdentifiers.map(
@@ -517,7 +616,9 @@ export const MultisigView = () => {
                                                                     identifier.name
                                                                 }
                                                             >
-                                                                {identifier.name}
+                                                                {
+                                                                    identifier.name
+                                                                }
                                                             </MenuItem>
                                                         )
                                                     )}
@@ -528,16 +629,23 @@ export const MultisigView = () => {
                                                 startIcon={<CheckCircleIcon />}
                                                 disabled={
                                                     actionRunning ||
-                                                    request.status !== 'actionable' ||
-                                                    draft.groupAlias.trim().length ===
-                                                        0 ||
+                                                    request.status !==
+                                                        'actionable' ||
+                                                    draft.groupAlias.trim()
+                                                        .length === 0 ||
                                                     draft.localMemberName.trim()
                                                         .length === 0
                                                 }
-                                                onClick={() => submitRequest(request)}
-                                                data-ui-sound={UI_SOUND_HOVER_VALUE}
+                                                onClick={() =>
+                                                    submitRequest(request)
+                                                }
+                                                data-ui-sound={
+                                                    UI_SOUND_HOVER_VALUE
+                                                }
                                             >
-                                                {multisigRequestActionLabel(request)}
+                                                {multisigRequestActionLabel(
+                                                    request
+                                                )}
                                             </Button>
                                         </Stack>
                                     </Stack>
@@ -568,7 +676,11 @@ export const MultisigView = () => {
                 memberOptions={memberOptions}
                 actionRunning={actionRunning}
                 onClose={() => setInteractionGroup(null)}
-                onSubmit={(groupAlias: string, localMemberName: string, data: string) => {
+                onSubmit={(
+                    groupAlias: string,
+                    localMemberName: string,
+                    data: string
+                ) => {
                     submitDraft('interact', {
                         groupAlias,
                         localMemberName,
