@@ -8,6 +8,8 @@ const readyRecord: DidWebsDidRecord = {
     aid: 'Eaid',
     loadState: 'ready',
     did: 'did:webs:example.com:dws:Eaid',
+    didJsonUrl: null,
+    keriCesrUrl: null,
     error: null,
     updatedAt: '2026-04-29T00:00:00.000Z',
 };
@@ -63,5 +65,28 @@ describe('did:webs DID details', () => {
         expect(markup).toContain('aria-label="copy did:webs DID"');
         expect(markup).toContain('aria-label="copy did.json URL"');
         expect(markup).toContain('aria-label="copy keri.cesr URL"');
+    });
+
+    it('renders KERIA-provided asset URLs before derived URL fallbacks', () => {
+        const markup = renderToStaticMarkup(
+            <DidWebsPublicationDetails
+                record={{
+                    ...readyRecord,
+                    didJsonUrl:
+                        'http://host.docker.internal:3902/dws/Eaid/did.json',
+                    keriCesrUrl:
+                        'http://host.docker.internal:3902/dws/Eaid/keri.cesr',
+                }}
+                testIdPrefix="identifier"
+            />
+        );
+
+        expect(markup).toContain(
+            'http://host.docker.internal:3902/dws/Eaid/did.json'
+        );
+        expect(markup).toContain(
+            'http://host.docker.internal:3902/dws/Eaid/keri.cesr'
+        );
+        expect(markup).not.toContain('https://example.com/dws/Eaid/did.json');
     });
 });

@@ -1,4 +1,5 @@
 import { refreshIdentifierDidWebsOp } from '../../workflows/didwebs.op';
+import type { DidWebsDidPayload } from '../../state/didwebs.slice';
 import type { RuntimeCommandContext, WorkflowRunOptions } from './types';
 
 export interface DidWebsRuntimeCommands {
@@ -6,7 +7,7 @@ export interface DidWebsRuntimeCommands {
         name: string,
         aid: string,
         options?: WorkflowRunOptions
-    ): Promise<string | null>;
+    ): Promise<DidWebsDidPayload | null>;
 }
 
 /**
@@ -24,7 +25,7 @@ const refreshIdentifierDid =
         name: string,
         aid: string,
         options: WorkflowRunOptions = {}
-    ): Promise<string | null> =>
+    ): Promise<DidWebsDidPayload | null> =>
         context.runWorkflow(() => refreshIdentifierDidWebsOp({ name, aid }), {
             ...options,
             label: options.label,

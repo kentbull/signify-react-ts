@@ -28,24 +28,32 @@ describe('did:webs state', () => {
             didWebsDidLoaded({
                 aid: 'Eaid',
                 did: null,
+                didJsonUrl: null,
+                keriCesrUrl: null,
                 updatedAt: '2026-04-29T00:00:01.000Z',
             })
         );
         expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'pending',
             did: null,
+            didJsonUrl: null,
+            keriCesrUrl: null,
         });
 
         store.dispatch(
             didWebsDidLoaded({
                 aid: 'Eaid',
                 did: 'did:webs:example:dws:Eaid',
+                didJsonUrl: 'https://example/dws/Eaid/did.json',
+                keriCesrUrl: 'https://example/dws/Eaid/keri.cesr',
                 updatedAt: '2026-04-29T00:00:02.000Z',
             })
         );
         expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'ready',
             did: 'did:webs:example:dws:Eaid',
+            didJsonUrl: 'https://example/dws/Eaid/did.json',
+            keriCesrUrl: 'https://example/dws/Eaid/keri.cesr',
         });
 
         store.dispatch(
@@ -79,12 +87,16 @@ describe('did:webs state', () => {
             didWebsReadyObserved({
                 aid: 'Eaid',
                 did: 'did:webs:example:dws:Eaid',
+                didJsonUrl: 'https://example/dws/Eaid/did.json',
+                keriCesrUrl: 'https://example/dws/Eaid/keri.cesr',
                 updatedAt: '2026-04-29T00:00:01.000Z',
             })
         );
         expect(selectDidWebsDidByAid('Eaid')(store.getState())).toMatchObject({
             loadState: 'ready',
             did: 'did:webs:example:dws:Eaid',
+            didJsonUrl: 'https://example/dws/Eaid/did.json',
+            keriCesrUrl: 'https://example/dws/Eaid/keri.cesr',
         });
     });
 });

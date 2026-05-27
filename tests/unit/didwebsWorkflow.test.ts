@@ -29,6 +29,8 @@ const envelope = (agent = 'Eagent'): SignedReplyEnvelope => ({
 const publicationPayload = {
     aid: 'Eaid',
     did: 'did:webs:example:dws:Eaid',
+    didJsonUrl: 'https://example/dws/Eaid/did.json',
+    keriCesrUrl: 'https://example/dws/Eaid/keri.cesr',
 };
 
 const publicationEnvelope = (
