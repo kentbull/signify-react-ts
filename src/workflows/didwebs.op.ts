@@ -24,6 +24,7 @@ import {
     didWebsDidLoading,
     didWebsPendingObserved,
     didWebsReadyObserved,
+    type DidWebsDidPayload,
 } from '../state/didwebs.slice';
 
 const minimumDidWebsPollingMs = 7000;
@@ -348,7 +349,7 @@ export function* refreshIdentifierDidWebsOp({
 }: {
     name: string;
     aid: string;
-}): EffectionOperation<string | null> {
+}): EffectionOperation<DidWebsDidPayload | null> {
     const services = yield* AppServicesContext.expect();
     const updatedAt = new Date().toISOString();
     services.store.dispatch(
@@ -359,18 +360,18 @@ export function* refreshIdentifierDidWebsOp({
     );
 
     try {
-        const did = yield* callPromise(() =>
+        const dws = yield* callPromise(() =>
             services.runtime.requireConnectedClient().identifiers().dws(name)
         );
-        const completedAt = new Date().toISOString();
-        services.store.dispatch(
-            didWebsDidLoaded({
-                aid,
-                did,
-                updatedAt: completedAt,
-            })
-        );
-        return did;
+        const payload: DidWebsDidPayload = {
+            aid,
+            did: dws.dws,
+            didJsonUrl: dws.didJsonUrl,
+            keriCesrUrl: dws.keriCesrUrl,
+            updatedAt: new Date().toISOString(),
+        };
+        services.store.dispatch(didWebsDidLoaded(payload));
+        return payload;
     } catch (error) {
         services.store.dispatch(
             didWebsDidFailed({
@@ -426,6 +427,8 @@ const didWebsSignalObserver =
                 didWebsReadyObserved({
                     aid,
                     did,
+                    didJsonUrl: stringValue(payload.didJsonUrl),
+                    keriCesrUrl: stringValue(payload.keriCesrUrl),
                     updatedAt,
                 })
             );

@@ -18,6 +18,8 @@ export interface DidWebsDidRecord {
     aid: string;
     loadState: DidWebsLoadState;
     did: string | null;
+    didJsonUrl: string | null;
+    keriCesrUrl: string | null;
     error: string | null;
     updatedAt: string | null;
 }
@@ -30,6 +32,8 @@ export interface DidWebsState {
 export interface DidWebsDidPayload {
     aid: string;
     did: string | null;
+    didJsonUrl: string | null;
+    keriCesrUrl: string | null;
     updatedAt: string;
 }
 
@@ -43,6 +47,8 @@ const emptyRecord = (aid: string): DidWebsDidRecord => ({
     aid,
     loadState: 'idle',
     did: null,
+    didJsonUrl: null,
+    keriCesrUrl: null,
     error: null,
     updatedAt: null,
 });
@@ -61,6 +67,8 @@ const applyDidPayload = (
 ): void => {
     record.loadState = payload.did === null ? 'pending' : 'ready';
     record.did = payload.did;
+    record.didJsonUrl = payload.didJsonUrl;
+    record.keriCesrUrl = payload.keriCesrUrl;
     record.error = null;
     record.updatedAt = payload.updatedAt;
 };

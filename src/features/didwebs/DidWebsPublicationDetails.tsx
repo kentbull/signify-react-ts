@@ -106,7 +106,10 @@ export const DidWebsPublicationDetails = ({
     testIdPrefix,
 }: DidWebsPublicationDetailsProps) => {
     const did = record?.did ?? null;
-    const urls = did === null ? null : didWebsAssetUrlsFromDid(did);
+    const derivedUrls = did === null ? null : didWebsAssetUrlsFromDid(did);
+    const didJsonUrl = record?.didJsonUrl ?? derivedUrls?.didJsonUrl ?? null;
+    const keriCesrUrl =
+        record?.keriCesrUrl ?? derivedUrls?.keriCesrUrl ?? null;
 
     return (
         <Stack spacing={1.25} data-testid={`${testIdPrefix}-didwebs`}>
@@ -136,14 +139,14 @@ export const DidWebsPublicationDetails = ({
             />
             <DetailRow
                 label="did.json URL"
-                value={readyValue(urls?.didJsonUrl)}
-                copyable={urls !== null}
+                value={readyValue(didJsonUrl)}
+                copyable={didJsonUrl !== null}
                 testId={`${testIdPrefix}-didwebs-did-json-url`}
             />
             <DetailRow
                 label="keri.cesr URL"
-                value={readyValue(urls?.keriCesrUrl)}
-                copyable={urls !== null}
+                value={readyValue(keriCesrUrl)}
+                copyable={keriCesrUrl !== null}
                 testId={`${testIdPrefix}-didwebs-keri-cesr-url`}
             />
             {record?.loadState === 'error' && record.error !== null && (

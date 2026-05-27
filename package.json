@@ -42,7 +42,7 @@
         "react-dom": "^19.2.5",
         "react-redux": "^9.2.0",
         "react-router-dom": "^7.14.2",
-        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#2a51fc5bbce6ead9a631b92e4725921c3ffdb197"
+        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#7004697d9662a031c939a81af6f4e935db2faf90"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
