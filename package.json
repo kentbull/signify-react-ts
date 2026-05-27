@@ -20,6 +20,9 @@
         "scenario:test": "vitest run tests/scenarios/salty.test.ts tests/scenarios/randy.test.ts tests/scenarios/witnessed.test.ts tests/scenarios/challenge.test.ts tests/scenarios/controller-rotation.test.ts tests/scenarios/oobi-contacts.test.ts tests/scenarios/credentials.test.ts tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts",
         "delegation:test": "vitest run tests/scenarios/optional/delegation.test.ts",
         "scenario:test:all": "vitest run tests/scenarios",
+        "portable:wallet-api": "vitest run tests/scenarios/challenge.test.ts tests/scenarios/credentials.test.ts tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts tests/scenarios/optional/delegation.test.ts",
+        "portable:wallet-browser": "node tests/browser-smoke.mjs && node tests/responsive-smoke.mjs && tsx tests/contact-challenge-smoke.ts",
+        "portable:e2e": "pnpm portable:wallet-api && pnpm portable:wallet-browser",
         "test:ci": "pnpm lint && pnpm build && pnpm unit:test && pnpm responsive:smoke && pnpm keria:smoke -- --mode connect && pnpm keria:smoke && pnpm browser:smoke && pnpm identifier:agent-oobi-smoke && pnpm scenario:test && pnpm contact:ui-smoke"
     },
     "engines": {
@@ -39,7 +42,7 @@
         "react-dom": "^19.2.5",
         "react-redux": "^9.2.0",
         "react-router-dom": "^7.14.2",
-        "signify-ts": "link:../signify-ts"
+        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#2a51fc5bbce6ead9a631b92e4725921c3ffdb197"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

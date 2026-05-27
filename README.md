@@ -28,6 +28,8 @@
   optional fixture requirements.
 - [CI](./docs/ci.md): GitHub Actions setup for installing pinned KERIpy/KERIA,
   starting local services, caching dependencies, and running smoke tests.
+- [Container build](./docs/container-build.md): Docker build contract,
+  `SIGNIFY_TS_PACKAGE`, and the source-owned dependency override helper.
 
 ### Run locally
 
