@@ -367,6 +367,11 @@ describe('runtime command adapters', () => {
             holderAid: 'Eholder',
             credentialSaid: 'Ecredential',
         });
+        commands.startW3CIssuance({
+            issuerAlias: 'issuer',
+            issuerAid: 'Eissuer',
+            credentialSaid: 'Ecredential',
+        });
         commands.startAdmit({
             holderAlias: 'holder',
             holderAid: 'Eholder',
@@ -454,6 +459,24 @@ describe('runtime command adapters', () => {
             },
         });
         expect(startedOptions[4]).toMatchObject({
+            label: 'Starting W3C issuance for Ecredential',
+            title: 'Start W3C issuance',
+            kind: 'w3cIssuance',
+            resourceKeys: ['credential:Ecredential:w3c-issue'],
+            resultRoute: { label: 'View credentials', path: '/credentials' },
+            successNotification: {
+                title: 'W3C VRD issued',
+                message:
+                    'The W3C VC-JWT was issued from the native VRD credential.',
+                severity: 'success',
+            },
+            failureNotification: {
+                title: 'W3C issuance failed',
+                message: 'The W3C VRD could not be issued.',
+                severity: 'error',
+            },
+        });
+        expect(startedOptions[5]).toMatchObject({
             label: 'Admitting credential grant Egrant',
             title: 'Admit credential grant',
             kind: 'admitCredential',
@@ -470,7 +493,7 @@ describe('runtime command adapters', () => {
                 severity: 'error',
             },
         });
-        expect(startedOptions[5]).toMatchObject({
+        expect(startedOptions[6]).toMatchObject({
             label: 'Presenting credential Ecredential',
             title: 'Present credential',
             kind: 'presentCredential',

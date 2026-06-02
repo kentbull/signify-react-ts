@@ -5,7 +5,12 @@ import {
     type CredentialState,
     type CredentialSubject,
     type Operation as KeriaOperation,
+    MemoryW3CAutomationStore,
     type SignifyClient,
+    W3C_PURPOSE_ISSUER_VC_JWT,
+    W3C,
+    W3CEdgeAutomator,
+    type W3CSigningRequest,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import type { OperationLogger } from '../signify/client';
@@ -61,9 +66,28 @@ const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
 const CREDENTIAL_FETCH_RETRIES = 10;
 const CREDENTIAL_FETCH_RETRY_MS = 1000;
 const EXCHANGE_QUERY_LIMIT = 200;
+const W3C_ISSUANCE_POLL_MS = 1000;
+const W3C_ISSUANCE_SUCCESS_STATES = new Set(['grant_sent']);
+const W3C_ISSUANCE_DELIVERY_READY_STATES = new Set([
+    'issued',
+    'delivery_pending',
+]);
+const W3C_ISSUANCE_FAILURE_STATES = new Set(['failed']);
 const W3C_PRESENT_TX_POLL_MS = 1000;
 const W3C_PRESENT_TX_SUCCESS_STATES = new Set(['submitted', 'verified']);
 const W3C_PRESENT_TX_FAILURE_STATES = new Set(['failed']);
+
+export interface W3CIssuanceView {
+    issuanceId: string;
+    state: string;
+    issuerName?: string | null;
+    issuerAid?: string | null;
+    sourceCredentialSaid?: string | null;
+    signingRequestId?: string | null;
+    vcJwt?: string | null;
+    error?: string | null;
+    [key: string]: unknown;
+}
 
 export interface W3CPresentTxView {
     presentTxId: string;
@@ -721,11 +745,171 @@ export function* admitCredentialGrantService({
 }
 
 /**
+ * Start QVI-side W3C VC-JWT issuance from a native VRD source credential.
+ *
+ * KERIA owns issuance orchestration. The browser edge runtime owns the two
+ * issuer signatures that complete the VC proof and VC-JWT stages, then signs
+ * and submits the issuer grant EXN that delivers the artifact to the holder.
+ *
+ * A long-lived `pending_signature` state means this foreground edge loop is not
+ * servicing the KERIA signing requests, or the issuer policy below rejected a
+ * request whose alias, AID, purpose, or issuance id no longer matches.
+ */
+export function* startW3CIssuanceService({
+    client,
+    issuerAlias,
+    issuerAid,
+    credentialSaid,
+    timeoutMs,
+    pollMs = W3C_ISSUANCE_POLL_MS,
+}: {
+    client: SignifyClient;
+    issuerAlias: string;
+    issuerAid: string;
+    credentialSaid: string;
+    timeoutMs: number;
+    pollMs?: number;
+}): EffectionOperation<W3CIssuanceView> {
+    const name = requireNonEmpty(issuerAlias, 'Issuer identifier');
+    requireNonEmpty(issuerAid, 'Issuer AID');
+    const sourceSaid = requireNonEmpty(credentialSaid, 'Credential SAID');
+    const issuance = yield* callPromise(() =>
+        postJson<W3CIssuanceView>(
+            client,
+            `/identifiers/${name}/w3c/credentials`,
+            { sourceCredentialSaid: sourceSaid }
+        )
+    );
+    const issuanceId = requireNonEmpty(
+        String(issuance.issuanceId ?? issuance.d ?? ''),
+        'W3C issuance id'
+    );
+    // The foreground automator keeps signing at the edge even for this manual
+    // fallback. It is scoped to this issuer and issuance id so a queued holder
+    // presentation or another issuer request cannot be signed accidentally.
+    const w3c = new W3C(client);
+    let current = issuance;
+    if (w3cIssuanceAlreadyDelivered(current)) {
+        current = (yield* callPromise(() =>
+            w3c.redeliverIssuance(name, issuanceId)
+        )) as W3CIssuanceView;
+    }
+
+    const automator = new W3CEdgeAutomator(client, {
+        store: new MemoryW3CAutomationStore(),
+        signingPolicy: issuerIssuanceSigningPolicy({
+            issuerAlias: name,
+            issuerAid,
+            issuanceId,
+        }),
+        importPolicy: () =>
+            'W3C issuance foreground automation handles issuer signatures only',
+    });
+    const timeoutAt = Date.now() + timeoutMs;
+
+    while (Date.now() < timeoutAt) {
+        const terminal = w3cIssuanceTerminalError(current);
+        if (terminal === null) {
+            return current;
+        }
+        if (terminal !== undefined) {
+            throw terminal;
+        }
+        if (w3cIssuanceReadyForDelivery(current)) {
+            current = (yield* callPromise(() =>
+                w3c.deliverIssuance(name, current as any)
+            )) as W3CIssuanceView;
+            continue;
+        }
+
+        yield* callPromise(() => automator.pollOnce(name));
+
+        current = yield* callPromise(() =>
+            getJson<W3CIssuanceView>(
+                client,
+                `/identifiers/${name}/w3c/credentials/${issuanceId}`
+            )
+        );
+        const refreshedTerminal = w3cIssuanceTerminalError(current);
+        if (refreshedTerminal === null) {
+            return current;
+        }
+        if (refreshedTerminal !== undefined) {
+            throw refreshedTerminal;
+        }
+
+        yield* sleep(pollMs);
+    }
+
+    throw new Error(
+        `Timed out waiting for W3C issuance delivery ${issuanceId}. Last state: ${current.state}.`
+    );
+}
+
+const w3cIssuanceTerminalError = (
+    issuance: W3CIssuanceView
+): Error | null | undefined => {
+    if (
+        W3C_ISSUANCE_SUCCESS_STATES.has(issuance.state) &&
+        stringValue(issuance.vcJwt) !== null
+    ) {
+        return null;
+    }
+    if (!W3C_ISSUANCE_FAILURE_STATES.has(issuance.state)) {
+        return undefined;
+    }
+
+    return new Error(
+        issuance.error ??
+            `W3C issuance ${issuance.issuanceId} ended as ${issuance.state}.`
+    );
+};
+
+const w3cIssuanceReadyForDelivery = (issuance: W3CIssuanceView): boolean =>
+    W3C_ISSUANCE_DELIVERY_READY_STATES.has(issuance.state) &&
+    stringValue(issuance.vcJwt) !== null;
+
+const w3cIssuanceAlreadyDelivered = (issuance: W3CIssuanceView): boolean =>
+    W3C_ISSUANCE_SUCCESS_STATES.has(issuance.state) &&
+    stringValue(issuance.vcJwt) !== null;
+
+const issuerIssuanceSigningPolicy =
+    ({
+        issuerAlias,
+        issuerAid,
+        issuanceId,
+    }: {
+        issuerAlias: string;
+        issuerAid: string;
+        issuanceId: string;
+    }) =>
+    (request: W3CSigningRequest): boolean | string => {
+        // Issuer issuance has two KERIA stages, but both use the same
+        // issuer_vc_jwt purpose and related issuance id. Anything else belongs
+        // to a different edge workflow and must fail closed here.
+        if (
+            request.purpose !== W3C_PURPOSE_ISSUER_VC_JWT ||
+            request.related !== issuanceId
+        ) {
+            return `W3C signing request ${request.d} is not for issuance ${issuanceId}`;
+        }
+        if (request.name !== issuerAlias || request.aid !== issuerAid) {
+            return `W3C issuance ${issuanceId} targets ${request.name}/${request.aid}, not ${issuerAlias}/${issuerAid}`;
+        }
+        return true;
+    };
+
+/**
  * Start a KERIA W3C presentation transaction from a runtime verifier request.
  *
  * The runtime descriptor comes from QR/request ingestion or manual operator
  * input. KERIA owns credential matching, VP-JWT signing requests, verifier
  * submission, and result state.
+ *
+ * KERIA deliberately rejects ambiguous matches. The common
+ * "presentation requires exactly one eligible held credential" failure means
+ * the holder has not imported/admitted the W3C VRD yet, or has duplicate
+ * eligible held W3C credentials for the request.
  */
 export function* presentCredentialService({
     client,
@@ -761,6 +945,10 @@ export function* presentCredentialService({
             requestDescriptor
         )
     );
+    // Holder VP signing is approved by a short-lived local record. The
+    // background W3C edge automator rechecks the live KERIA transaction before
+    // signing so the audience, nonce, holder, and selected credential stay
+    // bound to the operator-approved verifier request.
     recordPresentationApproval({
         tx,
         presenterAlias: name,

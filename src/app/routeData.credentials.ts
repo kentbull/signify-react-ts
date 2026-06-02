@@ -5,6 +5,7 @@ import type {
     GrantCredentialInput,
     IssueSediCredentialInput,
     PresentCredentialInput,
+    StartW3CIssuanceInput,
 } from '../domain/credentials/credentialCommands';
 import type {
     CredentialActionData,
@@ -36,6 +37,7 @@ const credentialIntentFromString = (value: string): CredentialIntent =>
     value === 'createRegistry' ||
     value === 'issueCredential' ||
     value === 'grantCredential' ||
+    value === 'startW3CIssuance' ||
     value === 'admitCredentialGrant' ||
     value === 'presentCredential' ||
     value === 'refreshCredentials'
@@ -343,6 +345,43 @@ const grantCredentialAction = ({
 };
 
 /**
+ * Starts QVI-side W3C issuance from an already issued native VRD credential.
+ */
+const startW3CIssuanceAction = ({
+    runtime,
+    formData,
+    requestId,
+}: CredentialActionContext): CredentialActionData => {
+    const intent = 'startW3CIssuance';
+    const input: StartW3CIssuanceInput = {
+        issuerAlias: formString(formData, 'issuerAlias').trim(),
+        issuerAid: formString(formData, 'issuerAid').trim(),
+        credentialSaid: formString(formData, 'credentialSaid').trim(),
+    };
+    if (
+        input.issuerAlias.length === 0 ||
+        input.issuerAid.length === 0 ||
+        input.credentialSaid.length === 0
+    ) {
+        return {
+            intent,
+            ok: false,
+            message: 'Issuer identifier, issuer AID, and credential SAID are required.',
+            requestId,
+        };
+    }
+
+    return credentialStartedResult(
+        intent,
+        runtime.credentials.startW3CIssuance(
+            input,
+            requestIdOption(requestId)
+        ),
+        `Starting W3C issuance for ${input.credentialSaid}`
+    );
+};
+
+/**
  * Starts holder-side admission of a received credential grant. The handler
  * narrows notification form data into the workflow input and keeps IPEX admit
  * semantics out of presentational components.
@@ -438,6 +477,8 @@ const runCredentialIntentAction = (
             return issueCredentialAction(context);
         case 'grantCredential':
             return grantCredentialAction(context);
+        case 'startW3CIssuance':
+            return startW3CIssuanceAction(context);
         case 'admitCredentialGrant':
             return admitCredentialGrantAction(context);
         case 'presentCredential':

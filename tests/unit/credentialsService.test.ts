@@ -12,6 +12,7 @@ import {
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
     presentCredentialService,
+    startW3CIssuanceService,
 } from '../../src/services/credentials.service';
 import {
     credentialGrantFromExchange,
@@ -148,6 +149,246 @@ const makeAdmitClient = () => {
 };
 
 describe('credential service helpers', () => {
+    it('starts W3C issuance and resolves when KERIA returns a VC-JWT', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const calls: Array<{ path: string; method: string; body: unknown }> =
+            [];
+        const client = {
+            manager: {
+                get: vi.fn(() => ({
+                    sign: vi.fn(async () => ['grant-exn-signature']),
+                })),
+            },
+            identifiers: () => ({
+                get: vi.fn(async () => ({ name: 'issuer', prefix: 'Eissuer' })),
+            }),
+            fetch: vi.fn(
+                async (path: string, method: string, body: unknown) => {
+                    calls.push({ path, method, body });
+                    if (
+                        method === 'POST' &&
+                        path === '/identifiers/issuer/w3c/credentials'
+                    ) {
+                        return Response.json({
+                            issuanceId: 'issuance-1',
+                            state: 'pending_signature',
+                            sourceCredentialSaid: 'Ecredential',
+                        });
+                    }
+                    if (
+                        method === 'POST' &&
+                        path ===
+                            '/identifiers/issuer/w3c/credentials/issuance-1/grant'
+                    ) {
+                        return Response.json({
+                            issuanceId: 'issuance-1',
+                            state: 'grant_sent',
+                            sourceCredentialSaid: 'Ecredential',
+                            holderAid: 'Eholder',
+                            holderDid: 'did:webs:example.com:dws:Eholder',
+                            issuerAid: 'Eissuer',
+                            issuerDid: 'did:webs:example.com:dws:Eissuer',
+                            schemaSaid: 'Eschema',
+                            statusUrl:
+                                'http://status.example/w3c/vc/status/Ecredential',
+                            profile: 'gleif-vrd-isomer-v1',
+                            vcJwt: 'vc.jwt',
+                            grantSaid: 'grant-said',
+                        });
+                    }
+                    if (path.endsWith('/w3c/credentials/import-requests')) {
+                        return Response.json({ requests: [] });
+                    }
+                    if (path.endsWith('/w3c/signing-requests')) {
+                        return Response.json({ requests: [] });
+                    }
+                    return Response.json({
+                        issuanceId: 'issuance-1',
+                        state: 'delivery_pending',
+                        sourceCredentialSaid: 'Ecredential',
+                        holderAid: 'Eholder',
+                        holderDid: 'did:webs:example.com:dws:Eholder',
+                        issuerAid: 'Eissuer',
+                        issuerDid: 'did:webs:example.com:dws:Eissuer',
+                        schemaSaid: 'Eschema',
+                        statusUrl:
+                            'http://status.example/w3c/vc/status/Ecredential',
+                        profile: 'gleif-vrd-isomer-v1',
+                        vcJwt: 'vc.jwt',
+                    });
+                }
+            ),
+        } as unknown as SignifyClient;
+
+        try {
+            const result = await runtime.runWorkflow(
+                () =>
+                    startW3CIssuanceService({
+                        client,
+                        issuerAlias: 'issuer',
+                        issuerAid: 'Eissuer',
+                        credentialSaid: 'Ecredential',
+                        timeoutMs: 1000,
+                        pollMs: 0,
+                    }),
+                {
+                    scope: 'app',
+                    track: false,
+                    kind: 'w3cIssuance',
+                }
+            );
+
+            expect(result).toEqual(
+                expect.objectContaining({
+                    issuanceId: 'issuance-1',
+                    state: 'grant_sent',
+                    vcJwt: 'vc.jwt',
+                    grantSaid: 'grant-said',
+                })
+            );
+            expect(calls.slice(0, 4)).toEqual([
+                {
+                    path: '/identifiers/issuer/w3c/credentials',
+                    method: 'POST',
+                    body: { sourceCredentialSaid: 'Ecredential' },
+                },
+                {
+                    path: '/identifiers/issuer/w3c/credentials/import-requests',
+                    method: 'GET',
+                    body: null,
+                },
+                {
+                    path: '/identifiers/issuer/w3c/signing-requests',
+                    method: 'GET',
+                    body: null,
+                },
+                {
+                    path: '/identifiers/issuer/w3c/credentials/issuance-1',
+                    method: 'GET',
+                    body: null,
+                },
+            ]);
+            const grantCall = calls.find(
+                (call) =>
+                    call.path ===
+                    '/identifiers/issuer/w3c/credentials/issuance-1/grant'
+            );
+            expect(grantCall).toEqual(
+                expect.objectContaining({
+                    method: 'POST',
+                    body: expect.objectContaining({
+                        rec: ['Eholder'],
+                        sigs: ['grant-exn-signature'],
+                    }),
+                })
+            );
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
+    it('redelivers an already finalized W3C issuance through a fresh grant EXN', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const calls: Array<{ path: string; method: string; body: unknown }> =
+            [];
+        const deliveryReadyIssuance = {
+            issuanceId: 'issuance-1',
+            state: 'delivery_pending',
+            sourceCredentialSaid: 'Ecredential',
+            holderAid: 'Eholder',
+            holderDid: 'did:webs:example.com:dws:Eholder',
+            issuerAid: 'Eissuer',
+            issuerDid: 'did:webs:example.com:dws:Eissuer',
+            schemaSaid: 'Eschema',
+            statusUrl: 'http://status.example/w3c/vc/status/Ecredential',
+            profile: 'gleif-vrd-isomer-v1',
+            vcJwt: 'vc.jwt',
+        };
+        const client = {
+            manager: {
+                get: vi.fn(() => ({
+                    sign: vi.fn(async () => ['grant-exn-signature']),
+                })),
+            },
+            identifiers: () => ({
+                get: vi.fn(async () => ({ name: 'issuer', prefix: 'Eissuer' })),
+            }),
+            fetch: vi.fn(
+                async (path: string, method: string, body: unknown) => {
+                    calls.push({ path, method, body });
+                    if (
+                        method === 'POST' &&
+                        path === '/identifiers/issuer/w3c/credentials'
+                    ) {
+                        return Response.json({
+                            ...deliveryReadyIssuance,
+                            state: 'grant_sent',
+                            grantSaid: 'old-grant-said',
+                        });
+                    }
+                    if (path.endsWith('/redeliver')) {
+                        return Response.json(deliveryReadyIssuance);
+                    }
+                    if (path.endsWith('/grant')) {
+                        return Response.json({
+                            ...deliveryReadyIssuance,
+                            state: 'grant_sent',
+                            grantSaid: 'new-grant-said',
+                        });
+                    }
+                    if (path.endsWith('/w3c/credentials/import-requests')) {
+                        return Response.json({ requests: [] });
+                    }
+                    if (path.endsWith('/w3c/signing-requests')) {
+                        return Response.json({ requests: [] });
+                    }
+                    return Response.json(deliveryReadyIssuance);
+                }
+            ),
+        } as unknown as SignifyClient;
+
+        try {
+            const result = await runtime.runWorkflow(
+                () =>
+                    startW3CIssuanceService({
+                        client,
+                        issuerAlias: 'issuer',
+                        issuerAid: 'Eissuer',
+                        credentialSaid: 'Ecredential',
+                        timeoutMs: 1000,
+                        pollMs: 0,
+                    }),
+                {
+                    scope: 'app',
+                    track: false,
+                    kind: 'w3cIssuance',
+                }
+            );
+
+            expect(result).toEqual(
+                expect.objectContaining({
+                    state: 'grant_sent',
+                    grantSaid: 'new-grant-said',
+                })
+            );
+            expect(calls).toEqual(
+                expect.arrayContaining([
+                    {
+                        path: '/identifiers/issuer/w3c/credentials/issuance-1/redeliver',
+                        method: 'POST',
+                        body: {},
+                    },
+                    expect.objectContaining({
+                        path: '/identifiers/issuer/w3c/credentials/issuance-1/grant',
+                        method: 'POST',
+                    }),
+                ])
+            );
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
     it('starts a W3C present-tx with the verifier request descriptor and resolves when submitted', async () => {
         const runtime = createAppRuntime({ storage: null });
         const calls: Array<{ path: string; method: string; body: unknown }> =

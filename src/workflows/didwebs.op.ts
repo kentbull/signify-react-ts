@@ -64,6 +64,9 @@ export const createHolderPresentationSigningPolicy = (
             return defaultSigningPolicy(request);
         }
 
+        // Holder VP signing is never auto-approved by the default policy. The
+        // UI records an explicit presentation approval, then this policy binds
+        // the live KERIA tx back to that approval before the browser signs.
         const presentTxId = request.related;
         const approval = getW3CHolderPresentationApproval(presentTxId);
         if (approval === undefined) {
@@ -463,6 +466,11 @@ export function* refreshIdentifierDidWebsOp({
  * SSE is the low-latency path. Polling and reconcile are kept running as the
  * durable fallback because KERIA signals are intentionally transient and KERIA
  * remains the source of truth for completion.
+ *
+ * The same authenticated stream carries W3C signing/import requests. The W3C
+ * automator preserves edge signing by handling only locally owned KERIA
+ * requests; polling covers missed SSE events without turning KERIA into a
+ * signer.
  */
 export function* liveDidWebsPublicationOp(): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();

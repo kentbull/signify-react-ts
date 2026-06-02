@@ -203,6 +203,11 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
                 requestId: 'grant-credential-request-1',
                 operationRoute: '/operations/grant-credential-request-1',
             })),
+            startW3CIssuance: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'w3c-issuance-request-1',
+                operationRoute: '/operations/w3c-issuance-request-1',
+            })),
             startAdmit: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'admit-credential-request-1',
@@ -1372,6 +1377,37 @@ describe('route actions', () => {
                 grantSaid: 'Egrant',
             },
             expect.objectContaining({ requestId: 'admit-credential-request-1' })
+        );
+    });
+
+    it('starts W3C issuance through the credentials action', async () => {
+        const runtime = makeRuntime();
+
+        await expect(
+            credentialsAction(
+                runtime,
+                makeRequest('/credentials', {
+                    intent: 'startW3CIssuance',
+                    requestId: 'w3c-issuance-request-1',
+                    issuerAlias: 'issuer',
+                    issuerAid: 'Eissuer',
+                    credentialSaid: 'Ecredential',
+                })
+            )
+        ).resolves.toEqual({
+            intent: 'startW3CIssuance',
+            ok: true,
+            message: 'Starting W3C issuance for Ecredential',
+            requestId: 'w3c-issuance-request-1',
+            operationRoute: '/operations/w3c-issuance-request-1',
+        });
+        expect(runtime.credentials.startW3CIssuance).toHaveBeenCalledWith(
+            {
+                issuerAlias: 'issuer',
+                issuerAid: 'Eissuer',
+                credentialSaid: 'Ecredential',
+            },
+            expect.objectContaining({ requestId: 'w3c-issuance-request-1' })
         );
     });
 

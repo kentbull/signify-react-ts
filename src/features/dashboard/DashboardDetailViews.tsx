@@ -1024,6 +1024,7 @@ export const CredentialRecordDetail = ({
     registriesById,
     aidAliases,
     activity,
+    issuanceControls = null,
     presentationControls = null,
 }: {
     loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
@@ -1036,6 +1037,7 @@ export const CredentialRecordDetail = ({
     registriesById: ReadonlyMap<string, RegistryRecord>;
     aidAliases: AidAliases;
     activity: readonly CredentialActivityEntry[];
+    issuanceControls?: ReactNode;
     presentationControls?: ReactNode;
 }) => {
     if (credential === null) {
@@ -1212,8 +1214,20 @@ export const CredentialRecordDetail = ({
                 </ConsolePanel>
             </Box>
             {presentationControls !== null && (
-                <ConsolePanel title="W3C Present" eyebrow="Verifier">
-                    {presentationControls}
+                <>
+                    {issuanceControls !== null && (
+                        <ConsolePanel title="W3C Issue" eyebrow="Issuer">
+                            {issuanceControls}
+                        </ConsolePanel>
+                    )}
+                    <ConsolePanel title="W3C Present" eyebrow="Verifier">
+                        {presentationControls}
+                    </ConsolePanel>
+                </>
+            )}
+            {presentationControls === null && issuanceControls !== null && (
+                <ConsolePanel title="W3C Issue" eyebrow="Issuer">
+                    {issuanceControls}
                 </ConsolePanel>
             )}
             <CredentialChainGraphPanel

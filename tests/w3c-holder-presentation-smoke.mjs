@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import puppeteer from 'puppeteer';
-import { SignifyClient, Tier, ready } from 'signify-ts';
+import { SignifyClient, Tier, W3C, ready } from 'signify-ts';
 
 /**
  * Browser smoke for the holder-based W3C VRD presentation path.
@@ -13,6 +13,10 @@ const appUrl = process.env.W3C_HOLDER_SMOKE_URL ?? 'http://127.0.0.1:5176';
 const keriaAdminUrl =
     process.env.VITE_KERIA_ADMIN_URL ?? 'http://127.0.0.1:3901';
 const keriaBootUrl = process.env.VITE_KERIA_BOOT_URL ?? 'http://127.0.0.1:3903';
+const dashboardUrl =
+    process.env.W3C_DASHBOARD_URL ??
+    process.env.W3C_HOLDER_SMOKE_DASHBOARD_URL ??
+    'http://127.0.0.1:8791';
 const manifestPath = process.env.W3C_HOLDER_SMOKE_MANIFEST;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,6 +128,24 @@ const holderAlias = required(
         process.env.W3C_HOLDER_ALIAS,
         manifest.holderAlias,
         manifest.holderWallet?.name
+    )
+);
+const issuerPasscode = required(
+    'issuer passcode',
+    firstString(
+        process.env.W3C_ISSUER_PASSCODE,
+        process.env.W3C_QVI_PASSCODE,
+        manifest.issuerPasscode,
+        manifest.qviWallet?.passcode
+    )
+);
+const issuerAlias = required(
+    'issuer alias',
+    firstString(
+        process.env.W3C_ISSUER_ALIAS,
+        process.env.W3C_QVI_ALIAS,
+        manifest.issuerAlias,
+        manifest.qviWallet?.name
     )
 );
 const credentialSaid = required(
@@ -293,19 +315,19 @@ const navigateInApp = async (page, path) => {
     }, path);
 };
 
-const connectBrowserWallet = async (page) => {
-    logStage('browser.goto', { appUrl });
+const connectBrowserWallet = async (page, passcode, role) => {
+    logStage('browser.goto', { appUrl, role });
     await page.goto(appUrl, { waitUntil: 'networkidle0' });
-    logStage('browser.connect.open');
+    logStage('browser.connect.open', { role });
     await dispatchClick(page, '[data-testid="connect-open"]');
     await waitForElement(page, '[data-testid="connect-dialog"]');
-    logStage('browser.connect.passcode');
-    await setInputValue(page, '#outlined-password-input', holderPasscode);
+    logStage('browser.connect.passcode', { role });
+    await setInputValue(page, '#outlined-password-input', passcode);
     await dispatchClick(page, '[data-testid="connect-submit"]');
-    logStage('browser.connect.submitted');
+    logStage('browser.connect.submitted', { role });
     await waitForDomState(
         page,
-        'connected dashboard',
+        `${role} connected dashboard`,
         () =>
             globalThis.document.querySelector(
                 '[data-testid="connect-dialog"]'
@@ -314,14 +336,14 @@ const connectBrowserWallet = async (page) => {
                 '[data-testid="dashboard-view"]'
             ) !== null
     );
-    logStage('browser.connect.ready');
+    logStage('browser.connect.ready', { role });
 };
 
-const connectKeriaClient = async () => {
+const connectKeriaClient = async (passcode) => {
     await ready();
     const client = new SignifyClient(
         keriaAdminUrl,
-        holderPasscode,
+        passcode,
         Tier.low,
         keriaBootUrl
     );
@@ -350,6 +372,107 @@ const descriptorOperationBase = (descriptor) =>
     descriptor.verifierOrigin ??
     descriptor.origin ??
     descriptorResponseUri(descriptor);
+
+const waitForHolderHeldCredential = async (client) => {
+    const w3c = new W3C(client);
+    const eligibleStates = new Set(['imported', 'pending_admit', 'admitted']);
+
+    for (let attempt = 0; attempt < 240; attempt += 1) {
+        const credentials = await w3c.credentials(holderAlias);
+        const eligible = credentials.filter(
+            (credential) =>
+                credential.sourceCredentialSaid === credentialSaid &&
+                eligibleStates.has(credential.state)
+        );
+        if (eligible.length === 1) {
+            logStage('holder.heldCredential.ready', {
+                credentialId: eligible[0].credentialId ?? eligible[0].d,
+                state: eligible[0].state,
+            });
+            return eligible[0];
+        }
+        if (eligible.length > 1) {
+            throw new Error(
+                `Holder has multiple eligible W3C credentials for ${credentialSaid}: ${eligible
+                    .map((credential) => credential.credentialId ?? credential.d)
+                    .join(', ')}`
+            );
+        }
+
+        const imports = await w3c.importRequests(holderAlias, true);
+        const relatedImports = imports.filter(
+            (request) => request.sourceCredentialSaid === credentialSaid
+        );
+        const failed = relatedImports.find((request) =>
+            ['failed', 'expired', 'blocked_native_vrd'].includes(
+                request.state ?? ''
+            )
+        );
+        if (failed !== undefined) {
+            throw new Error(
+                `Holder W3C import ${failed.d ?? failed.importRequestId} is ${failed.state}: ${failed.error ?? JSON.stringify(failed)}`
+            );
+        }
+
+        await sleep(1000);
+    }
+
+    throw new Error(
+        `Timed out waiting for holder W3C credential imported from ${credentialSaid}`
+    );
+};
+
+const startIssuerW3CIssuance = async (page) => {
+    logStage('issuer.credential.goto', { issuerAlias, credentialSaid });
+    await navigateInApp(
+        page,
+        `/dashboard/credentials/${encodeURIComponent(credentialSaid)}`
+    );
+    await waitForDomState(
+        page,
+        'issuer credential detail',
+        () =>
+            globalThis.document.querySelector(
+                '[data-testid="dashboard-credential-detail"]'
+            ) !== null
+    );
+    await waitForDomState(
+        page,
+        'W3C issuance controls',
+        () =>
+            globalThis.document
+                .querySelector('[data-testid="w3c-issuance-status"]')
+                ?.getAttribute('data-state') === 'ready',
+        120000
+    );
+    logStage('issuer.issuance.ready', { issuerAlias, credentialSaid });
+    await waitForDomState(page, 'W3C issuance button ready', () => {
+        const button = globalThis.document.querySelector(
+            '[data-testid="w3c-start-issuance-button"]'
+        );
+        return button instanceof HTMLButtonElement && !button.disabled;
+    });
+    await dispatchClick(page, '[data-testid="w3c-start-issuance-button"]');
+    await waitForDomState(
+        page,
+        'W3C issuance action accepted',
+        () => {
+            const result = globalThis.document.querySelector(
+                '[data-testid="w3c-issuance-action-result"]'
+            );
+            if (!(result instanceof HTMLElement)) {
+                return 'missing action result';
+            }
+            const state = result.getAttribute('data-state');
+            if (state === 'error') {
+                return { state, text: result.textContent };
+            }
+            return state === 'accepted';
+        },
+        30000
+    );
+    logStage('issuer.issuance.started', { issuerAlias, credentialSaid });
+};
 
 const waitForPresentationTx = async (client, descriptor) => {
     const expectedAud = descriptorAudience(descriptor);
@@ -442,6 +565,44 @@ const waitForVerifierOperation = async (descriptor, tx) => {
     );
 };
 
+const waitForDashboardPresentation = async (tx) => {
+    const presentationId = `urn:said:${tx.presentTxId}`;
+    const apiUrl = new URL('/api/presentations', dashboardUrl).toString();
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+        const response = await fetch(apiUrl, {
+            headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) {
+            throw new Error(
+                `Dashboard presentation fetch failed: ${response.status} ${response.statusText}`
+            );
+        }
+        const events = await response.json();
+        if (!Array.isArray(events)) {
+            throw new Error(
+                `Dashboard presentation API did not return a list: ${JSON.stringify(events)}`
+            );
+        }
+        const event = events.find(
+            (candidate) => candidate?.presentation?.id === presentationId
+        );
+        if (event !== undefined) {
+            logStage('dashboard.presentation.received', {
+                presentTxId: tx.presentTxId,
+                eventId: event.eventId ?? null,
+                verifierId: event.verifier?.id ?? event.verifier?.type ?? null,
+            });
+            return event;
+        }
+        await sleep(500);
+    }
+
+    throw new Error(
+        `Timed out waiting for dashboard webhook event for ${presentationId}`
+    );
+};
+
 const chromeArgs =
     process.env.CI === 'true'
         ? ['--no-sandbox', '--disable-setuid-sandbox']
@@ -455,26 +616,45 @@ const browser = await puppeteer.launch({
 });
 
 try {
-    const page = await browser.newPage();
-    page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
-    page.on('pageerror', (error) => {
-        console.error(
-            JSON.stringify({ stage: 'browser.pageerror', error: error.message })
-        );
-    });
-    page.on('console', (message) => {
-        if (message.type() === 'error') {
+    const preparePage = async (role) => {
+        const context = await browser.createBrowserContext();
+        const page = await context.newPage();
+        page.setDefaultTimeout(60000);
+        page.setDefaultNavigationTimeout(60000);
+        page.on('pageerror', (error) => {
             console.error(
                 JSON.stringify({
-                    stage: 'browser.console.error',
-                    text: message.text(),
+                    stage: 'browser.pageerror',
+                    role,
+                    error: error.message,
                 })
             );
-        }
-    });
-    const client = await connectKeriaClient();
-    await connectBrowserWallet(page);
+        });
+        page.on('console', (message) => {
+            if (message.type() === 'error') {
+                console.error(
+                    JSON.stringify({
+                        stage: 'browser.console.error',
+                        role,
+                        text: message.text(),
+                    })
+                );
+            }
+        });
+        return { context, page };
+    };
+
+    const issuer = await preparePage('issuer');
+    const holder = await preparePage('holder');
+    const holderClient = await connectKeriaClient(holderPasscode);
+
+    await connectBrowserWallet(issuer.page, issuerPasscode, 'issuer');
+    await connectBrowserWallet(holder.page, holderPasscode, 'holder');
+    await startIssuerW3CIssuance(issuer.page);
+    await waitForHolderHeldCredential(holderClient);
+
+    const page = holder.page;
+    const client = holderClient;
 
     logStage('credential.goto', { credentialSaid });
     await navigateInApp(
@@ -548,6 +728,7 @@ try {
 
         const tx = await waitForPresentationTx(client, descriptor);
         const operation = await waitForVerifierOperation(descriptor, tx);
+        await waitForDashboardPresentation(tx);
         const binding = {
             aud: descriptorAudience(descriptor),
             nonce: descriptor.nonce ?? null,

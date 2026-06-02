@@ -47,6 +47,7 @@ import {
     credentialDetailPath,
     dashboardModeForPath,
 } from './dashboardViewModels';
+import { CredentialW3CIssuanceControls } from '../credentials/CredentialW3CIssuanceControls';
 import { CredentialW3CPresentationControls } from '../credentials/CredentialW3CPresentationControls';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
@@ -198,6 +199,17 @@ export const DashboardView = () => {
     const openCredential = (said: string) => {
         navigate(credentialDetailPath(said));
     };
+    const submitStartW3CIssuance = (
+        credential: CredentialSummaryRecord,
+        issuer: IdentifierSummary
+    ) => {
+        const formData = new FormData();
+        formData.set('intent', 'startW3CIssuance');
+        formData.set('issuerAlias', issuer.name);
+        formData.set('issuerAid', issuer.prefix);
+        formData.set('credentialSaid', credential.said);
+        submitCredentialAction(fetcher, formData);
+    };
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
@@ -270,6 +282,22 @@ export const DashboardView = () => {
                 chainGraph={selectedCredentialChainGraph}
                 acdcsBySaid={credentialAcdcsBySaid}
                 schemasBySaid={schemasBySaid}
+                issuanceControls={
+                    selectedCredential === null ? null : (
+                        <CredentialW3CIssuanceControls
+                            credential={selectedCredential}
+                            identifiers={identifiers}
+                            didWebsReadyByAid={didWebsReadyByAid}
+                            actionRunning={actionRunning}
+                            issuanceAction={
+                                fetcher.data?.intent === 'startW3CIssuance'
+                                    ? fetcher.data
+                                    : null
+                            }
+                            onStartIssuance={submitStartW3CIssuance}
+                        />
+                    )
+                }
                 presentationControls={
                     selectedCredential === null ? null : (
                         <CredentialW3CPresentationControls
