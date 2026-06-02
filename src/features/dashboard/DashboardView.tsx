@@ -279,6 +279,7 @@ export const DashboardView = () => {
                             verifiers={w3cVerifiers}
                             selectedVerifierId={selectedVerifierId}
                             actionRunning={actionRunning}
+                            presentationAction={fetcher.data ?? null}
                             onVerifierChange={setSelectedVerifierId}
                             onPresent={submitPresent}
                         />

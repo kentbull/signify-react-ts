@@ -159,8 +159,7 @@ describe('runtime command adapters', () => {
             resultRoute: { label: 'View identifiers', path: '/identifiers' },
             successNotification: {
                 title: 'Delegated rotation complete',
-                message:
-                    'The delegator approved the rotation for Edelegate.',
+                message: 'The delegator approved the rotation for Edelegate.',
                 severity: 'success',
             },
             failureNotification: {
@@ -378,7 +377,10 @@ describe('runtime command adapters', () => {
             presenterAlias: 'issuer',
             presenterAid: 'Eissuer',
             credentialSaid: 'Ecredential',
-            verifierId: 'isomer-python',
+            verifierRequest: {
+                aud: 'https://verifier.example',
+                nonce: 'nonce-1',
+            },
         });
 
         expect(startedOptions[0]).toMatchObject({
@@ -477,13 +479,13 @@ describe('runtime command adapters', () => {
             successNotification: {
                 title: 'Credential presented',
                 message:
-                    'The W3C VC-JWT was accepted by the selected verifier.',
+                    'KERIA recorded the W3C presentation transaction result.',
                 severity: 'success',
             },
             failureNotification: {
                 title: 'Credential presentation failed',
                 message:
-                    'The credential could not be presented to the selected verifier.',
+                    'The credential could not be presented through the verifier request.',
                 severity: 'error',
             },
         });
@@ -670,7 +672,10 @@ describe('runtime command adapters', () => {
             label: 'Joining multisig group team',
             title: 'Join multisig group',
             kind: 'acceptMultisigInception',
-            resourceKeys: ['multisig:proposal:Eexn-inception', 'multisig:group:team'],
+            resourceKeys: [
+                'multisig:proposal:Eexn-inception',
+                'multisig:group:team',
+            ],
         });
         expect(startedOptions[5]).toMatchObject({
             label: 'Approving multisig role for team',

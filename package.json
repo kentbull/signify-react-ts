@@ -14,6 +14,7 @@
         "contact:challenge-smoke": "tsx tests/contact-challenge-smoke.ts",
         "identifier:agent-oobi-smoke": "tsx tests/identifier-agent-oobi-smoke.ts",
         "browser:smoke": "node tests/browser-smoke.mjs",
+        "w3c:holder-presentation:smoke": "node tests/w3c-holder-presentation-smoke.mjs",
         "responsive:smoke": "node tests/responsive-smoke.mjs",
         "unit:test": "vitest run tests/unit",
         "multisig:test": "vitest run tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts",
@@ -42,7 +43,7 @@
         "react-dom": "^19.2.5",
         "react-redux": "^9.2.0",
         "react-router-dom": "^7.14.2",
-        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#7004697d9662a031c939a81af6f4e935db2faf90"
+        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#5e5125e6e2bfb5329f81c0bff0d22551b1333f8d"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

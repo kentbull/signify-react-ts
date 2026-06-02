@@ -1370,6 +1370,11 @@ export const CredentialRecordDetail = ({
                                             />
                                         </Stack>
                                     }
+                                    slotProps={{
+                                        secondary: {
+                                            component: 'div',
+                                        },
+                                    }}
                                 />
                             </ListItem>
                         ))}

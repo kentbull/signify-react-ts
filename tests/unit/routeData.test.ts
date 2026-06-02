@@ -397,7 +397,6 @@ describe('route loaders', () => {
         expect(runtime.credentials.syncKnownSchemas).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncRegistries).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncInventory).toHaveBeenCalledOnce();
-        expect(runtime.credentials.listW3CVerifiers).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncIpexActivity).toHaveBeenCalledOnce();
     });
 
@@ -514,10 +513,6 @@ describe('route loaders', () => {
                     calls.push('ipexActivity');
                     return {};
                 }),
-                listW3CVerifiers: vi.fn(async () => {
-                    calls.push('w3cVerifiers');
-                    return [];
-                }),
             },
         });
 
@@ -532,7 +527,6 @@ describe('route loaders', () => {
                 'schemas',
                 'registries',
                 'credentials',
-                'w3cVerifiers',
                 'ipexActivity',
             ])
         );
@@ -1393,7 +1387,10 @@ describe('route actions', () => {
                     presenterAlias: 'issuer',
                     presenterAid: 'Eissuer',
                     credentialSaid: 'Ecredential',
-                    verifierId: 'isomer-python',
+                    verifierRequest: JSON.stringify({
+                        aud: 'https://verifier.example',
+                        nonce: 'nonce-1',
+                    }),
                 })
             )
         ).resolves.toEqual({
@@ -1408,7 +1405,10 @@ describe('route actions', () => {
                 presenterAlias: 'issuer',
                 presenterAid: 'Eissuer',
                 credentialSaid: 'Ecredential',
-                verifierId: 'isomer-python',
+                verifierRequest: {
+                    aud: 'https://verifier.example',
+                    nonce: 'nonce-1',
+                },
             },
             expect.objectContaining({
                 requestId: 'present-credential-request-1',
@@ -1425,14 +1425,17 @@ describe('route actions', () => {
                 makeRequest('/credentials', {
                     intent: 'presentCredential',
                     credentialSaid: 'Ecredential',
-                    verifierId: 'isomer-python',
+                    verifierRequest: JSON.stringify({
+                        aud: 'https://verifier.example',
+                        nonce: 'nonce-1',
+                    }),
                 })
             )
         ).resolves.toMatchObject({
             intent: 'presentCredential',
             ok: false,
             message:
-                'Presenter identifier, credential, and verifier are required.',
+                'Presenter identifier, credential, and verifier request JSON are required.',
         });
         expect(runtime.credentials.startPresent).not.toHaveBeenCalled();
     });

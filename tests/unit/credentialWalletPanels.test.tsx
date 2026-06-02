@@ -105,15 +105,15 @@ describe('wallet credential panels', () => {
                         verifyUrl: 'http://verifier.example/verify',
                     },
                 ]}
-                selectedVerifierId="isomer-python"
+                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
-        expect(markup).toContain('Verifier');
-        expect(markup).toContain('Python Isomer');
+        expect(markup).toContain('Verifier request');
+        expect(markup).toContain('https://verifier.example');
         expect(markup).toContain('Present');
         expect(markup).toContain(
             'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
@@ -137,14 +137,16 @@ describe('wallet credential panels', () => {
                         verifyUrl: 'http://verifier.example/verify',
                     },
                 ]}
-                selectedVerifierId="isomer-python"
+                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
-        expect(markup).toContain('Ready to present to Python Isomer.');
+        expect(markup).toContain(
+            'Ready to create a KERIA W3C presentation transaction from this verifier request.'
+        );
     });
 
     it('uses a local issuer as the presenter for issued VRD credentials', () => {
@@ -166,14 +168,16 @@ describe('wallet credential panels', () => {
                         verifyUrl: 'http://verifier.example/verify',
                     },
                 ]}
-                selectedVerifierId="isomer-python"
+                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
-        expect(markup).toContain('Ready to present to Python Isomer.');
+        expect(markup).toContain(
+            'Ready to create a KERIA W3C presentation transaction from this verifier request.'
+        );
     });
 
     it('renders W3C Present controls alongside issuer IPEX Grant controls', () => {
@@ -210,7 +214,7 @@ describe('wallet credential panels', () => {
                         verifyUrl: 'http://verifier.example/verify',
                     },
                 ]}
-                selectedVerifierId="isomer-python"
+                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 onGrant={vi.fn()}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -219,6 +223,6 @@ describe('wallet credential panels', () => {
 
         expect(markup).toContain('Grant');
         expect(markup).toContain('Present');
-        expect(markup).toContain('Python Isomer');
+        expect(markup).toContain('Verifier request');
     });
 });
