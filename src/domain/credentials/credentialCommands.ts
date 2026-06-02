@@ -50,5 +50,5 @@ export interface PresentCredentialInput {
     presenterAlias: string;
     presenterAid: string;
     credentialSaid: string;
-    verifierId: string;
+    verifierRequest: Record<string, unknown>;
 }

@@ -2,7 +2,7 @@ import type { CredentialSummaryRecord } from './credentialTypes';
 import type { IdentifierSummary } from '../identifiers/identifierTypes';
 
 /**
- * KERIA's current W3C projection path supports the Isomer VRD credential only.
+ * KERIA's current W3C presentation path supports the Isomer VRD credential only.
  *
  * Keep this explicit in the app so W3C Present does not look like a generic
  * replacement for IPEX Grant or a generic ACDC presentation mechanism.

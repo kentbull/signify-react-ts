@@ -51,9 +51,7 @@ export const CredentialWalletRoute = () => {
     const heldCredentials = useAppSelector(selectHeldCredentials);
     const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
     const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
-    const [selectedVerifierId, setSelectedVerifierId] = useState(
-        w3cVerifiers[0]?.id ?? ''
-    );
+    const [selectedVerifierId, setSelectedVerifierId] = useState('');
 
     const credentialTypesBySchema = new Map(
         credentialTypes.map((credentialType) => [
@@ -115,11 +113,7 @@ export const CredentialWalletRoute = () => {
         heldCredentials,
         grants: grantNotifications,
     });
-    const effectiveVerifierId =
-        w3cVerifiers.find((verifier) => verifier.id === selectedVerifierId)
-            ?.id ??
-        w3cVerifiers[0]?.id ??
-        '';
+    const effectiveVerifierId = selectedVerifierId;
     const unresolvedWalletCredentialType =
         credentialTypes.find((type) => type.schemaStatus !== 'resolved') ?? null;
 
@@ -166,9 +160,9 @@ export const CredentialWalletRoute = () => {
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => {
-        if (verifierId.length === 0) {
+        if (verifierRequestJson.length === 0) {
             return;
         }
 
@@ -177,7 +171,7 @@ export const CredentialWalletRoute = () => {
         formData.set('presenterAlias', presenter.name);
         formData.set('presenterAid', presenter.prefix);
         formData.set('credentialSaid', credential.said);
-        formData.set('verifierId', verifierId);
+        formData.set('verifierRequest', verifierRequestJson);
         submitCredentialForm(formData);
     };
 

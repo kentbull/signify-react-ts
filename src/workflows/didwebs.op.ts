@@ -8,12 +8,9 @@ import {
 import {
     DidWebsAutoApprover,
     DWS_SIGNING_ROUTE,
-    W3CProjectionAutoApprover,
-    W3C_SIGNING_ROUTE,
     type DidWebsAutoApproveResult,
     type SignifyClient,
     type SignedReplyEnvelope,
-    type W3CProjectionAutoApproveResult,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import { AppServicesContext, type AppServices } from '../effects/contexts';
@@ -29,6 +26,8 @@ import {
 
 const minimumDidWebsPollingMs = 7000;
 const DWS_READY_ROUTE = '/didwebs/ready';
+const W3C_SIGNING_ROUTE = '/w3c/signing/request';
+const W3C_IMPORT_ROUTE = '/w3c/credentials/import-request';
 
 /** Verified did:webs signal payload observed from the generic agent stream. */
 export interface ObservedDidWebsSignal {
@@ -46,6 +45,181 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const stringValue = (value: unknown): string | null =>
     typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+
+interface ReactW3CAutomationResult {
+    outcome: 'submitted' | 'imported' | 'skipped' | 'blocked' | 'failed' | 'rejected';
+    requestId?: string;
+    error?: string;
+}
+
+const decodeBase64Url = (input: string): Uint8Array => {
+    const padded = `${input}${'='.repeat((4 - (input.length % 4)) % 4)}`;
+    const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = globalThis.atob(base64);
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
+
+class ReactW3CEdgeAutomator {
+    private readonly seen = new Set<string>();
+
+    constructor(private readonly client: SignifyClient) {}
+
+    async handleEnvelope(
+        envelope: SignedReplyEnvelope
+    ): Promise<ReactW3CAutomationResult> {
+        const route = isRecord(envelope.rpy) ? stringValue(envelope.rpy.r) : null;
+        if (route !== W3C_SIGNING_ROUTE && route !== W3C_IMPORT_ROUTE) {
+            return { outcome: 'rejected', error: `unsupported W3C route ${route}` };
+        }
+        const verified = this.client
+            .signals()
+            .verifyReplyEnvelope(envelope, { route });
+        if (!verified) {
+            return {
+                outcome: 'rejected',
+                error: `W3C signal envelope failed verification for ${route}`,
+            };
+        }
+        const payload = isRecord(envelope.rpy)
+            ? (envelope.rpy.a as Record<string, unknown> | undefined)
+            : undefined;
+        return route === W3C_SIGNING_ROUTE
+            ? this.handleSigningRequest(payload)
+            : this.handleImportRequest(payload);
+    }
+
+    async pollOnce(): Promise<ReactW3CAutomationResult[]> {
+        const names = await this.managedNames();
+        const results: ReactW3CAutomationResult[] = [];
+        for (const name of names) {
+            for (const request of await this.getRequests(
+                `/identifiers/${name}/w3c/credentials/import-requests`
+            )) {
+                results.push(await this.handleImportRequest(request));
+            }
+        }
+        for (const name of names) {
+            for (const request of await this.getRequests(
+                `/identifiers/${name}/w3c/signing-requests`
+            )) {
+                results.push(await this.handleSigningRequest(request));
+            }
+        }
+        return results;
+    }
+
+    async reconcile(): Promise<ReactW3CAutomationResult[]> {
+        return [];
+    }
+
+    private async handleSigningRequest(
+        request: Record<string, unknown> | undefined
+    ): Promise<ReactW3CAutomationResult> {
+        const id = stringValue(request?.d);
+        const name = stringValue(request?.name);
+        const aid = stringValue(request?.aid);
+        const signingInputB64 = stringValue(request?.signingInputB64);
+        if (id === null || name === null || aid === null || signingInputB64 === null) {
+            return { outcome: 'rejected', error: 'W3C signing request is malformed' };
+        }
+        if (this.seen.has(id)) {
+            return { outcome: 'skipped', requestId: id };
+        }
+        const ownershipError = await this.localOwnershipError(name, aid, id);
+        if (ownershipError !== null) {
+            this.seen.add(id);
+            return { outcome: 'rejected', requestId: id, error: ownershipError };
+        }
+        try {
+            const hab = await this.client.identifiers().get(name);
+            const keeper = this.client.manager!.get(hab);
+            const sigs = await keeper.sign(decodeBase64Url(signingInputB64), false);
+            const firstSig = sigs[0] as string | { qb64: string };
+            const signature =
+                typeof firstSig === 'string' ? firstSig : firstSig.qb64;
+            await this.client.fetch(
+                `/identifiers/${name}/w3c/signing-requests/${encodeURIComponent(id)}/signatures`,
+                'POST',
+                { signature }
+            );
+            this.seen.add(id);
+            return { outcome: 'submitted', requestId: id };
+        } catch (error) {
+            return { outcome: 'failed', requestId: id, error: toErrorText(error) };
+        }
+    }
+
+    private async handleImportRequest(
+        request: Record<string, unknown> | undefined
+    ): Promise<ReactW3CAutomationResult> {
+        const id = stringValue(request?.d) ?? stringValue(request?.importRequestId);
+        const holderName = stringValue(request?.holderName);
+        const holderAid = stringValue(request?.holderAid);
+        const state = stringValue(request?.state);
+        if (id === null || holderName === null || holderAid === null) {
+            return { outcome: 'rejected', error: 'W3C import request is malformed' };
+        }
+        if (this.seen.has(id)) {
+            return { outcome: 'skipped', requestId: id };
+        }
+        const ownershipError = await this.localOwnershipError(holderName, holderAid, id);
+        if (ownershipError !== null) {
+            this.seen.add(id);
+            return { outcome: 'rejected', requestId: id, error: ownershipError };
+        }
+        if (state === 'blocked_native_vrd') {
+            this.seen.add(id);
+            return {
+                outcome: 'blocked',
+                requestId: id,
+                error: stringValue(request?.error) ?? 'W3C import is blocked',
+            };
+        }
+        if (state !== null && state !== 'pending') {
+            this.seen.add(id);
+            return { outcome: 'rejected', requestId: id, error: `W3C import request is ${state}` };
+        }
+        try {
+            await this.client.fetch(
+                `/identifiers/${holderName}/w3c/credentials/import`,
+                'POST',
+                { importRequestId: id }
+            );
+            this.seen.add(id);
+            return { outcome: 'imported', requestId: id };
+        } catch (error) {
+            return { outcome: 'failed', requestId: id, error: toErrorText(error) };
+        }
+    }
+
+    private async getRequests(path: string): Promise<Record<string, unknown>[]> {
+        const response = await this.client.fetch(path, 'GET', null);
+        const body = (await response.json()) as { requests?: unknown[] };
+        return (body.requests ?? []).filter(isRecord);
+    }
+
+    private async managedNames(): Promise<string[]> {
+        const result = await this.client.identifiers().list();
+        return result.aids
+            .map((aid: { name?: unknown }) => stringValue(aid.name))
+            .filter((name: string | null): name is string => name !== null);
+    }
+
+    private async localOwnershipError(
+        name: string,
+        aid: string,
+        requestId: string
+    ): Promise<string | null> {
+        try {
+            const hab = await this.client.identifiers().get(name);
+            return hab.prefix === aid
+                ? null
+                : `W3C request ${requestId} targets ${aid}, but local identifier ${name} is ${hab.prefix}`;
+        } catch (error) {
+            return `W3C request ${requestId} targets ${aid}, but local identifier ${name} is unavailable: ${toErrorText(error)}`;
+        }
+    }
+}
 
 /**
  * Incremental parser for JSON-valued Server-Sent Event frames.
@@ -148,7 +322,7 @@ export const consumeDidWebsSignalStream = async ({
 }: {
     client: SignifyClient;
     approver: DidWebsAutoApprover;
-    w3cApprover?: W3CProjectionAutoApprover;
+    w3cApprover?: ReactW3CEdgeAutomator;
     signal: AbortSignal;
     observer?: DidWebsSignalObserver;
 }): Promise<void> => {
@@ -219,12 +393,15 @@ const handleSignalEnvelope = async ({
 }: {
     envelope: SignedReplyEnvelope;
     didWebsApprover: DidWebsAutoApprover;
-    w3cApprover?: W3CProjectionAutoApprover;
+    w3cApprover?: ReactW3CEdgeAutomator;
 }): Promise<void> => {
     const route = isRecord(envelope.rpy) ? stringValue(envelope.rpy.r) : null;
     if (route === DWS_SIGNING_ROUTE) {
         await didWebsApprover.handleEnvelope(envelope);
-    } else if (route === W3C_SIGNING_ROUTE && w3cApprover !== undefined) {
+    } else if (
+        (route === W3C_SIGNING_ROUTE || route === W3C_IMPORT_ROUTE) &&
+        w3cApprover !== undefined
+    ) {
         await w3cApprover.handleEnvelope(envelope);
     }
 };
@@ -285,12 +462,12 @@ export const approvePendingDidWebsRequests = async (
 };
 
 /**
- * Poll durable W3C projection requests and reconcile completed ones.
+ * Poll durable W3C holder requests and reconcile completed ones.
  */
-export const approvePendingW3CProjectionRequests = async (
-    approver: W3CProjectionAutoApprover
+export const approvePendingW3CRequests = async (
+    approver: ReactW3CEdgeAutomator
 ): Promise<{
-    pollResults: W3CProjectionAutoApproveResult[];
+    pollResults: ReactW3CAutomationResult[];
     reconciled: number;
 }> => {
     const pollResults = await approver.pollOnce();
@@ -312,20 +489,20 @@ export const approvePendingDidWebsAndW3CRequests = async ({
     w3cApprover,
 }: {
     approver: DidWebsAutoApprover;
-    w3cApprover: W3CProjectionAutoApprover;
+    w3cApprover: ReactW3CEdgeAutomator;
 }): Promise<{
     didWebs:
         | { ok: true; value: Awaited<ReturnType<typeof approvePendingDidWebsRequests>> }
         | { ok: false; error: unknown };
     w3c:
-        | { ok: true; value: Awaited<ReturnType<typeof approvePendingW3CProjectionRequests>> }
+        | { ok: true; value: Awaited<ReturnType<typeof approvePendingW3CRequests>> }
         | { ok: false; error: unknown };
 }> => {
     const didWebs = await settlePollingStep(() =>
         approvePendingDidWebsRequests(approver)
     );
     const w3c = await settlePollingStep(() =>
-        approvePendingW3CProjectionRequests(w3cApprover)
+        approvePendingW3CRequests(w3cApprover)
     );
     return { didWebs, w3c };
 };
@@ -395,7 +572,7 @@ export function* liveDidWebsPublicationOp(): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
     const client = services.runtime.requireConnectedClient();
     const approver = new DidWebsAutoApprover(client);
-    const w3cApprover = new W3CProjectionAutoApprover(client);
+    const w3cApprover = new ReactW3CEdgeAutomator(client);
 
     yield* spawn(() =>
         didWebsSignalLoop(
@@ -445,7 +622,7 @@ const didWebsSignalObserver =
 
 function* didWebsSignalLoop(
     approver: DidWebsAutoApprover,
-    w3cApprover: W3CProjectionAutoApprover,
+    w3cApprover: ReactW3CEdgeAutomator,
     observer: DidWebsSignalObserver
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
@@ -491,7 +668,7 @@ function* didWebsSignalLoop(
 
 function* didWebsPollingLoop(
     approver: DidWebsAutoApprover,
-    w3cApprover: W3CProjectionAutoApprover
+    w3cApprover: ReactW3CEdgeAutomator
 ): EffectionOperation<void> {
     const services = yield* AppServicesContext.expect();
     let didWebsConsecutiveFailures = 0;
@@ -526,7 +703,7 @@ function* didWebsPollingLoop(
                 w3cWarned = true;
                 recordDidWebsWarning(
                     services,
-                    'W3C projection signing polling stalled',
+                    'W3C holder workflow polling stalled',
                     results.w3c.error
                 );
             }

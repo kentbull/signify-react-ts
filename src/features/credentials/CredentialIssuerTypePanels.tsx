@@ -41,7 +41,6 @@ import type { CredentialRegistryTile } from './credentialViewModels';
 import { statusTone } from './credentialDisplay';
 import { CredentialRecordRows } from './CredentialShared';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
-import type { W3CVerifier } from 'signify-ts';
 import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
 
 /**
@@ -367,14 +366,14 @@ export const IssuedCredentialsForTypePanel = ({
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers: readonly W3CVerifier[];
+    verifiers: readonly unknown[];
     selectedVerifierId: string;
     onGrant: (credential: CredentialSummaryRecord) => void;
-    onVerifierChange: (verifierId: string) => void;
+    onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => void;
 }) => (
     <ConsolePanel

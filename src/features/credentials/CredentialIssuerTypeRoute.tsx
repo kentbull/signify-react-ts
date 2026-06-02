@@ -84,9 +84,7 @@ export const CredentialIssuerTypeRoute = () => {
     const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const walletSelectedRegistry = useAppSelector(selectSelectedWalletRegistry);
     const [holderAid, setHolderAid] = useState('');
-    const [selectedVerifierId, setSelectedVerifierId] = useState(
-        w3cVerifiers[0]?.id ?? ''
-    );
+    const [selectedVerifierId, setSelectedVerifierId] = useState('');
     const [registryName, setRegistryName] = useState(
         SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME
     );
@@ -153,11 +151,7 @@ export const CredentialIssuerTypeRoute = () => {
                   selectedIdentifier.prefix,
                   selectedType.schemaSaid
               );
-    const effectiveVerifierId =
-        w3cVerifiers.find((verifier) => verifier.id === selectedVerifierId)
-            ?.id ??
-        w3cVerifiers[0]?.id ??
-        '';
+    const effectiveVerifierId = selectedVerifierId;
     const selectedIdentifierName = selectedIdentifier?.name ?? '';
     const selectedIdentifierPrefix = selectedIdentifier?.prefix ?? '';
 
@@ -297,9 +291,9 @@ export const CredentialIssuerTypeRoute = () => {
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => {
-        if (verifierId.length === 0) {
+        if (verifierRequestJson.length === 0) {
             return;
         }
 
@@ -308,7 +302,7 @@ export const CredentialIssuerTypeRoute = () => {
         formData.set('presenterAlias', presenter.name);
         formData.set('presenterAid', presenter.prefix);
         formData.set('credentialSaid', credential.said);
-        formData.set('verifierId', verifierId);
+        formData.set('verifierRequest', verifierRequestJson);
         submitCredentialForm(formData);
     };
 

@@ -96,9 +96,7 @@ export const DashboardView = () => {
     const connection = runtimeSnapshot.connection;
     const w3cVerifiers =
         loaderData.status === 'blocked' ? [] : loaderData.verifiers;
-    const [selectedVerifierId, setSelectedVerifierId] = useState(
-        w3cVerifiers[0]?.id ?? ''
-    );
+    const [selectedVerifierId, setSelectedVerifierId] = useState('');
     const actionRunning = fetcher.state !== 'idle';
     const connectionUrl =
         connection.status === 'connected' ? connection.client.url : null;
@@ -203,9 +201,9 @@ export const DashboardView = () => {
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => {
-        if (verifierId.length === 0) {
+        if (verifierRequestJson.length === 0) {
             return;
         }
 
@@ -214,7 +212,7 @@ export const DashboardView = () => {
         formData.set('presenterAlias', presenter.name);
         formData.set('presenterAid', presenter.prefix);
         formData.set('credentialSaid', credential.said);
-        formData.set('verifierId', verifierId);
+        formData.set('verifierRequest', verifierRequestJson);
         submitCredentialAction(fetcher, formData);
     };
 

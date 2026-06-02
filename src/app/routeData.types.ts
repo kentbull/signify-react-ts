@@ -5,7 +5,6 @@ import type {
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../signify/client';
-import type { W3CVerifier } from 'signify-ts';
 import type {
     ChallengeRuntimeCommands,
     ContactRuntimeCommands,
@@ -22,6 +21,12 @@ import type {
  * KERIA connection submissions.
  */
 export const DEFAULT_APP_PATH = '/dashboard';
+
+export interface W3CVerifierRequestPreset {
+    id: string;
+    label: string;
+    descriptor: Record<string, unknown>;
+}
 
 /**
  * Loader result used when a connected Signify client is required.
@@ -44,8 +49,12 @@ export type IdentifiersLoaderData =
  * Loader data for `/dashboard`.
  */
 export type DashboardLoaderData =
-    | { status: 'ready'; verifiers: W3CVerifier[] }
-    | { status: 'error'; message: string; verifiers: W3CVerifier[] }
+    | { status: 'ready'; verifiers: W3CVerifierRequestPreset[] }
+    | {
+          status: 'error';
+          message: string;
+          verifiers: W3CVerifierRequestPreset[];
+      }
     | BlockedRouteData;
 
 /**
@@ -94,7 +103,7 @@ export type ClientLoaderData =
  * Loader data for the credentials route.
  */
 export type CredentialsLoaderData =
-    | { status: 'ready'; verifiers: W3CVerifier[] }
+    | { status: 'ready'; verifiers: W3CVerifierRequestPreset[] }
     | { status: 'error'; message: string }
     | BlockedRouteData;
 

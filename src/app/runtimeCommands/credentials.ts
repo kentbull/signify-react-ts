@@ -11,13 +11,12 @@ import type {
     RegistryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
-import type { W3CProjectionSession, W3CVerifier } from 'signify-ts';
+import type { W3CPresentTxView } from '../../services/credentials.service';
 import {
     admitCredentialGrantOp,
     createCredentialRegistryOp,
     grantCredentialOp,
     issueSediCredentialOp,
-    listW3CVerifiersOp,
     presentCredentialOp,
     resolveCredentialSchemaOp,
     syncCredentialInventoryOp,
@@ -63,7 +62,6 @@ export interface CredentialRuntimeCommands {
         input: PresentCredentialInput,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
-    listW3CVerifiers(options?: WorkflowRunOptions): Promise<W3CVerifier[]>;
 }
 
 /**
@@ -82,7 +80,6 @@ export const createCredentialRuntimeCommands = (
     startGrant: startGrantCredential(context),
     startAdmit: startAdmitCredentialGrant(context),
     startPresent: startPresentCredential(context),
-    listW3CVerifiers: listW3CVerifiers(context),
 });
 
 const syncCredentialInventory =
@@ -190,16 +187,6 @@ const startPresentCredential =
             () => presentCredentialOp(input),
             presentCredentialOptions(input, options)
         );
-
-const listW3CVerifiers =
-    (context: RuntimeCommandContext) =>
-    (options: WorkflowRunOptions = {}): Promise<W3CVerifier[]> =>
-        context.runWorkflow(() => listW3CVerifiersOp(), {
-            ...options,
-            label: options.label ?? 'Loading W3C verifiers',
-            kind: options.kind ?? 'syncInventory',
-            track: options.track ?? false,
-        });
 
 const resolveCredentialSchemaOptions = (
     input: ResolveCredentialSchemaInput,
@@ -326,24 +313,24 @@ const admitCredentialGrantOptions = (
 const presentCredentialOptions = (
     input: PresentCredentialInput,
     options: RequestIdOptions
-): BackgroundWorkflowRunOptions<W3CProjectionSession> => ({
+): BackgroundWorkflowRunOptions<W3CPresentTxView> => ({
     requestId: options.requestId,
     label: `Presenting credential ${input.credentialSaid}`,
     title: 'Present credential',
     description:
-        'Projects the VRD credential into a short-lived W3C VC-JWT and submits it to the selected verifier.',
+        'Creates a KERIA W3C presentation transaction from a runtime verifier request.',
     kind: 'presentCredential',
     resourceKeys: [`credential:${input.credentialSaid}:w3c-present`],
     resultRoute: credentialsRoute,
     successNotification: {
         title: 'Credential presented',
-        message: 'The W3C VC-JWT was accepted by the selected verifier.',
+        message: 'KERIA recorded the W3C presentation transaction result.',
         severity: 'success',
     },
     failureNotification: {
         title: 'Credential presentation failed',
         message:
-            'The credential could not be presented to the selected verifier.',
+            'The credential could not be presented through the verifier request.',
         severity: 'error',
     },
 });

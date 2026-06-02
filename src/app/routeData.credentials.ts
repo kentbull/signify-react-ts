@@ -61,17 +61,14 @@ export const loadCredentials = async (
 
     try {
         await runtime.identifiers.list({ signal: request?.signal });
-        const [, , , , verifiers] = await Promise.all([
+        await Promise.all([
             runtime.contacts.syncInventory({ signal: request?.signal }),
             runtime.credentials.syncKnownSchemas({ signal: request?.signal }),
             runtime.credentials.syncRegistries({ signal: request?.signal }),
             runtime.credentials.syncInventory({ signal: request?.signal }),
-            runtime.credentials.listW3CVerifiers({
-                signal: request?.signal,
-            }),
         ]);
         await runtime.credentials.syncIpexActivity({ signal: request?.signal });
-        return { status: 'ready', verifiers };
+        return { status: 'ready', verifiers: [] };
     } catch (error) {
         return {
             status: 'error',
@@ -84,6 +81,23 @@ export const loadCredentials = async (
 const formBoolean = (formData: FormData, field: string): boolean => {
     const value = formString(formData, field).trim().toLowerCase();
     return value === 'true' || value === 'on' || value === '1';
+};
+
+const verifierRequestFromForm = (
+    formData: FormData
+): Record<string, unknown> | null => {
+    const raw = formString(formData, 'verifierRequest').trim();
+    if (raw.length === 0) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+    } catch {
+        return null;
+    }
 };
 
 /**
@@ -376,23 +390,24 @@ const presentCredentialAction = ({
     requestId,
 }: CredentialActionContext): CredentialActionData => {
     const intent = 'presentCredential';
+    const verifierRequest = verifierRequestFromForm(formData);
     const input: PresentCredentialInput = {
         presenterAlias: formString(formData, 'presenterAlias').trim(),
         presenterAid: formString(formData, 'presenterAid').trim(),
         credentialSaid: formString(formData, 'credentialSaid').trim(),
-        verifierId: formString(formData, 'verifierId').trim(),
+        verifierRequest: verifierRequest ?? {},
     };
     if (
         input.presenterAlias.length === 0 ||
         input.presenterAid.length === 0 ||
         input.credentialSaid.length === 0 ||
-        input.verifierId.length === 0
+        verifierRequest === null
     ) {
         return {
             intent,
             ok: false,
             message:
-                'Presenter identifier, credential, and verifier are required.',
+                'Presenter identifier, credential, and verifier request JSON are required.',
             requestId,
         };
     }

@@ -1,17 +1,11 @@
 import { sleep, type Operation as EffectionOperation } from 'effection';
 import {
-    MemoryW3CProjectionDedupeStore,
     Serder,
-    W3CProjectionAutoApprover,
     type CredentialResult,
     type CredentialState,
     type CredentialSubject,
     type Operation as KeriaOperation,
     type SignifyClient,
-    type W3CProjectionAutoApproveResult,
-    type W3CProjectionSession,
-    type W3CSigningRequest,
-    type W3CVerifier,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import type { OperationLogger } from '../signify/client';
@@ -66,12 +60,19 @@ const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
 const CREDENTIAL_FETCH_RETRIES = 10;
 const CREDENTIAL_FETCH_RETRY_MS = 1000;
 const EXCHANGE_QUERY_LIMIT = 200;
-const W3C_PROJECTION_POLL_MS = 1000;
-const W3C_TERMINAL_PROJECTION_STATES = new Set([
-    'complete',
-    'failed',
-    'expired',
-]);
+const W3C_PRESENT_TX_POLL_MS = 1000;
+const W3C_PRESENT_TX_SUCCESS_STATES = new Set(['submitted', 'verified']);
+const W3C_PRESENT_TX_FAILURE_STATES = new Set(['failed']);
+
+export interface W3CPresentTxView {
+    presentTxId: string;
+    state: string;
+    signingRequestId?: string | null;
+    vpJwt?: string | null;
+    verifierResponse?: unknown;
+    error?: string | null;
+    [key: string]: unknown;
+}
 
 const keriaTimestamp = (): string =>
     new Date().toISOString().replace('Z', '000+00:00');
@@ -715,46 +716,48 @@ export function* admitCredentialGrantService({
 }
 
 /**
- * Start an ephemeral KERIA W3C presentation session and wait until KERIA has
- * submitted the assembled VC-JWT to the configured verifier or failed.
+ * Start a KERIA W3C presentation transaction from a runtime verifier request.
  *
- * The edge signatures are supplied by the live W3C auto-approver running on
- * the generic KERIA signal stream; this foreground workflow only creates the
- * session and observes KERIA's short-lived session state.
+ * The runtime descriptor comes from QR/request ingestion or manual operator
+ * input. KERIA owns credential matching, VP-JWT signing requests, verifier
+ * submission, and result state.
  */
 export function* presentCredentialService({
     client,
     presenterAlias,
     presenterAid,
     credentialSaid,
-    verifierId,
+    verifierRequest,
     timeoutMs,
-    pollMs = W3C_PROJECTION_POLL_MS,
+    pollMs = W3C_PRESENT_TX_POLL_MS,
 }: {
     client: SignifyClient;
     presenterAlias: string;
     presenterAid: string;
     credentialSaid: string;
-    verifierId: string;
+    verifierRequest: Record<string, unknown>;
     timeoutMs: number;
     pollMs?: number;
-}): EffectionOperation<W3CProjectionSession> {
+}): EffectionOperation<W3CPresentTxView> {
     const name = requireNonEmpty(presenterAlias, 'Presenter identifier');
-    const aid = requireNonEmpty(presenterAid, 'Presenter AID');
+    requireNonEmpty(presenterAid, 'Presenter AID');
     const said = requireNonEmpty(credentialSaid, 'Credential SAID');
-    const verifier = requireNonEmpty(verifierId, 'Verifier');
-    const session = yield* callPromise(() =>
-        client.w3c().project(name, said, verifier)
+    const requestDescriptor = {
+        ...verifierRequest,
+        credentialSaid: said,
+    };
+    const tx = yield* callPromise(() =>
+        postJson<W3CPresentTxView>(
+            client,
+            `/identifiers/${name}/w3c/present-txs`,
+            requestDescriptor
+        )
     );
-    const approver = new W3CProjectionAutoApprover(client, {
-        store: new MemoryW3CProjectionDedupeStore(),
-    });
     const timeoutAt = Date.now() + timeoutMs;
 
-    let current = session;
-    let lastPendingRequestIds: string[] = [];
+    let current = tx;
     while (Date.now() < timeoutAt) {
-        const terminal = projectionTerminalError(current);
+        const terminal = presentTxTerminalError(current);
         if (terminal === null) {
             return current;
         }
@@ -762,21 +765,13 @@ export function* presentCredentialService({
             throw terminal;
         }
 
-        const approval = yield* callPromise(() =>
-            approveW3CProjectionSigningRequests({
-                client,
-                approver,
-                presenterAlias: name,
-                presenterAid: aid,
-                sessionId: current.d,
-            })
-        );
-        lastPendingRequestIds = approval.pendingRequestIds;
-
         current = yield* callPromise(() =>
-            client.w3c().projection(name, current.d)
+            getJson<W3CPresentTxView>(
+                client,
+                `/identifiers/${name}/w3c/present-txs/${current.presentTxId}`
+            )
         );
-        const refreshedTerminal = projectionTerminalError(current);
+        const refreshedTerminal = presentTxTerminalError(current);
         if (refreshedTerminal === null) {
             return current;
         }
@@ -788,98 +783,39 @@ export function* presentCredentialService({
     }
 
     throw new Error(
-        `Timed out waiting for W3C projection ${session.d}. Last state: ${current.state}. Pending signing requests: ${
-            lastPendingRequestIds.length > 0
-                ? lastPendingRequestIds.join(', ')
-                : 'none observed'
-        }.`
+        `Timed out waiting for W3C presentation transaction ${tx.presentTxId}. Last state: ${current.state}.`
     );
 }
 
-const projectionTerminalError = (
-    session: W3CProjectionSession
+const presentTxTerminalError = (
+    tx: W3CPresentTxView
 ): Error | null | undefined => {
-    if (session.state === 'complete') {
+    if (W3C_PRESENT_TX_SUCCESS_STATES.has(tx.state)) {
         return null;
     }
-    if (!W3C_TERMINAL_PROJECTION_STATES.has(session.state)) {
+    if (!W3C_PRESENT_TX_FAILURE_STATES.has(tx.state)) {
         return undefined;
     }
 
     return new Error(
-        session.error ??
-            `W3C projection ${session.d} ended as ${session.state}.`
+        tx.error ??
+            `W3C presentation transaction ${tx.presentTxId} ended as ${tx.state}.`
     );
 };
 
-export const approveW3CProjectionSigningRequests = async ({
-    client,
-    approver,
-    presenterAlias,
-    presenterAid,
-    sessionId,
-}: {
-    client: SignifyClient;
-    approver: W3CProjectionAutoApprover;
-    presenterAlias: string;
-    presenterAid: string;
-    sessionId: string;
-}): Promise<{
-    pendingRequestIds: string[];
-    results: W3CProjectionAutoApproveResult[];
-}> => {
-    const requests = await client.w3c().requests(presenterAlias);
-    const scopedRequests = requests.filter(
-        (request) => request.session === sessionId
-    );
-    const results: W3CProjectionAutoApproveResult[] = [];
-    for (const request of scopedRequests) {
-        validateW3CProjectionRequestPresenter(request, presenterAid);
-        const result = await approver.handleRequest(request, 'polling');
-        if (
-            result.outcome === 'failed' ||
-            result.outcome === 'rejected' ||
-            result.record?.status === 'failed' ||
-            result.record?.status === 'rejected'
-        ) {
-            throw new Error(
-                `W3C signing request ${request.d} ${result.outcome}: ${
-                    result.error ??
-                    result.record?.error ??
-                    'auto-approval did not submit the signature'
-                }`
-            );
-        }
-        results.push(result);
-    }
-
-    return {
-        pendingRequestIds: scopedRequests.map((request) => request.d),
-        results,
-    };
+const getJson = async <T>(client: SignifyClient, path: string): Promise<T> => {
+    const response = await client.fetch(path, 'GET', null);
+    return (await response.json()) as T;
 };
 
-const validateW3CProjectionRequestPresenter = (
-    request: W3CSigningRequest,
-    presenterAid: string
-): void => {
-    if (request.aid !== presenterAid) {
-        throw new Error(
-            `W3C signing request ${request.d} targets ${request.aid}, but Present is using ${presenterAid}.`
-        );
-    }
+const postJson = async <T>(
+    client: SignifyClient,
+    path: string,
+    body: Record<string, unknown>
+): Promise<T> => {
+    const response = await client.fetch(path, 'POST', body);
+    return (await response.json()) as T;
 };
-
-/**
- * Load the verifier allowlist exposed by KERIA.
- */
-export function* listW3CVerifiersService({
-    client,
-}: {
-    client: SignifyClient;
-}): EffectionOperation<W3CVerifier[]> {
-    return yield* callPromise(() => client.w3c().verifiers());
-}
 
 /**
  * Load issued and held credentials for local AIDs and project them into
