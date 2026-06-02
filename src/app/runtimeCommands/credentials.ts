@@ -5,13 +5,17 @@ import type {
     IssueSediCredentialInput,
     PresentCredentialInput,
     ResolveCredentialSchemaInput,
+    StartW3CIssuanceInput,
 } from '../../domain/credentials/credentialCommands';
 import type {
     CredentialSummaryRecord,
     RegistryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
-import type { W3CPresentTxView } from '../../services/credentials.service';
+import type {
+    W3CIssuanceView,
+    W3CPresentTxView,
+} from '../../services/credentials.service';
 import {
     admitCredentialGrantOp,
     createCredentialRegistryOp,
@@ -19,6 +23,7 @@ import {
     issueSediCredentialOp,
     presentCredentialOp,
     resolveCredentialSchemaOp,
+    startW3CIssuanceOp,
     syncCredentialInventoryOp,
     syncCredentialIpexActivityOp,
     syncCredentialRegistriesOp,
@@ -55,6 +60,10 @@ export interface CredentialRuntimeCommands {
         input: GrantCredentialInput,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
+    startW3CIssuance(
+        input: StartW3CIssuanceInput,
+        options?: RequestIdOptions
+    ): BackgroundWorkflowStartResult;
     startAdmit(
         input: AdmitCredentialGrantInput,
         options?: RequestIdOptions
@@ -79,6 +88,7 @@ export const createCredentialRuntimeCommands = (
     startCreateRegistry: startCreateCredentialRegistry(context),
     startIssue: startIssueCredential(context),
     startGrant: startGrantCredential(context),
+    startW3CIssuance: startW3CIssuance(context),
     startAdmit: startAdmitCredentialGrant(context),
     startPresent: startPresentCredential(context),
 });
@@ -165,6 +175,17 @@ const startGrantCredential =
         context.startBackgroundWorkflow(
             () => grantCredentialOp(input),
             grantCredentialOptions(input, options)
+        );
+
+const startW3CIssuance =
+    (context: RuntimeCommandContext) =>
+    (
+        input: StartW3CIssuanceInput,
+        options: RequestIdOptions = {}
+    ): BackgroundWorkflowStartResult =>
+        context.startBackgroundWorkflow(
+            () => startW3CIssuanceOp(input),
+            w3cIssuanceOptions(input, options)
         );
 
 const startAdmitCredentialGrant =
@@ -283,6 +304,30 @@ const grantCredentialOptions = (
     failureNotification: {
         title: 'Credential grant failed',
         message: 'The credential grant could not be sent.',
+        severity: 'error',
+    },
+});
+
+const w3cIssuanceOptions = (
+    input: StartW3CIssuanceInput,
+    options: RequestIdOptions
+): BackgroundWorkflowRunOptions<W3CIssuanceView> => ({
+    requestId: options.requestId,
+    label: `Starting W3C issuance for ${input.credentialSaid}`,
+    title: 'Start W3C issuance',
+    description:
+        'Starts QVI-side W3C VC-JWT issuance for a native VRD credential.',
+    kind: 'w3cIssuance',
+    resourceKeys: [`credential:${input.credentialSaid}:w3c-issue`],
+    resultRoute: credentialsRoute,
+    successNotification: {
+        title: 'W3C VRD issued',
+        message: 'The W3C VC-JWT was issued from the native VRD credential.',
+        severity: 'success',
+    },
+    failureNotification: {
+        title: 'W3C issuance failed',
+        message: 'The W3C VRD could not be issued.',
         severity: 'error',
     },
 });

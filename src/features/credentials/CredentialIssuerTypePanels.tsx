@@ -41,7 +41,9 @@ import type { CredentialRegistryTile } from './credentialViewModels';
 import { statusTone } from './credentialDisplay';
 import { CredentialRecordRows } from './CredentialShared';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
+import { CredentialW3CIssuanceControls } from './CredentialW3CIssuanceControls';
 import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
+import type { CredentialActionData } from '../../app/routeData';
 
 /**
  * Registry selection and creation controls for issuer credential-type routes.
@@ -356,7 +358,9 @@ export const IssuedCredentialsForTypePanel = ({
     didWebsReadyByAid,
     verifiers,
     selectedVerifierId,
+    issuanceAction,
     onGrant,
+    onStartW3CIssuance,
     onVerifierChange,
     onPresent,
 }: {
@@ -368,7 +372,12 @@ export const IssuedCredentialsForTypePanel = ({
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
     verifiers: readonly unknown[];
     selectedVerifierId: string;
+    issuanceAction?: CredentialActionData | null;
     onGrant: (credential: CredentialSummaryRecord) => void;
+    onStartW3CIssuance: (
+        credential: CredentialSummaryRecord,
+        issuer: IdentifierSummary
+    ) => void;
     onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
@@ -437,6 +446,14 @@ export const IssuedCredentialsForTypePanel = ({
                                     credentialTypesBySchema
                                 }
                                 schemasBySaid={schemasBySaid}
+                            />
+                            <CredentialW3CIssuanceControls
+                                credential={credential}
+                                identifiers={identifiers}
+                                didWebsReadyByAid={didWebsReadyByAid}
+                                actionRunning={actionRunning}
+                                issuanceAction={issuanceAction}
+                                onStartIssuance={onStartW3CIssuance}
                             />
                             <CredentialW3CPresentationControls
                                 credential={credential}

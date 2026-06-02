@@ -193,6 +193,7 @@ export type CredentialActionData =
               | 'createRegistry'
               | 'issueCredential'
               | 'grantCredential'
+              | 'startW3CIssuance'
               | 'admitCredentialGrant'
               | 'presentCredential'
               | 'refreshCredentials';
@@ -207,6 +208,7 @@ export type CredentialActionData =
               | 'createRegistry'
               | 'issueCredential'
               | 'grantCredential'
+              | 'startW3CIssuance'
               | 'admitCredentialGrant'
               | 'presentCredential'
               | 'refreshCredentials'

@@ -76,6 +76,10 @@ const intentLabel = (intent: string): string | null => {
         return 'Granting credential...';
     }
 
+    if (intent === 'startW3CIssuance') {
+        return 'Starting W3C issuance...';
+    }
+
     if (intent === 'admit') {
         return 'Admitting credential...';
     }

@@ -47,8 +47,8 @@ importers:
                 specifier: ^7.14.2
                 version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
             signify-ts:
-                specifier: git+https://github.com/kentbull/signify-ts.git#5e5125e6e2bfb5329f81c0bff0d22551b1333f8d
-                version: https://codeload.github.com/kentbull/signify-ts/tar.gz/5e5125e6e2bfb5329f81c0bff0d22551b1333f8d
+                specifier: git+https://github.com/kentbull/signify-ts.git#d42957c70cb1e0b17273ec02e32e5a6abac61c92
+                version: https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92
         devDependencies:
             '@eslint/js':
                 specifier: ^10.0.1
@@ -3070,12 +3070,12 @@ packages:
                 integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==,
             }
 
-    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/5e5125e6e2bfb5329f81c0bff0d22551b1333f8d:
+    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92:
         resolution:
             {
                 gitHosted: true,
-                integrity: sha512-a/LmSDkp/+Woi8uAZ9/JAUAzET18ysAbLjbq14DL8a4OuO6jqn9pYOTu2nP2IOx7uNtBLhdT9RonusZ/e6UwLg==,
-                tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/5e5125e6e2bfb5329f81c0bff0d22551b1333f8d,
+                integrity: sha512-gm38lGkGT8qzyAa4Pl5ylxqLmG97KHx3GJc5jRSCeSKGYmxo8RvZRiZsodWyUM+mUbfZjHxabV0yOOcyK+vGaw==,
+                tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92,
             }
         version: 0.4.0
 
@@ -5306,7 +5306,7 @@ snapshots:
 
     siginfo@2.0.0: {}
 
-    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/5e5125e6e2bfb5329f81c0bff0d22551b1333f8d:
+    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92:
         dependencies:
             '@noble/curves': 1.9.7
             '@noble/hashes': 1.8.0

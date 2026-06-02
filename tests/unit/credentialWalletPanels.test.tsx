@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialWalletPanels';
+import { CredentialW3CIssuanceControls } from '../../src/features/credentials/CredentialW3CIssuanceControls';
 import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
 import { IssuedCredentialsForTypePanel } from '../../src/features/credentials/CredentialIssuerTypePanels';
 import {
+    selectCredentialW3CIssuer,
     selectCredentialW3CPresenter,
     W3C_PRESENTABLE_VRD_SCHEMA_SAID,
 } from '../../src/domain/credentials/credentialPresentation';
@@ -45,12 +47,15 @@ const schema = {
 } satisfies SchemaRecord;
 
 describe('wallet credential panels', () => {
-    it('prefers holder presenters for held credentials and issuer presenters for issued credentials', () => {
+    it('selects the correct local W3C issuer and presenter roles', () => {
         const identifiers = [
             { name: 'issuer', prefix: 'Eissuer' },
             { name: 'holder', prefix: 'Eholder' },
         ];
 
+        expect(selectCredentialW3CIssuer(credential, identifiers)?.prefix).toBe(
+            'Eissuer'
+        );
         expect(
             selectCredentialW3CPresenter(credential, identifiers)?.prefix
         ).toBe('Eholder');
@@ -180,6 +185,48 @@ describe('wallet credential panels', () => {
         );
     });
 
+    it('renders a ready issuer-side W3C issuance fallback for issued VRD credentials', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CIssuanceControls
+                credential={{
+                    ...credential,
+                    direction: 'issued',
+                    status: 'issued',
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', true]])}
+                actionRunning={false}
+                onStartIssuance={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Start W3C issuance');
+        expect(markup).toContain(
+            'Ready to start QVI-side W3C VC-JWT issuance from this native VRD.'
+        );
+    });
+
+    it('blocks W3C issuance fallback outside the local issuer role', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CIssuanceControls
+                credential={{
+                    ...credential,
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
+                didWebsReadyByAid={new Map([['Eholder', true]])}
+                actionRunning={false}
+                onStartIssuance={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Start W3C issuance');
+        expect(markup).toContain(
+            'Only issuer-side VRD credentials can start W3C issuance.'
+        );
+    });
+
     it('renders W3C Present controls alongside issuer IPEX Grant controls', () => {
         const markup = renderToStaticMarkup(
             <IssuedCredentialsForTypePanel
@@ -216,12 +263,14 @@ describe('wallet credential panels', () => {
                 ]}
                 selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 onGrant={vi.fn()}
+                onStartW3CIssuance={vi.fn()}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
         expect(markup).toContain('Grant');
+        expect(markup).toContain('Start W3C issuance');
         expect(markup).toContain('Present');
         expect(markup).toContain('Verifier request');
     });

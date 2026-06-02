@@ -11,6 +11,8 @@ import {
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
     presentCredentialService,
+    startW3CIssuanceService,
+    type W3CIssuanceView,
     type W3CPresentTxView,
     resolveCredentialSchemaService,
 } from '../services/credentials.service';
@@ -38,6 +40,7 @@ import type {
     IssueSediCredentialInput,
     PresentCredentialInput,
     ResolveCredentialSchemaInput,
+    StartW3CIssuanceInput,
 } from '../domain/credentials/credentialCommands';
 import { localIdentifierAids, syncSessionInventoryOp } from './contacts.op';
 
@@ -48,6 +51,7 @@ export type {
     IssueSediCredentialInput,
     PresentCredentialInput,
     ResolveCredentialSchemaInput,
+    StartW3CIssuanceInput,
 } from '../domain/credentials/credentialCommands';
 
 /**
@@ -220,6 +224,22 @@ export function* admitCredentialGrantOp(
     yield* syncCredentialInventoryOp();
     yield* syncSessionInventoryOp();
     return credential;
+}
+
+/**
+ * Workflow for QVI-side W3C VRD issuance from a native VRD credential.
+ */
+export function* startW3CIssuanceOp(
+    input: StartW3CIssuanceInput
+): EffectionOperation<W3CIssuanceView> {
+    const services = yield* AppServicesContext.expect();
+    return yield* startW3CIssuanceService({
+        client: services.runtime.requireConnectedClient(),
+        issuerAlias: input.issuerAlias,
+        issuerAid: input.issuerAid,
+        credentialSaid: input.credentialSaid,
+        timeoutMs: services.config.operations.timeoutMs,
+    });
 }
 
 /**

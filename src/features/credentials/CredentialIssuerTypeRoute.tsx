@@ -67,6 +67,7 @@ const defaultDraft: SediVoterIssueFormDraft = {
 export const CredentialIssuerTypeRoute = () => {
     const {
         actionRunning,
+        actionStatus,
         selectedIdentifier,
         identifiers,
         submitResolveSchema,
@@ -288,6 +289,18 @@ export const CredentialIssuerTypeRoute = () => {
         submitCredentialForm(formData);
     };
 
+    const submitStartW3CIssuance = (
+        credential: CredentialSummaryRecord,
+        issuer: IdentifierSummary
+    ) => {
+        const formData = new FormData();
+        formData.set('intent', 'startW3CIssuance');
+        formData.set('issuerAlias', issuer.name);
+        formData.set('issuerAid', issuer.prefix);
+        formData.set('credentialSaid', credential.said);
+        submitCredentialForm(formData);
+    };
+
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
@@ -428,7 +441,15 @@ export const CredentialIssuerTypeRoute = () => {
                 didWebsReadyByAid={didWebsReadyByAid}
                 verifiers={w3cVerifiers}
                 selectedVerifierId={effectiveVerifierId}
+                issuanceAction={
+                    actionStatus !== null &&
+                    'intent' in actionStatus &&
+                    actionStatus.intent === 'startW3CIssuance'
+                        ? actionStatus
+                        : null
+                }
                 onGrant={submitGrant}
+                onStartW3CIssuance={submitStartW3CIssuance}
                 onVerifierChange={setSelectedVerifierId}
                 onPresent={submitPresent}
             />
