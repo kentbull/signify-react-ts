@@ -1,14 +1,10 @@
 import {
     Button,
-    FormControl,
-    InputLabel,
-    MenuItem,
-    Select,
     Stack,
+    TextField,
     Typography,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-import type { W3CVerifier } from 'signify-ts';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import {
     isW3CPresentableVrdCredential,
@@ -21,45 +17,63 @@ interface CredentialW3CPresentationControlsProps {
     credential: CredentialSummaryRecord;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers: readonly W3CVerifier[];
+    verifiers?: readonly unknown[];
     selectedVerifierId: string;
     actionRunning: boolean;
-    onVerifierChange: (verifierId: string) => void;
+    onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => void;
 }
 
 const controlId = (credentialSaid: string): string =>
-    `w3c-verifier-${credentialSaid.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    `w3c-verifier-request-${credentialSaid.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+
+const defaultVerifierRequestJson = (credentialSaid: string): string =>
+    JSON.stringify(
+        {
+            aud: 'https://verifier.example',
+            nonce: `nonce-${credentialSaid.slice(0, 12)}`,
+            response_uri: 'https://verifier.example/verify',
+            formats: ['vp+jwt'],
+        },
+        null,
+        2
+    );
+
+const parseVerifierRequest = (value: string): Record<string, unknown> | null => {
+    try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+    } catch {
+        return null;
+    }
+};
 
 /**
  * Shared W3C presentation controls for admitted VRD credentials.
  *
- * KERIA's current W3C endpoint owns the combined projection plus verifier
- * submission workflow. This component keeps the user-facing command named
- * "Present" while surfacing every prerequisite that can block that workflow.
+ * KERIA owns the presentation transaction and verifier submission workflow.
+ * This component accepts a runtime verifier request descriptor instead of a
+ * deployment-time verifier allowlist entry.
  */
 export const CredentialW3CPresentationControls = ({
     credential,
     identifiers,
     didWebsReadyByAid,
-    verifiers,
     selectedVerifierId,
     actionRunning,
     onVerifierChange,
     onPresent,
 }: CredentialW3CPresentationControlsProps) => {
     const presenter = selectCredentialW3CPresenter(credential, identifiers);
-    const effectiveVerifierId =
-        verifiers.find((verifier) => verifier.id === selectedVerifierId)?.id ??
-        verifiers[0]?.id ??
-        '';
-    const selectedVerifier =
-        verifiers.find((verifier) => verifier.id === effectiveVerifierId) ??
-        null;
+    const effectiveVerifierRequestJson =
+        selectedVerifierId || defaultVerifierRequestJson(credential.said);
+    const verifierRequest = parseVerifierRequest(effectiveVerifierRequestJson);
     const verifierLabelId = controlId(credential.said);
     const schemaSupported = isW3CPresentableVrdCredential(credential);
     const statusPresentable =
@@ -76,15 +90,13 @@ export const CredentialW3CPresentationControls = ({
               ? 'Only supported VRD credentials can be presented through W3C.'
               : presenter === null
                 ? 'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
-                : verifiers.length === 0
-                    ? 'No W3C verifier is configured.'
-                    : effectiveVerifierId.length === 0
-                      ? 'Select a W3C verifier.'
-                      : !didWebsReady
-                        ? 'The presenter did:webs DID is not ready.'
-                        : actionRunning
-                          ? 'A credential command is already running.'
-                          : null;
+                : verifierRequest === null
+                  ? 'Enter a valid runtime verifier request JSON object.'
+                  : !didWebsReady
+                    ? 'The presenter did:webs DID is not ready.'
+                    : actionRunning
+                      ? 'A credential command is already running.'
+                      : null;
 
     return (
         <Stack
@@ -98,34 +110,17 @@ export const CredentialW3CPresentationControls = ({
                 spacing={1}
                 sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}
             >
-                <FormControl
+                <TextField
+                    id={verifierLabelId}
+                    label="Verifier request"
                     size="small"
-                    disabled={actionRunning || verifiers.length === 0}
-                    sx={{ minWidth: 220 }}
-                >
-                    <InputLabel id={verifierLabelId}>Verifier</InputLabel>
-                    <Select
-                        labelId={verifierLabelId}
-                        label="Verifier"
-                        value={effectiveVerifierId}
-                        onChange={(event) =>
-                            onVerifierChange(event.target.value)
-                        }
-                    >
-                        {verifiers.length === 0 ? (
-                            <MenuItem value="">No verifiers</MenuItem>
-                        ) : (
-                            verifiers.map((verifier) => (
-                                <MenuItem
-                                    key={verifier.id}
-                                    value={verifier.id}
-                                >
-                                    {verifier.label}
-                                </MenuItem>
-                            ))
-                        )}
-                    </Select>
-                </FormControl>
+                    value={effectiveVerifierRequestJson}
+                    onChange={(event) => onVerifierChange(event.target.value)}
+                    disabled={actionRunning}
+                    multiline
+                    minRows={3}
+                    sx={{ minWidth: { xs: '100%', sm: 320 } }}
+                />
                 <Button
                     variant="outlined"
                     startIcon={<SendIcon />}
@@ -135,12 +130,12 @@ export const CredentialW3CPresentationControls = ({
                         if (
                             blocker === null &&
                             presenter !== null &&
-                            effectiveVerifierId.length > 0
+                            verifierRequest !== null
                         ) {
                             onPresent(
                                 credential,
                                 presenter,
-                                effectiveVerifierId
+                                effectiveVerifierRequestJson
                             );
                         }
                     }}
@@ -154,7 +149,7 @@ export const CredentialW3CPresentationControls = ({
                 sx={{ overflowWrap: 'anywhere' }}
             >
                 {blocker ??
-                    `Ready to present to ${selectedVerifier?.label ?? 'selected verifier'}.`}
+                    'Ready to create a KERIA W3C presentation transaction from this verifier request.'}
             </Typography>
         </Stack>
     );

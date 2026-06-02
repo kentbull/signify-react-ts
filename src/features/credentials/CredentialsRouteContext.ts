@@ -2,7 +2,6 @@ import { useOutletContext } from 'react-router-dom';
 import type { CredentialActionData } from '../../app/routeData';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
-import type { W3CVerifier } from 'signify-ts';
 
 export interface CredentialsRouteContextValue {
     actionRunning: boolean;
@@ -10,7 +9,7 @@ export interface CredentialsRouteContextValue {
     selectedAid: string;
     selectedIdentifier: IdentifierSummary | null;
     identifiers: readonly IdentifierSummary[];
-    w3cVerifiers: readonly W3CVerifier[];
+    w3cVerifiers: readonly unknown[];
     navigateToAid: (aid: string) => void;
     submitRefresh: () => void;
     submitResolveSchema: (credentialType: IssueableCredentialTypeView) => void;

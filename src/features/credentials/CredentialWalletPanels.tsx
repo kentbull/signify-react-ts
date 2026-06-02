@@ -16,7 +16,6 @@ import type {
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
-import type { W3CVerifier } from 'signify-ts';
 import type { CredentialWalletStats } from './credentialViewModels';
 import { schemaLabel, schemaStatusTone, statusTone } from './credentialDisplay';
 import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
@@ -283,15 +282,15 @@ export const HeldCredentialsPanel = ({
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers: readonly W3CVerifier[];
+    verifiers: readonly unknown[];
     selectedVerifierId: string;
     actionRunning: boolean;
     onOpenCredential: (credentialSaid: string) => void;
-    onVerifierChange: (verifierId: string) => void;
+    onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
-        verifierId: string
+        verifierRequestJson: string
     ) => void;
 }) => (
     <ConsolePanel title="Held credentials">

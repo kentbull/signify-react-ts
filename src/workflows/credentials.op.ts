@@ -10,8 +10,8 @@ import {
     listCredentialInventoryService,
     listCredentialRegistriesService,
     listKnownCredentialSchemasService,
-    listW3CVerifiersService,
     presentCredentialService,
+    type W3CPresentTxView,
     resolveCredentialSchemaService,
 } from '../services/credentials.service';
 import {
@@ -30,7 +30,6 @@ import type {
     RegistryRecord,
     SchemaRecord,
 } from '../domain/credentials/credentialTypes';
-import type { W3CProjectionSession, W3CVerifier } from 'signify-ts';
 import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
 import type {
     AdmitCredentialGrantInput,
@@ -228,14 +227,14 @@ export function* admitCredentialGrantOp(
  */
 export function* presentCredentialOp(
     input: PresentCredentialInput
-): EffectionOperation<W3CProjectionSession> {
+): EffectionOperation<W3CPresentTxView> {
     const services = yield* AppServicesContext.expect();
     return yield* presentCredentialService({
         client: services.runtime.requireConnectedClient(),
         presenterAlias: input.presenterAlias,
         presenterAid: input.presenterAid,
         credentialSaid: input.credentialSaid,
-        verifierId: input.verifierId,
+        verifierRequest: input.verifierRequest,
         timeoutMs: services.config.operations.timeoutMs,
     });
 }
@@ -343,18 +342,4 @@ export function* syncKnownCredentialSchemasOp(): EffectionOperation<
     }
 
     return schemas;
-}
-
-/**
- * Load KERIA's configured short-lived W3C verifier allowlist.
- */
-export function* listW3CVerifiersOp(): EffectionOperation<W3CVerifier[]> {
-    const services = yield* AppServicesContext.expect();
-    try {
-        return yield* listW3CVerifiersService({
-            client: services.runtime.requireConnectedClient(),
-        });
-    } catch {
-        return [];
-    }
 }
