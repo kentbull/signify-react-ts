@@ -43,7 +43,7 @@
         "react-dom": "^19.2.5",
         "react-redux": "^9.2.0",
         "react-router-dom": "^7.14.2",
-        "signify-ts": "git+https://github.com/kentbull/signify-ts.git#d42957c70cb1e0b17273ec02e32e5a6abac61c92"
+        "signify-ts": "github:kentbull/signify-ts#4857945"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

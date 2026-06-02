@@ -47,8 +47,8 @@ importers:
                 specifier: ^7.14.2
                 version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
             signify-ts:
-                specifier: git+https://github.com/kentbull/signify-ts.git#d42957c70cb1e0b17273ec02e32e5a6abac61c92
-                version: https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92
+                specifier: github:kentbull/signify-ts#4857945
+                version: https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18
         devDependencies:
             '@eslint/js':
                 specifier: ^10.0.1
@@ -3070,12 +3070,11 @@ packages:
                 integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==,
             }
 
-    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92:
+    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18:
         resolution:
             {
                 gitHosted: true,
-                integrity: sha512-gm38lGkGT8qzyAa4Pl5ylxqLmG97KHx3GJc5jRSCeSKGYmxo8RvZRiZsodWyUM+mUbfZjHxabV0yOOcyK+vGaw==,
-                tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92,
+                tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18,
             }
         version: 0.4.0
 
@@ -5306,7 +5305,7 @@ snapshots:
 
     siginfo@2.0.0: {}
 
-    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/d42957c70cb1e0b17273ec02e32e5a6abac61c92:
+    signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18:
         dependencies:
             '@noble/curves': 1.9.7
             '@noble/hashes': 1.8.0
