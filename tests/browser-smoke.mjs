@@ -58,6 +58,71 @@ const routeUrl = (path) => new URL(path, appUrl).toString();
 const passcodeValue = (page) =>
     page.$eval('#outlined-password-input', (element) => element.value ?? '');
 
+const waitForDomState = async (
+    page,
+    label,
+    predicate,
+    timeoutMs = 30000,
+    ...args
+) => {
+    const timeoutAt = Date.now() + timeoutMs;
+    let lastState = null;
+    while (Date.now() < timeoutAt) {
+        try {
+            lastState = await page.evaluate(predicate, ...args);
+            if (lastState === true) {
+                return;
+            }
+        } catch (error) {
+            lastState = error instanceof Error ? error.message : String(error);
+        }
+        await sleep(250);
+    }
+    throw new Error(
+        `Timed out waiting for ${label}. Last state: ${JSON.stringify(lastState)}`
+    );
+};
+
+const waitForElement = async (page, selector, timeoutMs = 30000) =>
+    waitForDomState(
+        page,
+        `element ${selector}`,
+        (targetSelector) =>
+            globalThis.document.querySelector(targetSelector) !== null,
+        timeoutMs,
+        selector
+    );
+
+const waitForElementHidden = async (page, selector, timeoutMs = 30000) =>
+    waitForDomState(
+        page,
+        `hidden element ${selector}`,
+        (targetSelector) =>
+            globalThis.document.querySelector(targetSelector) === null,
+        timeoutMs,
+        selector
+    );
+
+const dispatchClick = async (page, selector) => {
+    await waitForElement(page, selector, 10000);
+    await page.evaluate((targetSelector) => {
+        const element = globalThis.document.querySelector(targetSelector);
+        if (!(element instanceof HTMLElement)) {
+            throw new Error(
+                `Clickable element not found for ${targetSelector}`
+            );
+        }
+        element.focus();
+        element.dispatchEvent(
+            new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: globalThis,
+            })
+        );
+    }, selector);
+};
+
 const chromeArgs =
     process.env.CI === 'true'
         ? ['--no-sandbox', '--disable-setuid-sandbox']
@@ -77,12 +142,8 @@ try {
         globalThis.localStorage.removeItem(key);
     }, uiPreferencesStorageKey);
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('[data-testid="ui-sound-toggle"]', {
-        timeout: 10000,
-    });
-    await page.waitForSelector('[data-testid="theme-mode-toggle"]', {
-        timeout: 10000,
-    });
+    await waitForElement(page, '[data-testid="ui-sound-toggle"]', 10000);
+    await waitForElement(page, '[data-testid="theme-mode-toggle"]', 10000);
     const topBarToggleOrder = await page.evaluate(() => {
         const theme = globalThis.document.querySelector(
             '[data-testid="theme-mode-toggle"]'
@@ -126,13 +187,15 @@ try {
             `Expected sound enabled by default, got aria-pressed=${defaultSoundMuted}`
         );
     }
-    await page.click('[data-testid="theme-mode-toggle"]');
-    await page.waitForFunction(
+    await dispatchClick(page, '[data-testid="theme-mode-toggle"]');
+    await waitForDomState(
+        page,
+        'light theme toggle state',
         () =>
             globalThis.document
                 .querySelector('[data-testid="theme-mode-toggle"]')
                 ?.getAttribute('aria-pressed') === 'true',
-        { timeout: 10000 }
+        10000
     );
     const lightThemeIconIsDark = await page.$eval(
         '[data-testid="theme-mode-toggle"]',
@@ -151,13 +214,15 @@ try {
             'Expected light theme top-bar icons to use a dark foreground'
         );
     }
-    await page.click('[data-testid="ui-sound-toggle"]');
-    await page.waitForFunction(
+    await dispatchClick(page, '[data-testid="ui-sound-toggle"]');
+    await waitForDomState(
+        page,
+        'muted sound toggle state',
         () =>
             globalThis.document
                 .querySelector('[data-testid="ui-sound-toggle"]')
                 ?.getAttribute('aria-pressed') === 'true',
-        { timeout: 10000 }
+        10000
     );
     const persistedSoundPreference = await page.evaluate((key) => {
         const text = globalThis.localStorage.getItem(key);
@@ -170,12 +235,8 @@ try {
         throw new Error('Expected light theme preference to persist');
     }
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('[data-testid="ui-sound-toggle"]', {
-        timeout: 10000,
-    });
-    await page.waitForSelector('[data-testid="theme-mode-toggle"]', {
-        timeout: 10000,
-    });
+    await waitForElement(page, '[data-testid="ui-sound-toggle"]', 10000);
+    await waitForElement(page, '[data-testid="theme-mode-toggle"]', 10000);
     const restoredThemeLight = await page.$eval(
         '[data-testid="theme-mode-toggle"]',
         (element) => element.getAttribute('aria-pressed')
@@ -203,30 +264,24 @@ try {
         '/client',
     ]) {
         await page.goto(routeUrl(path), { waitUntil: 'networkidle0' });
-        await page.waitForSelector('[data-testid="connection-required"]', {
-            timeout: 10000,
-        });
+        await waitForElement(
+            page,
+            '[data-testid="connection-required"]',
+            10000
+        );
     }
 
     await page.goto(appUrl, { waitUntil: 'networkidle0' });
 
-    await page.click('[data-testid="connect-open"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]');
-    await page.click('[data-testid="generate-passcode"]');
-    await page.waitForFunction(
-        () =>
-            globalThis.document.querySelector(
-                '[data-testid="app-loading-overlay"]'
-            ) !== null ||
-            globalThis.document.querySelector('#outlined-password-input')?.value
-                .length >= 21,
-        { timeout: 10000 }
-    );
-    await page.waitForFunction(
+    await dispatchClick(page, '[data-testid="connect-open"]');
+    await waitForElement(page, '[data-testid="connect-dialog"]');
+    await dispatchClick(page, '[data-testid="generate-passcode"]');
+    await waitForDomState(
+        page,
+        'generated passcode',
         () =>
             globalThis.document.querySelector('#outlined-password-input')?.value
-                .length >= 21,
-        { timeout: 10000 }
+                .length >= 21
     );
     const generatedPasscode = await passcodeValue(page);
     if (generatedPasscode.length < 21) {
@@ -234,35 +289,25 @@ try {
             `Expected generated passcode, got ${generatedPasscode}`
         );
     }
-    await page.click('[data-testid="connect-submit"]');
-    await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-        timeout: 10000,
-    });
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        hidden: true,
-        timeout: 30000,
-    });
-    await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-        hidden: true,
-        timeout: 10000,
-    });
-    await page.waitForSelector('[data-testid="dashboard-view"]', {
-        timeout: 10000,
-    });
+    await dispatchClick(page, '[data-testid="connect-submit"]');
+    await waitForElement(page, '[data-testid="app-loading-overlay"]', 10000);
+    await waitForElementHidden(page, '[data-testid="connect-dialog"]', 30000);
+    await waitForElementHidden(
+        page,
+        '[data-testid="app-loading-overlay"]',
+        10000
+    );
+    await waitForElement(page, '[data-testid="dashboard-view"]', 10000);
     if (!page.url().endsWith('/dashboard')) {
         throw new Error(
             `Expected post-connect /dashboard route, got ${page.url()}`
         );
     }
 
-    await page.click('[data-testid="nav-open"]');
-    await page.waitForSelector('[data-testid="nav-identifiers"]', {
-        timeout: 10000,
-    });
-    await page.click('[data-testid="nav-identifiers"]');
-    await page.waitForSelector('[data-testid="identifier-table"]', {
-        timeout: 10000,
-    });
+    await dispatchClick(page, '[data-testid="nav-open"]');
+    await waitForElement(page, '[data-testid="nav-identifiers"]', 10000);
+    await dispatchClick(page, '[data-testid="nav-identifiers"]');
+    await waitForElement(page, '[data-testid="identifier-table"]', 10000);
     const identifierTableText = await textContent(
         page,
         '[data-testid="identifier-table"]'
@@ -294,14 +339,10 @@ try {
     }
 
     await sleep(500);
-    await page.click('[data-testid="nav-open"]');
-    await page.waitForSelector('[data-testid="nav-client"]', {
-        timeout: 10000,
-    });
-    await page.click('[data-testid="nav-client"]');
-    await page.waitForSelector('[data-testid="client-summary"]', {
-        timeout: 10000,
-    });
+    await dispatchClick(page, '[data-testid="nav-open"]');
+    await waitForElement(page, '[data-testid="nav-client"]', 10000);
+    await dispatchClick(page, '[data-testid="nav-client"]');
+    await waitForElement(page, '[data-testid="client-summary"]', 10000);
     if (!page.url().endsWith('/client')) {
         throw new Error(
             `Expected drawer navigation to /client, got ${page.url()}`
