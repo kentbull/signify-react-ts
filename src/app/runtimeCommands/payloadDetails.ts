@@ -177,6 +177,75 @@ export const delegationPayloadDetails = (
 };
 
 /**
+ * Extract KERIA W3C presentation transaction ids from workflow results.
+ */
+export const w3cPresentationPayloadDetails = (
+    result: unknown
+): PayloadDetailRecord[] => {
+    if (!isRecord(result)) {
+        return [];
+    }
+
+    const details: PayloadDetailRecord[] = [];
+    const presentTxId = stringValue(result.presentTxId);
+    const state = stringValue(result.state);
+    const submissionState = stringValue(result.submissionState);
+    const submissionEndpoint = stringValue(result.submissionEndpoint);
+    const verifierResponse = isRecord(result.verifierResponse)
+        ? result.verifierResponse
+        : null;
+    const verifierOperation = stringValue(verifierResponse?.name);
+
+    if (presentTxId !== null) {
+        details.push({
+            id: detailId('w3c-present-tx', details.length),
+            label: 'Present Tx',
+            value: presentTxId,
+            kind: 'text',
+            copyable: true,
+        });
+    }
+    if (state !== null) {
+        details.push({
+            id: detailId('w3c-present-state', details.length),
+            label: 'Present State',
+            value: state,
+            kind: 'text',
+            copyable: false,
+        });
+    }
+    if (submissionState !== null) {
+        details.push({
+            id: detailId('w3c-submission-state', details.length),
+            label: 'Submission State',
+            value: submissionState,
+            kind: 'text',
+            copyable: false,
+        });
+    }
+    if (verifierOperation !== null) {
+        details.push({
+            id: detailId('w3c-verifier-operation', details.length),
+            label: 'Verifier Operation',
+            value: verifierOperation,
+            kind: 'text',
+            copyable: true,
+        });
+    }
+    if (submissionEndpoint !== null) {
+        details.push({
+            id: detailId('w3c-submission-endpoint', details.length),
+            label: 'Submission Endpoint',
+            value: submissionEndpoint,
+            kind: 'url',
+            copyable: true,
+        });
+    }
+
+    return dedupeDetails(details);
+};
+
+/**
  * Compose runtime payload extractors without letting `AppRuntime` inspect
  * domain-specific workflow result shapes.
  */
@@ -187,6 +256,7 @@ export const combinedPayloadDetails = (
     dedupeDetails([
         ...oobiPayloadDetails(result),
         ...delegationPayloadDetails(result, state),
+        ...w3cPresentationPayloadDetails(result),
     ]);
 
 const dedupeDetails = (

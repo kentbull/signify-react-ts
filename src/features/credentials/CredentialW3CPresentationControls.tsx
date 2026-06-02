@@ -1,9 +1,4 @@
-import {
-    Button,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Button, Stack, TextField, Typography } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import {
@@ -12,6 +7,7 @@ import {
 } from '../../domain/credentials/credentialPresentation';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
+import type { CredentialActionData } from '../../app/routeData';
 
 interface CredentialW3CPresentationControlsProps {
     credential: CredentialSummaryRecord;
@@ -20,6 +16,7 @@ interface CredentialW3CPresentationControlsProps {
     verifiers?: readonly unknown[];
     selectedVerifierId: string;
     actionRunning: boolean;
+    presentationAction?: CredentialActionData | null;
     onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
@@ -43,10 +40,14 @@ const defaultVerifierRequestJson = (credentialSaid: string): string =>
         2
     );
 
-const parseVerifierRequest = (value: string): Record<string, unknown> | null => {
+const parseVerifierRequest = (
+    value: string
+): Record<string, unknown> | null => {
     try {
         const parsed = JSON.parse(value);
-        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+        return typeof parsed === 'object' &&
+            parsed !== null &&
+            !Array.isArray(parsed)
             ? (parsed as Record<string, unknown>)
             : null;
     } catch {
@@ -67,6 +68,7 @@ export const CredentialW3CPresentationControls = ({
     didWebsReadyByAid,
     selectedVerifierId,
     actionRunning,
+    presentationAction = null,
     onVerifierChange,
     onPresent,
 }: CredentialW3CPresentationControlsProps) => {
@@ -82,21 +84,24 @@ export const CredentialW3CPresentationControls = ({
         credential.status === 'grantSent';
     const didWebsReady =
         presenter !== null && didWebsReadyByAid.get(presenter.prefix) === true;
+    const presentationActionResult =
+        presentationAction?.intent === 'presentCredential'
+            ? presentationAction
+            : null;
 
-    const blocker =
-        !statusPresentable
-            ? `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`
-            : !schemaSupported
-              ? 'Only supported VRD credentials can be presented through W3C.'
-              : presenter === null
-                ? 'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
-                : verifierRequest === null
-                  ? 'Enter a valid runtime verifier request JSON object.'
-                  : !didWebsReady
-                    ? 'The presenter did:webs DID is not ready.'
-                    : actionRunning
-                      ? 'A credential command is already running.'
-                      : null;
+    const blocker = !statusPresentable
+        ? `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`
+        : !schemaSupported
+          ? 'Only supported VRD credentials can be presented through W3C.'
+          : presenter === null
+            ? 'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
+            : verifierRequest === null
+              ? 'Enter a valid runtime verifier request JSON object.'
+              : !didWebsReady
+                ? 'The presenter did:webs DID is not ready.'
+                : actionRunning
+                  ? 'A credential command is already running.'
+                  : null;
 
     return (
         <Stack
@@ -114,6 +119,7 @@ export const CredentialW3CPresentationControls = ({
                     id={verifierLabelId}
                     label="Verifier request"
                     size="small"
+                    data-testid="w3c-verifier-request-input"
                     value={effectiveVerifierRequestJson}
                     onChange={(event) => onVerifierChange(event.target.value)}
                     disabled={actionRunning}
@@ -125,6 +131,8 @@ export const CredentialW3CPresentationControls = ({
                     variant="outlined"
                     startIcon={<SendIcon />}
                     disabled={blocker !== null}
+                    data-testid="w3c-present-button"
+                    data-credential-said={credential.said}
                     data-ui-sound={UI_SOUND_HOVER_VALUE}
                     onClick={() => {
                         if (
@@ -144,6 +152,9 @@ export const CredentialW3CPresentationControls = ({
                 </Button>
             </Stack>
             <Typography
+                data-testid="w3c-presentation-status"
+                data-state={blocker === null ? 'ready' : 'blocked'}
+                data-presenter-aid={presenter?.prefix ?? ''}
                 variant="caption"
                 color={blocker === null ? 'text.secondary' : 'warning.main'}
                 sx={{ overflowWrap: 'anywhere' }}
@@ -151,6 +162,27 @@ export const CredentialW3CPresentationControls = ({
                 {blocker ??
                     'Ready to create a KERIA W3C presentation transaction from this verifier request.'}
             </Typography>
+            {presentationActionResult !== null && (
+                <Typography
+                    data-testid="w3c-presentation-action-result"
+                    data-state={
+                        presentationActionResult.ok ? 'accepted' : 'error'
+                    }
+                    data-request-id={presentationActionResult.requestId ?? ''}
+                    data-operation-route={
+                        presentationActionResult.operationRoute ?? ''
+                    }
+                    variant="caption"
+                    color={
+                        presentationActionResult.ok
+                            ? 'success.main'
+                            : 'error.main'
+                    }
+                    sx={{ overflowWrap: 'anywhere' }}
+                >
+                    {presentationActionResult.message}
+                </Typography>
+            )}
         </Stack>
     );
 };

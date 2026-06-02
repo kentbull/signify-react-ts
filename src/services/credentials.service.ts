@@ -53,6 +53,7 @@ import {
     SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
     SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS,
 } from '../domain/credentials/sediVoterId';
+import { recordW3CHolderPresentationApproval } from '../domain/credentials/w3cPresentationApprovals';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import { waitOperationService } from './signify.service';
 
@@ -67,6 +68,12 @@ const W3C_PRESENT_TX_FAILURE_STATES = new Set(['failed']);
 export interface W3CPresentTxView {
     presentTxId: string;
     state: string;
+    holderName?: string | null;
+    holderAid?: string | null;
+    selectedCredentialId?: string | null;
+    aud?: string | null;
+    nonce?: string | null;
+    expires?: string | null;
     signingRequestId?: string | null;
     vpJwt?: string | null;
     verifierResponse?: unknown;
@@ -175,9 +182,7 @@ export function* createCredentialRegistryService({
         'Registry name'
     );
 
-    const registries = yield* callPromise(() =>
-        client.registries().list(name)
-    );
+    const registries = yield* callPromise(() => client.registries().list(name));
     const existing =
         registries.find(
             (registry) =>
@@ -328,9 +333,7 @@ export function* issueSediCredentialService({
         throw new Error('Issued credential response did not include a SAID.');
     }
 
-    const credential = yield* callPromise(() =>
-        client.credentials().get(said)
-    );
+    const credential = yield* callPromise(() => client.credentials().get(said));
     return credentialRecordFromKeriaCredential({
         credential,
         credentialTypes: ISSUEABLE_CREDENTIAL_TYPES,
@@ -369,7 +372,9 @@ export function* grantIssuedCredentialService({
             recipient,
             acdc: new Serder(serderSad(credential.sad, 'Credential SAD')),
             anc: new Serder(serderSad(credential.anc, 'Credential anchor')),
-            iss: new Serder(serderSad(credential.iss, 'Credential issue event')),
+            iss: new Serder(
+                serderSad(credential.iss, 'Credential issue event')
+            ),
             ancAttachment: stringValue(credential.ancatc) ?? undefined,
             datetime: keriaTimestamp(),
         })
@@ -742,6 +747,9 @@ export function* presentCredentialService({
     const name = requireNonEmpty(presenterAlias, 'Presenter identifier');
     requireNonEmpty(presenterAid, 'Presenter AID');
     const said = requireNonEmpty(credentialSaid, 'Credential SAID');
+    if (Object.keys(verifierRequest).length === 0) {
+        throw new Error('Verifier request JSON is required.');
+    }
     const requestDescriptor = {
         ...verifierRequest,
         credentialSaid: said,
@@ -753,6 +761,14 @@ export function* presentCredentialService({
             requestDescriptor
         )
     );
+    recordPresentationApproval({
+        tx,
+        presenterAlias: name,
+        presenterAid,
+        credentialSaid: said,
+        verifierRequest: requestDescriptor,
+        timeoutMs,
+    });
     const timeoutAt = Date.now() + timeoutMs;
 
     let current = tx;
@@ -801,6 +817,42 @@ const presentTxTerminalError = (
         tx.error ??
             `W3C presentation transaction ${tx.presentTxId} ended as ${tx.state}.`
     );
+};
+
+const recordPresentationApproval = ({
+    tx,
+    presenterAlias,
+    presenterAid,
+    credentialSaid,
+    verifierRequest,
+    timeoutMs,
+}: {
+    tx: W3CPresentTxView;
+    presenterAlias: string;
+    presenterAid: string;
+    credentialSaid: string;
+    verifierRequest: Record<string, unknown>;
+    timeoutMs: number;
+}): void => {
+    const aud =
+        stringValue(tx.aud) ??
+        stringValue(verifierRequest.aud) ??
+        stringValue(verifierRequest.client_id);
+    const nonce = stringValue(tx.nonce) ?? stringValue(verifierRequest.nonce);
+    if (aud === null || nonce === null) {
+        return;
+    }
+    recordW3CHolderPresentationApproval({
+        presentTxId: tx.presentTxId,
+        holderAlias: presenterAlias,
+        holderAid: presenterAid,
+        credentialSaid,
+        aud,
+        nonce,
+        expiresAt:
+            stringValue(tx.expires) ??
+            new Date(Date.now() + timeoutMs).toISOString(),
+    });
 };
 
 const getJson = async <T>(client: SignifyClient, path: string): Promise<T> => {

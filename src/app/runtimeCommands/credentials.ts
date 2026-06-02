@@ -24,6 +24,7 @@ import {
     syncCredentialRegistriesOp,
     syncKnownCredentialSchemasOp,
 } from '../../workflows/credentials.op';
+import { w3cPresentationPayloadDetails } from './payloadDetails';
 import { credentialsRoute } from './helpers';
 import type {
     BackgroundWorkflowRunOptions,
@@ -327,6 +328,7 @@ const presentCredentialOptions = (
         message: 'KERIA recorded the W3C presentation transaction result.',
         severity: 'success',
     },
+    payloadDetails: w3cPresentationPayloadDetails,
     failureNotification: {
         title: 'Credential presentation failed',
         message:
