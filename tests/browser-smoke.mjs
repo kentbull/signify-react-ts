@@ -107,14 +107,14 @@ const dispatchClick = async (page, selector) => {
     await waitForElement(page, selector, 10000);
     await page.evaluate((targetSelector) => {
         const element = globalThis.document.querySelector(targetSelector);
-        if (!(element instanceof HTMLElement)) {
+        if (!(element instanceof globalThis.HTMLElement)) {
             throw new Error(
                 `Clickable element not found for ${targetSelector}`
             );
         }
         element.focus();
         element.dispatchEvent(
-            new MouseEvent('click', {
+            new globalThis.MouseEvent('click', {
                 bubbles: true,
                 cancelable: true,
                 view: globalThis,
