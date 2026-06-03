@@ -710,9 +710,11 @@ const waitForPresentationTx = async (client, descriptor) => {
     for (let attempt = 0; attempt < 180; attempt += 1) {
         const body = await getJson(
             client,
-            `/identifiers/${encodeURIComponent(holderAlias)}/w3c/present-txs`
+            `/identifiers/${encodeURIComponent(holderAlias)}/w3c/presentations`
         );
-        const txs = Array.isArray(body.presentTxs) ? body.presentTxs : [];
+        const txs = Array.isArray(body.presentations)
+            ? body.presentations
+            : [];
         const tx = txs.find((candidate) => {
             const request = candidate.requestDescriptor ?? {};
             return (
@@ -725,13 +727,13 @@ const waitForPresentationTx = async (client, descriptor) => {
 
         if (tx !== undefined) {
             lastMatchingTx = tx;
-            const stateKey = `${tx.presentTxId ?? ''}:${tx.state ?? ''}`;
+            const presentationId = tx.presentationId ?? tx.presentTxId ?? null;
+            const stateKey = `${presentationId ?? ''}:${tx.state ?? ''}`;
             if (stateKey !== lastLoggedTxState) {
                 lastLoggedTxState = stateKey;
                 logStage('presentation.tx.state', {
-                    presentTxId: tx.presentTxId ?? null,
+                    presentationId,
                     state: tx.state ?? null,
-                    signingRequestId: tx.signingRequestId ?? null,
                 });
             }
         }
@@ -751,8 +753,10 @@ const waitForPresentationTx = async (client, descriptor) => {
     }
 
     if (lastMatchingTx !== null) {
+        const presentationId =
+            lastMatchingTx.presentationId ?? lastMatchingTx.presentTxId;
         throw new Error(
-            `Timed out waiting for W3C presentation transaction ${lastMatchingTx.presentTxId}. Last state: ${lastMatchingTx.state}.`
+            `Timed out waiting for W3C presentation ${presentationId}. Last state: ${lastMatchingTx.state}.`
         );
     }
     throw new Error(
@@ -811,7 +815,7 @@ const waitForVerifierOperation = async (descriptor, tx) => {
 };
 
 const waitForDashboardPresentation = async (tx) => {
-    const presentationId = `urn:said:${tx.presentTxId}`;
+    const presentationId = `urn:said:${tx.presentationId ?? tx.presentTxId}`;
     const apiUrl = new URL('/api/presentations', dashboardUrl).toString();
 
     for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -834,7 +838,7 @@ const waitForDashboardPresentation = async (tx) => {
         );
         if (event !== undefined) {
             logStage('dashboard.presentation.received', {
-                presentTxId: tx.presentTxId,
+                presentationId: tx.presentationId ?? tx.presentTxId,
                 eventId: event.eventId ?? null,
                 verifierId: event.verifier?.id ?? event.verifier?.type ?? null,
             });
@@ -1007,7 +1011,7 @@ try {
                 stage: 'presentation.accepted',
                 verifierId:
                     descriptor.verifierId ?? descriptorResponseUri(descriptor),
-                presentTxId: tx.presentTxId,
+                presentationId: tx.presentationId ?? tx.presentTxId,
                 verifierOperation: operation.name,
                 accepted: true,
             })

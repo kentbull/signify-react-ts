@@ -6,12 +6,13 @@ maintainers debugging the UI, Effection workflows, and Signify/KERIA boundary.
 ## Ownership Model
 
 - QVI issuer wallet starts W3C issuance from the native issuer-side VRD ACDC.
-- KERIA stages issuance, import, presentation, verifier submission, and durable
-  state. KERIA does not sign VC-JWT or VP-JWT token material.
-- The browser edge signs KERIA-staged bytes through `W3CEdgeAutomator` after
-  local ownership and workflow policy checks pass.
-- LE holder wallet presents only after it receives the W3C grant, imports it,
-  and completes holder admit for exactly one eligible held W3C credential.
+- The browser edge assembles and signs VC-JWT and VP-JWT artifacts through
+  `signify-w3c`.
+- KERIA validates edge-provided artifacts, records durable state, forwards issuer
+  grants, and submits holder presentations to verifier endpoints.
+- LE holder wallet presents only after it receives a W3C grant and KERIA
+  materializes exactly one eligible held W3C credential for the clicked source
+  credential.
 
 ## Issuance Flow
 
@@ -27,51 +28,28 @@ The button is enabled only when:
 - the issuer did:webs DID is ready,
 - no conflicting credential command is already running.
 
-`startW3CIssuanceService` posts to
-`/identifiers/{issuer}/w3c/credentials`, then runs a foreground
-`W3CEdgeAutomator` scoped to that issuer alias, issuer AID, and issuance id.
-That automator signs only issuer VC proof/JWT requests for the issuance it just
-started.
-
-`pending_signature` means KERIA is waiting for edge signatures. In this app,
-that usually means the foreground automator did not run, the wrong wallet is
-connected, did:webs state changed, or the issuer policy rejected a request
-whose alias, AID, purpose, or issuance id did not match.
+`startW3CIssuanceService` calls `signify-w3c` to create an issuance context,
+build and sign the VC-JWT at the edge, submit the VC-JWT to KERIA for
+validation, then sign and submit the issuer grant EXN. The workflow uses
+`/identifiers/{issuer}/w3c/issuances`.
 
 ## Holder Presentation Flow
 
-`presentCredentialService` starts a KERIA presentation transaction from a
-runtime verifier request descriptor. KERIA matches held W3C credentials and
-creates a holder VP-JWT signing request only when exactly one eligible held
-credential exists.
+`presentCredentialService` resolves the clicked source credential SAID to a held
+W3C credential, builds and signs the VP-JWT through `signify-w3c`, then submits
+one request to `/identifiers/{holder}/w3c/presentations`. KERIA validates the
+VP-JWT binding to holder DID, selected credential, audience, nonce, response
+endpoint, and wallet state before forwarding it to the verifier.
 
-The app records a short-lived local approval containing:
-
-- presentation transaction id,
-- holder alias and AID,
-- selected native credential SAID,
-- verifier audience,
-- verifier nonce,
-- expiry.
-
-The background did:webs/W3C signal worker rechecks the live KERIA transaction
-before signing. It verifies the holder, signing request id, audience, nonce,
-and selected held credential source SAID. Holder VP signing fails closed unless
-that approval still matches.
-
-`presentation requires exactly one eligible held credential` is a KERIA wallet
-state failure. The holder has either not imported/admitted the W3C VRD yet, or
-has duplicate eligible held W3C credentials. Issue from the QVI first, then let
-the LE holder import/admit before presenting.
+If presentation cannot resolve a held W3C credential, issue from the QVI first
+and wait for the holder wallet to receive the W3C grant. Duplicate or missing
+held W3C records are wallet state failures, not signing-request failures.
 
 ## Signal And Polling Behavior
 
-The session worker in `liveDidWebsPublicationOp` handles both did:webs and W3C
-signals. SSE is the low-latency path. Polling is the durable fallback because
-SSE signals are transient and KERIA remains the source of truth.
-
-Polling does not relax edge signing. It only fetches the same durable KERIA
-signing/import queues that SSE would have signaled.
+The session worker in `liveDidWebsPublicationOp` handles did:webs publication
+signals only. W3C issuance and presentation are foreground user-driven
+credential operations; they do not use background W3C signing/import queues.
 
 ## Validation
 

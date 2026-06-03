@@ -138,26 +138,23 @@ Current workflow groups:
 
 ## W3C Credential Flow
 
-The W3C VRD path spans the credential workflow and the session did:webs/W3C
-signal worker:
+The W3C VRD path lives in the credential workflow:
 
-- Domain helpers identify issuer-side VRD credentials, choose the local QVI
-  issuer AID, and store short-lived holder presentation approvals.
-- `credentials.service.ts` starts QVI-side W3C issuance, runs the issuer edge
-  automator while KERIA is in `pending_signature`, and starts holder
-  presentation transactions from verifier descriptors.
+- Domain helpers identify issuer-side and holder-side VRD credentials and choose
+  the local issuer or holder AID for the foreground action.
+- `credentials.service.ts` delegates VC-JWT and VP-JWT artifact assembly to
+  `signify-w3c`, then submits those edge-signed artifacts to KERIA.
 - `credentials.op.ts` and runtime command wiring expose those service calls
   through normal Effection operation tracking.
-- `didwebs.op.ts` owns the session SSE plus polling fallback for did:webs and
-  W3C signing/import requests. Its holder VP signing policy must recheck live
-  KERIA state against the recorded approval before signing.
-- Redux stores only serializable summaries, operation results, and local
-  approval metadata. It does not store raw clients, private keys, or verifier
-  service objects.
+- `didwebs.op.ts` owns the session SSE plus polling fallback for did:webs
+  publication only. It does not service W3C queues.
+- Redux stores only serializable summaries and operation results. It does not
+  store raw clients, private keys, verifier service objects, or W3C signing
+  approvals.
 
-KERIA is the durable workflow source of truth. The React app is the edge policy
-and signing runtime. If a W3C change makes KERIA sign token material, or lets a
-holder VP request pass without a local approval, it breaks the architecture.
+KERIA is the durable workflow source of truth and validator/forwarder. The
+React app is the edge policy and signing runtime. If a W3C change makes KERIA
+assemble or sign token material, it breaks the architecture.
 
 ## Redux State
 

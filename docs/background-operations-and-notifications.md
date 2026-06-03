@@ -138,21 +138,17 @@ operations must not trigger the blocking overlay.
 ## W3C Issuance And Presentation Notes
 
 W3C VRD issuance and presentation use the same operation records and
-notifications as other credential work, but the signing model is stricter than
-a passive KERIA operation wait.
+notifications as other credential work, but the browser edge owns W3C artifact
+assembly and signing.
 
-QVI-side W3C issuance starts as an app action and KERIA enters
-`pending_signature` until the browser edge signs the issuer VC proof and
-VC-JWT signing inputs. The workflow must run a scoped `W3CEdgeAutomator` while
-it waits. A background or foreground wrapper that only polls the issuance record
-will time out because KERIA is correctly waiting for edge signatures.
+QVI-side W3C issuance calls `signify-w3c` to build/sign the VC-JWT, submits it
+to KERIA for validation, then signs and submits the issuer grant EXN. Holder
+presentation resolves the held W3C credential, builds/signs the VP-JWT, and
+submits it to KERIA in one foreground action.
 
-Holder presentation records a local approval after KERIA creates the
-presentation transaction. The session did:webs/W3C worker handles the holder
-VP-JWT signing request through SSE or polling fallback, but only when the live
-transaction still matches the approved holder, credential SAID, audience, and
-nonce. Holder presentation signing must never be approved by a generic default
-policy.
+KERIA validates the edge-provided VC-JWT or VP-JWT before forwarding. There are
+no W3C signing-request queues, local holder approval records, or background W3C
+automators in this workflow.
 
 ## Adding A Background Flow
 
