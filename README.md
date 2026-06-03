@@ -21,6 +21,9 @@
 - [Workflow and state architecture](./docs/workflow-state-architecture.md):
   Effection workflows, service boundaries, Redux slices, and where new KERIA
   behavior belongs.
+- [W3C VRD issuance and presentation](./docs/w3c-vrd-issuance-and-presentation.md):
+  QVI-side W3C issuance, holder import/admit prerequisites, verifier
+  presentation approval, edge signing, and failure triage.
 - [Smoke tests](./docs/smoke-tests.md): how the CLI and browser smoke checks
   work, how to run them, required local services, configuration, outputs, and
   failure triage.

@@ -93,6 +93,7 @@ export const CredentialW3CIssuanceControls = ({
             </Stack>
             <Typography
                 data-testid="w3c-issuance-status"
+                data-credential-said={credential.said}
                 data-state={blocker === null ? 'ready' : 'blocked'}
                 data-issuer-aid={issuer?.prefix ?? ''}
                 variant="caption"
@@ -105,6 +106,7 @@ export const CredentialW3CIssuanceControls = ({
             {issuanceActionResult !== null && (
                 <Typography
                     data-testid="w3c-issuance-action-result"
+                    data-credential-said={credential.said}
                     data-state={issuanceActionResult.ok ? 'accepted' : 'error'}
                     data-request-id={issuanceActionResult.requestId ?? ''}
                     data-operation-route={

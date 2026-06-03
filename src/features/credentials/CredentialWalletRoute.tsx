@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Button, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
@@ -18,7 +18,6 @@ import {
 } from './credentialViewModels';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import { credentialPath } from './credentialDisplay';
-import { credentialDetailPath } from '../dashboard/dashboardViewModels';
 import { useCredentialsRouteContext } from './CredentialsRouteContext';
 import {
     HeldCredentialsPanel,
@@ -36,7 +35,6 @@ import { selectCredentialW3CPresenter } from '../../domain/credentials/credentia
  * held credential W3C Present actions.
  */
 export const CredentialWalletRoute = () => {
-    const navigate = useNavigate();
     const runtime = useAppRuntime();
     const {
         actionRunning,
@@ -153,10 +151,6 @@ export const CredentialWalletRoute = () => {
         submitCredentialForm(formData);
     };
 
-    const openHeldCredential = (credentialSaid: string) => {
-        navigate(credentialDetailPath(credentialSaid));
-    };
-
     const submitPresent = (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
@@ -196,7 +190,6 @@ export const CredentialWalletRoute = () => {
                 verifiers={w3cVerifiers}
                 selectedVerifierId={effectiveVerifierId}
                 actionRunning={actionRunning}
-                onOpenCredential={openHeldCredential}
                 onVerifierChange={setSelectedVerifierId}
                 onPresent={submitPresent}
             />

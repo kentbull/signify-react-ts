@@ -1,5 +1,6 @@
 import type { DashboardLoaderData, RouteDataRuntime } from './routeData.types';
 import { toRouteError } from './routeData.shared';
+import { appConfig } from '../config';
 
 /**
  * Loader for `/dashboard`.
@@ -24,11 +25,14 @@ export const loadDashboard = async (
             runtime.credentials.syncInventory({ signal: request?.signal }),
         ]);
         await runtime.credentials.syncIpexActivity({ signal: request?.signal });
-        return { status: 'ready', verifiers: [] };
+        return {
+            status: 'ready',
+            verifiers: [...appConfig.w3cVerifiers],
+        };
     } catch (error) {
         return {
             status: 'error',
-            verifiers: [],
+            verifiers: [...appConfig.w3cVerifiers],
             message: `Unable to refresh dashboard inventory: ${toRouteError(error).message}`,
         };
     }

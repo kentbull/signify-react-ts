@@ -72,7 +72,6 @@ export const CredentialIssuerTypeRoute = () => {
         identifiers,
         submitResolveSchema,
         submitCredentialForm,
-        w3cVerifiers,
     } = useCredentialsRouteContext();
     const { typeKey } = useParams<{ typeKey?: string }>();
     const runtime = useAppRuntime();
@@ -85,7 +84,6 @@ export const CredentialIssuerTypeRoute = () => {
     const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const walletSelectedRegistry = useAppSelector(selectSelectedWalletRegistry);
     const [holderAid, setHolderAid] = useState('');
-    const [selectedVerifierId, setSelectedVerifierId] = useState('');
     const [registryName, setRegistryName] = useState(
         SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME
     );
@@ -152,7 +150,6 @@ export const CredentialIssuerTypeRoute = () => {
                   selectedIdentifier.prefix,
                   selectedType.schemaSaid
               );
-    const effectiveVerifierId = selectedVerifierId;
     const selectedIdentifierName = selectedIdentifier?.name ?? '';
     const selectedIdentifierPrefix = selectedIdentifier?.prefix ?? '';
 
@@ -301,24 +298,6 @@ export const CredentialIssuerTypeRoute = () => {
         submitCredentialForm(formData);
     };
 
-    const submitPresent = (
-        credential: CredentialSummaryRecord,
-        presenter: IdentifierSummary,
-        verifierRequestJson: string
-    ) => {
-        if (verifierRequestJson.length === 0) {
-            return;
-        }
-
-        const formData = new FormData();
-        formData.set('intent', 'presentCredential');
-        formData.set('presenterAlias', presenter.name);
-        formData.set('presenterAid', presenter.prefix);
-        formData.set('credentialSaid', credential.said);
-        formData.set('verifierRequest', verifierRequestJson);
-        submitCredentialForm(formData);
-    };
-
     const selectRegistry = (registryId: string) => {
         dispatch(walletRegistrySelected({ registryId }));
     };
@@ -439,8 +418,6 @@ export const CredentialIssuerTypeRoute = () => {
                 schemasBySaid={schemasBySaid}
                 identifiers={identifiers}
                 didWebsReadyByAid={didWebsReadyByAid}
-                verifiers={w3cVerifiers}
-                selectedVerifierId={effectiveVerifierId}
                 issuanceAction={
                     actionStatus !== null &&
                     'intent' in actionStatus &&
@@ -450,8 +427,6 @@ export const CredentialIssuerTypeRoute = () => {
                 }
                 onGrant={submitGrant}
                 onStartW3CIssuance={submitStartW3CIssuance}
-                onVerifierChange={setSelectedVerifierId}
-                onPresent={submitPresent}
             />
         </Stack>
     );

@@ -7,9 +7,11 @@ import {
     type Operation as KeriaOperation,
     MemoryW3CAutomationStore,
     type SignifyClient,
+    W3C_PURPOSE_HOLDER_VP_JWT,
     W3C_PURPOSE_ISSUER_VC_JWT,
     W3C,
     W3CEdgeAutomator,
+    type W3CAutomationResult,
     type W3CSigningRequest,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
@@ -58,7 +60,10 @@ import {
     SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
     SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS,
 } from '../domain/credentials/sediVoterId';
-import { recordW3CHolderPresentationApproval } from '../domain/credentials/w3cPresentationApprovals';
+import {
+    createHolderPresentationSigningPolicy,
+    recordW3CHolderPresentationApproval,
+} from '../domain/credentials/w3cPresentationApprovals';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import { waitOperationService } from './signify.service';
 
@@ -957,6 +962,12 @@ export function* presentCredentialService({
         verifierRequest: requestDescriptor,
         timeoutMs,
     });
+    const w3c = new W3C(client);
+    const automator = new W3CEdgeAutomator(client, {
+        signingPolicy: createHolderPresentationSigningPolicy(client),
+        importPolicy: () =>
+            'W3C presentation foreground automation handles holder VP signatures only',
+    });
     const timeoutAt = Date.now() + timeoutMs;
 
     let current = tx;
@@ -968,6 +979,15 @@ export function* presentCredentialService({
         if (terminal !== undefined) {
             throw terminal;
         }
+
+        yield* callPromise(() =>
+            approveHolderPresentationSignature({
+                w3c,
+                automator,
+                presenterAlias: name,
+                tx: current,
+            })
+        );
 
         current = yield* callPromise(() =>
             getJson<W3CPresentTxView>(
@@ -990,6 +1010,51 @@ export function* presentCredentialService({
         `Timed out waiting for W3C presentation transaction ${tx.presentTxId}. Last state: ${current.state}.`
     );
 }
+
+const approveHolderPresentationSignature = async ({
+    w3c,
+    automator,
+    presenterAlias,
+    tx,
+}: {
+    w3c: W3C;
+    automator: W3CEdgeAutomator;
+    presenterAlias: string;
+    tx: W3CPresentTxView;
+}): Promise<W3CAutomationResult | null> => {
+    if (tx.state !== 'pending_holder_signature') {
+        return null;
+    }
+    const presentTxId = stringValue(tx.presentTxId);
+    if (presentTxId === null) {
+        return null;
+    }
+    const signingRequestId = stringValue(tx.signingRequestId);
+    const requests = await w3c.signingRequests(
+        presenterAlias,
+        false,
+        W3C_PURPOSE_HOLDER_VP_JWT
+    );
+    const request = requests.find((candidate: W3CSigningRequest) => {
+        const candidateId =
+            stringValue(candidate.requestId) ?? stringValue(candidate.d);
+        return (
+            candidate.related === presentTxId ||
+            (signingRequestId !== null && candidateId === signingRequestId)
+        );
+    });
+    if (request === undefined) {
+        return null;
+    }
+
+    const result = await automator.handleSigningRequest(request);
+    if (result.outcome === 'failed' || result.outcome === 'rejected') {
+        throw new Error(
+            `W3C holder presentation signing request ${request.d} ${result.outcome}: ${result.error ?? 'no error detail'}`
+        );
+    }
+    return result;
+};
 
 const presentTxTerminalError = (
     tx: W3CPresentTxView

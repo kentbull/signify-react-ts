@@ -4,6 +4,7 @@ import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialW
 import { CredentialW3CIssuanceControls } from '../../src/features/credentials/CredentialW3CIssuanceControls';
 import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
 import { IssuedCredentialsForTypePanel } from '../../src/features/credentials/CredentialIssuerTypePanels';
+import { appConfig } from '../../src/config';
 import {
     selectCredentialW3CIssuer,
     selectCredentialW3CPresenter,
@@ -63,11 +64,11 @@ describe('wallet credential panels', () => {
             selectCredentialW3CPresenter(
                 { ...credential, direction: 'issued' },
                 identifiers
-            )?.prefix
-        ).toBe('Eissuer');
+            )
+        ).toBeNull();
     });
 
-    it('renders held credential rows as detail navigation targets without inline expansion details', () => {
+    it('renders held credential rows as inline workflow cards without detail navigation', () => {
         const markup = renderToStaticMarkup(
             <HeldCredentialsPanel
                 credentials={[credential]}
@@ -78,13 +79,12 @@ describe('wallet credential panels', () => {
                 verifiers={[]}
                 selectedVerifierId=""
                 actionRunning={false}
-                onOpenCredential={vi.fn()}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
-        expect(markup).toContain('role="button"');
+        expect(markup).not.toContain('role="button"');
         expect(markup).toContain('Verifiable Reference Data (VRD) Credential');
         expect(markup).toContain('Present');
         expect(markup).toContain('Ecredential');
@@ -102,15 +102,8 @@ describe('wallet credential panels', () => {
                 }}
                 identifiers={[]}
                 didWebsReadyByAid={new Map()}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -118,10 +111,11 @@ describe('wallet credential panels', () => {
         );
 
         expect(markup).toContain('Verifier request');
-        expect(markup).toContain('https://verifier.example');
+        expect(markup).toContain('Isomer Python');
+        expect(markup).toContain('http://127.0.0.1:8788/verify/vp');
         expect(markup).toContain('Present');
         expect(markup).toContain(
-            'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
+            'This wallet does not control the credential holder AID required for W3C Present.'
         );
     });
 
@@ -134,15 +128,8 @@ describe('wallet credential panels', () => {
                 }}
                 identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
                 didWebsReadyByAid={new Map([['Eholder', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -154,7 +141,7 @@ describe('wallet credential panels', () => {
         );
     });
 
-    it('uses a local issuer as the presenter for issued VRD credentials', () => {
+    it('does not present issued VRD credentials through the issuer role', () => {
         const markup = renderToStaticMarkup(
             <CredentialW3CPresentationControls
                 credential={{
@@ -165,15 +152,8 @@ describe('wallet credential panels', () => {
                 }}
                 identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
                 didWebsReadyByAid={new Map([['Eissuer', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -181,7 +161,7 @@ describe('wallet credential panels', () => {
         );
 
         expect(markup).toContain(
-            'Ready to create a KERIA W3C presentation transaction from this verifier request.'
+            'This wallet does not control the credential holder AID required for W3C Present.'
         );
     });
 
@@ -227,7 +207,7 @@ describe('wallet credential panels', () => {
         );
     });
 
-    it('renders W3C Present controls alongside issuer IPEX Grant controls', () => {
+    it('renders W3C issuance alongside issuer IPEX Grant controls', () => {
         const markup = renderToStaticMarkup(
             <IssuedCredentialsForTypePanel
                 credentials={[
@@ -253,25 +233,14 @@ describe('wallet credential panels', () => {
                 }
                 identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
                 didWebsReadyByAid={new Map([['Eissuer', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 onGrant={vi.fn()}
                 onStartW3CIssuance={vi.fn()}
-                onVerifierChange={vi.fn()}
-                onPresent={vi.fn()}
             />
         );
 
         expect(markup).toContain('Grant');
         expect(markup).toContain('Start W3C issuance');
-        expect(markup).toContain('Present');
-        expect(markup).toContain('Verifier request');
+        expect(markup).not.toContain('Present');
+        expect(markup).not.toContain('Verifier request');
     });
 });

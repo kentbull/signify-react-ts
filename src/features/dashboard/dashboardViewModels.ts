@@ -6,6 +6,7 @@ import type {
     CredentialSummaryRecord,
     RegistryRecord,
 } from '../../domain/credentials/credentialTypes';
+import { issuerPath, walletPath } from '../credentials/credentialDisplay';
 
 /**
  * Dashboard sub-route modes derived from the current location.
@@ -59,11 +60,48 @@ export const dashboardModeForPath = (pathname: string): DashboardMode => {
     return 'overview';
 };
 
-/**
- * Build the stable dashboard credential detail route.
- */
-export const credentialDetailPath = (said: string): string =>
-    `/dashboard/credentials/${encodeURIComponent(said)}`;
+export const canonicalCredentialWorkflowPath = (
+    credential: CredentialSummaryRecord
+): string | null => {
+    if (credential.direction === 'held') {
+        return credential.holderAid === null
+            ? null
+            : walletPath(credential.holderAid);
+    }
+
+    return credential.issuerAid === null
+        ? null
+        : issuerPath(credential.issuerAid);
+};
+
+export const legacyDashboardCredentialRedirectPath = ({
+    credentialSaid,
+    heldCredentials,
+    issuedCredentials,
+}: {
+    credentialSaid: string;
+    heldCredentials: readonly CredentialSummaryRecord[];
+    issuedCredentials: readonly CredentialSummaryRecord[];
+}): string => {
+    const candidates = [
+        heldCredentials.find((credential) => credential.said === credentialSaid),
+        issuedCredentials.find(
+            (credential) => credential.said === credentialSaid
+        ),
+    ];
+
+    for (const credential of candidates) {
+        if (credential === undefined) {
+            continue;
+        }
+        const path = canonicalCredentialWorkflowPath(credential);
+        if (path !== null) {
+            return path;
+        }
+    }
+
+    return '/dashboard/credentials/held';
+};
 
 /**
  * Merge exchange activity and grant notification facts for one credential timeline.

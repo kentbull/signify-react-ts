@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type {
-    CredentialResult,
-    Operation as KeriaOperation,
-    SignifyClient,
+import {
+    W3C_PURPOSE_HOLDER_VP_JWT,
+    type CredentialResult,
+    type Operation as KeriaOperation,
+    type SignifyClient,
 } from 'signify-ts';
 import { createAppRuntime } from '../../src/app/runtime';
 import {
@@ -393,17 +394,102 @@ describe('credential service helpers', () => {
         const runtime = createAppRuntime({ storage: null });
         const calls: Array<{ path: string; method: string; body: unknown }> =
             [];
+        let signatureSubmitted = false;
         const client = {
+            manager: {
+                get: vi.fn(() => ({
+                    sign: vi.fn(async () => ['edge-signature']),
+                })),
+            },
+            identifiers: () => ({
+                get: vi.fn(async () => ({
+                    name: 'presenter',
+                    prefix: 'Epresenter',
+                })),
+            }),
             fetch: vi.fn(
                 async (path: string, method: string, body: unknown) => {
                     calls.push({ path, method, body });
-                    if (method === 'POST') {
+                    if (
+                        method === 'POST' &&
+                        path === '/identifiers/presenter/w3c/present-txs'
+                    ) {
                         return Response.json({
                             presentTxId: 'present-tx-1',
                             state: 'pending_holder_signature',
+                            holderName: 'presenter',
+                            holderAid: 'Epresenter',
+                            selectedCredentialId: 'held-id',
+                            signingRequestId: 'signing-1',
                             aud: 'https://verifier.example',
                             nonce: 'nonce-1',
                             expires: '2030-04-22T00:10:00.000Z',
+                        });
+                    }
+                    if (
+                        method === 'GET' &&
+                        path === '/identifiers/presenter/w3c/signing-requests'
+                    ) {
+                        return Response.json({
+                            requests: signatureSubmitted
+                                ? []
+                                : [
+                                      {
+                                          d: 'signing-1',
+                                          requestId: 'signing-1',
+                                          name: 'presenter',
+                                          aid: 'Epresenter',
+                                          purpose: W3C_PURPOSE_HOLDER_VP_JWT,
+                                          related: 'present-tx-1',
+                                          signingInputB64: 'YQ',
+                                          encoding: 'base64url',
+                                      },
+                                  ],
+                        });
+                    }
+                    if (
+                        method === 'GET' &&
+                        path ===
+                            '/identifiers/presenter/w3c/present-txs/present-tx-1'
+                    ) {
+                        return Response.json(
+                            signatureSubmitted
+                                ? {
+                                      presentTxId: 'present-tx-1',
+                                      state: 'submitted',
+                                      verifierResponse: { ok: true },
+                                  }
+                                : {
+                                      presentTxId: 'present-tx-1',
+                                      state: 'pending_holder_signature',
+                                      holderName: 'presenter',
+                                      holderAid: 'Epresenter',
+                                      selectedCredentialId: 'held-id',
+                                      signingRequestId: 'signing-1',
+                                      aud: 'https://verifier.example',
+                                      nonce: 'nonce-1',
+                                  }
+                        );
+                    }
+                    if (
+                        method === 'GET' &&
+                        path ===
+                            '/identifiers/presenter/w3c/credentials/held-id'
+                    ) {
+                        return Response.json({
+                            credentialId: 'held-id',
+                            sourceCredentialSaid: 'Ecredential',
+                        });
+                    }
+                    if (
+                        method === 'POST' &&
+                        path ===
+                            '/identifiers/presenter/w3c/signing-requests/signing-1/signatures'
+                    ) {
+                        signatureSubmitted = true;
+                        return Response.json({
+                            d: 'signing-1',
+                            state: 'complete',
                         });
                     }
                     return Response.json({
@@ -455,6 +541,26 @@ describe('credential service helpers', () => {
                         response_uri: 'http://verifier.example/verify/vp',
                         credentialSaid: 'Ecredential',
                     },
+                },
+                {
+                    path: '/identifiers/presenter/w3c/signing-requests',
+                    method: 'GET',
+                    body: null,
+                },
+                {
+                    path: '/identifiers/presenter/w3c/present-txs/present-tx-1',
+                    method: 'GET',
+                    body: null,
+                },
+                {
+                    path: '/identifiers/presenter/w3c/credentials/held-id',
+                    method: 'GET',
+                    body: null,
+                },
+                {
+                    path: '/identifiers/presenter/w3c/signing-requests/signing-1/signatures',
+                    method: 'POST',
+                    body: { signature: 'edge-signature' },
                 },
                 {
                     path: '/identifiers/presenter/w3c/present-txs/present-tx-1',

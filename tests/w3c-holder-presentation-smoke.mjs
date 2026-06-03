@@ -59,9 +59,6 @@ const logStage = (stage, details = {}) => {
 };
 
 const manifest = readManifest();
-const randomNonce = (serviceName) =>
-    `react-smoke-${serviceName}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
 const liveVerifierDescriptor = (serviceName, hostUrl, submissionUrl) => {
     if (typeof hostUrl !== 'string' || hostUrl.trim().length === 0) {
         return undefined;
@@ -79,7 +76,6 @@ const liveVerifierDescriptor = (serviceName, hostUrl, submissionUrl) => {
         format: 'vp+jwt',
         formats: ['vp+jwt'],
         aud: `${publicBase}/verify/vp`,
-        nonce: randomNonce(serviceName),
         response_uri: `${submissionBase}/verify/vp`,
         submissionEndpoint: `${submissionBase}/verify/vp`,
     };
@@ -88,19 +84,43 @@ const liveVerifierDescriptor = (serviceName, hostUrl, submissionUrl) => {
 const defaultVerifierRequests = () =>
     [
         liveVerifierDescriptor(
-            'python',
-            process.env.W3C_PYTHON_VERIFIER_URL,
-            process.env.W3C_PYTHON_VERIFIER_SUBMISSION_URL
+            'isomer-python',
+            firstString(
+                process.env.VITE_W3C_ISOMER_PYTHON_PUBLIC_URL,
+                process.env.W3C_PYTHON_VERIFIER_URL,
+                'http://127.0.0.1:8788'
+            ),
+            firstString(
+                process.env.VITE_W3C_ISOMER_PYTHON_SUBMISSION_URL,
+                process.env.W3C_PYTHON_VERIFIER_SUBMISSION_URL,
+                'http://isomer-python:8788'
+            )
         ),
         liveVerifierDescriptor(
-            'node',
-            process.env.W3C_NODE_VERIFIER_URL,
-            process.env.W3C_NODE_VERIFIER_SUBMISSION_URL
+            'isomer-node',
+            firstString(
+                process.env.VITE_W3C_ISOMER_NODE_PUBLIC_URL,
+                process.env.W3C_NODE_VERIFIER_URL,
+                'http://127.0.0.1:8789'
+            ),
+            firstString(
+                process.env.VITE_W3C_ISOMER_NODE_SUBMISSION_URL,
+                process.env.W3C_NODE_VERIFIER_SUBMISSION_URL,
+                'http://isomer-node:8788'
+            )
         ),
         liveVerifierDescriptor(
-            'go',
-            process.env.W3C_GO_VERIFIER_URL,
-            process.env.W3C_GO_VERIFIER_SUBMISSION_URL
+            'isomer-go',
+            firstString(
+                process.env.VITE_W3C_ISOMER_GO_PUBLIC_URL,
+                process.env.W3C_GO_VERIFIER_URL,
+                'http://127.0.0.1:8790'
+            ),
+            firstString(
+                process.env.VITE_W3C_ISOMER_GO_SUBMISSION_URL,
+                process.env.W3C_GO_VERIFIER_SUBMISSION_URL,
+                'http://isomer-go:8788'
+            )
         ),
     ].filter((descriptor) => descriptor !== undefined);
 
@@ -130,6 +150,11 @@ const holderAlias = required(
         manifest.holderWallet?.name
     )
 );
+const holderAidHint = firstString(
+    process.env.W3C_HOLDER_AID,
+    manifest.holderAid,
+    manifest.holderWallet?.aid
+);
 const issuerPasscode = required(
     'issuer passcode',
     firstString(
@@ -147,6 +172,12 @@ const issuerAlias = required(
         manifest.issuerAlias,
         manifest.qviWallet?.name
     )
+);
+const issuerAidHint = firstString(
+    process.env.W3C_ISSUER_AID,
+    process.env.W3C_QVI_AID,
+    manifest.issuerAid,
+    manifest.qviWallet?.aid
 );
 const credentialSaid = required(
     'credential SAID',
@@ -218,21 +249,21 @@ const setInputValue = async (page, selector, value) => {
         ({ targetSelector, nextValue }) => {
             const element = globalThis.document.querySelector(targetSelector);
             if (
-                !(element instanceof HTMLInputElement) &&
-                !(element instanceof HTMLTextAreaElement)
+                !(element instanceof globalThis.HTMLInputElement) &&
+                !(element instanceof globalThis.HTMLTextAreaElement)
             ) {
                 throw new Error(
                     `Input not found for selector ${targetSelector}`
                 );
             }
             const valueSetter =
-                element instanceof HTMLTextAreaElement
+                element instanceof globalThis.HTMLTextAreaElement
                     ? Object.getOwnPropertyDescriptor(
-                          HTMLTextAreaElement.prototype,
+                          globalThis.HTMLTextAreaElement.prototype,
                           'value'
                       )?.set
                     : Object.getOwnPropertyDescriptor(
-                          HTMLInputElement.prototype,
+                          globalThis.HTMLInputElement.prototype,
                           'value'
                       )?.set;
             if (valueSetter === undefined) {
@@ -242,8 +273,12 @@ const setInputValue = async (page, selector, value) => {
             }
             element.focus();
             valueSetter.call(element, nextValue);
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(
+                new globalThis.Event('input', { bubbles: true })
+            );
+            element.dispatchEvent(
+                new globalThis.Event('change', { bubbles: true })
+            );
         },
         { targetSelector: selector, nextValue: value }
     );
@@ -253,14 +288,23 @@ const dispatchClick = async (page, selector) => {
     await waitForElement(page, selector, 10000);
     await page.evaluate((targetSelector) => {
         const element = globalThis.document.querySelector(targetSelector);
-        if (!(element instanceof HTMLElement)) {
+        if (!(element instanceof globalThis.HTMLElement)) {
             throw new Error(
                 `Clickable element not found for ${targetSelector}`
             );
         }
         element.focus();
+        for (const type of ['mousedown', 'mouseup']) {
+            element.dispatchEvent(
+                new globalThis.MouseEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    view: globalThis,
+                })
+            );
+        }
         element.dispatchEvent(
-            new MouseEvent('click', {
+            new globalThis.MouseEvent('click', {
                 bubbles: true,
                 cancelable: true,
                 view: globalThis,
@@ -308,7 +352,7 @@ const navigateInApp = async (page, path) => {
     await page.evaluate((nextPath) => {
         globalThis.history.pushState({}, '', nextPath);
         globalThis.dispatchEvent(
-            new PopStateEvent('popstate', {
+            new globalThis.PopStateEvent('popstate', {
                 state: globalThis.history.state,
             })
         );
@@ -351,6 +395,17 @@ const connectKeriaClient = async (passcode) => {
     return client;
 };
 
+const resolveIdentifierAid = async (client, alias, aidHint) => {
+    if (aidHint !== undefined) {
+        return aidHint;
+    }
+    const hab = await client.identifiers().get(alias);
+    if (typeof hab?.prefix !== 'string' || hab.prefix.length === 0) {
+        throw new Error(`Unable to resolve AID for identifier ${alias}`);
+    }
+    return hab.prefix;
+};
+
 const getJson = async (client, path) => {
     const response = await client.fetch(path, 'GET', null);
     if (!response.ok) {
@@ -372,6 +427,112 @@ const descriptorOperationBase = (descriptor) =>
     descriptor.verifierOrigin ??
     descriptor.origin ??
     descriptorResponseUri(descriptor);
+
+const uiVerifierId = (descriptor) => {
+    const id = descriptor.verifierId;
+    if (id === 'python') {
+        return 'isomer-python';
+    }
+    if (id === 'node') {
+        return 'isomer-node';
+    }
+    if (id === 'go') {
+        return 'isomer-go';
+    }
+    return typeof id === 'string' && id.startsWith('isomer-')
+        ? id
+        : undefined;
+};
+
+const readVerifierRequestDescriptor = async (page, controlsSelector) =>
+    page.evaluate((selector) => {
+        const root = globalThis.document.querySelector(selector);
+        const input = root?.querySelector(
+            '[data-testid="w3c-verifier-request-input"] textarea'
+        );
+        if (!(input instanceof globalThis.HTMLTextAreaElement)) {
+            throw new Error('W3C verifier request textarea not found');
+        }
+        return JSON.parse(input.value);
+    }, controlsSelector);
+
+const selectVerifierPreset = async (
+    page,
+    verifierId,
+    controlsSelector,
+    presentButtonSelector
+) => {
+    await waitForElement(page, controlsSelector, 10000);
+    await page.click(
+        `${controlsSelector} [data-testid="w3c-verifier-selector"]`
+    );
+    const optionSelector = `[data-testid="w3c-verifier-option-${verifierId}"]`;
+    await waitForDomState(
+        page,
+        `W3C verifier option ${verifierId}`,
+        (selector) => {
+            const option = globalThis.document.querySelector(selector);
+            return option instanceof globalThis.HTMLElement;
+        },
+        30000,
+        optionSelector
+    );
+    await page.click(optionSelector);
+    await waitForDomState(
+        page,
+        `W3C verifier ${verifierId} selected`,
+        (expectedVerifierId, selector, buttonSelector) => {
+            const root = globalThis.document.querySelector(selector);
+            const input = root?.querySelector(
+                '[data-testid="w3c-verifier-request-input"] textarea'
+            );
+            const button = globalThis.document.querySelector(buttonSelector);
+            if (
+                !(input instanceof globalThis.HTMLTextAreaElement) ||
+                !(button instanceof globalThis.HTMLButtonElement)
+            ) {
+                return false;
+            }
+            try {
+                const descriptor = JSON.parse(input.value);
+                return (
+                    descriptor.verifierId === expectedVerifierId &&
+                    !button.disabled
+                );
+            } catch {
+                return false;
+            }
+        },
+        30000,
+        verifierId,
+        controlsSelector,
+        presentButtonSelector
+    );
+};
+
+const readSubmittedVerifierRequestDescriptor = async (
+    page,
+    controlsSelector,
+    verifierId,
+    previousNonce
+) => {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+        const descriptor = await readVerifierRequestDescriptor(
+            page,
+            controlsSelector
+        );
+        if (
+            descriptor.verifierId === verifierId &&
+            typeof descriptor.nonce === 'string' &&
+            descriptor.nonce.length > 0 &&
+            descriptor.nonce !== previousNonce
+        ) {
+            return descriptor;
+        }
+        await sleep(250);
+    }
+    return readVerifierRequestDescriptor(page, controlsSelector);
+};
 
 const waitForHolderHeldCredential = async (client) => {
     const w3c = new W3C(client);
@@ -422,45 +583,42 @@ const waitForHolderHeldCredential = async (client) => {
     );
 };
 
-const startIssuerW3CIssuance = async (page) => {
+const startIssuerW3CIssuance = async (page, issuerAid) => {
+    const issuanceButtonSelector = `[data-testid="w3c-start-issuance-button"][data-credential-said="${credentialSaid}"]`;
     logStage('issuer.credential.goto', { issuerAlias, credentialSaid });
     await navigateInApp(
         page,
-        `/dashboard/credentials/${encodeURIComponent(credentialSaid)}`
-    );
-    await waitForDomState(
-        page,
-        'issuer credential detail',
-        () =>
-            globalThis.document.querySelector(
-                '[data-testid="dashboard-credential-detail"]'
-            ) !== null
+        `/credentials/${encodeURIComponent(issuerAid)}/issuer`
     );
     await waitForDomState(
         page,
         'W3C issuance controls',
         () =>
             globalThis.document
-                .querySelector('[data-testid="w3c-issuance-status"]')
+                .querySelector(
+                    `[data-testid="w3c-issuance-status"][data-credential-said="${credentialSaid}"]`
+                )
                 ?.getAttribute('data-state') === 'ready',
         120000
     );
     logStage('issuer.issuance.ready', { issuerAlias, credentialSaid });
     await waitForDomState(page, 'W3C issuance button ready', () => {
         const button = globalThis.document.querySelector(
-            '[data-testid="w3c-start-issuance-button"]'
+            `[data-testid="w3c-start-issuance-button"][data-credential-said="${credentialSaid}"]`
         );
-        return button instanceof HTMLButtonElement && !button.disabled;
+        return (
+            button instanceof globalThis.HTMLButtonElement && !button.disabled
+        );
     });
-    await dispatchClick(page, '[data-testid="w3c-start-issuance-button"]');
+    await dispatchClick(page, issuanceButtonSelector);
     await waitForDomState(
         page,
         'W3C issuance action accepted',
         () => {
             const result = globalThis.document.querySelector(
-                '[data-testid="w3c-issuance-action-result"]'
+                `[data-testid="w3c-issuance-action-result"][data-credential-said="${credentialSaid}"]`
             );
-            if (!(result instanceof HTMLElement)) {
+            if (!(result instanceof globalThis.HTMLElement)) {
                 return 'missing action result';
             }
             const state = result.getAttribute('data-state');
@@ -646,85 +804,110 @@ try {
 
     const issuer = await preparePage('issuer');
     const holder = await preparePage('holder');
+    const issuerClient = await connectKeriaClient(issuerPasscode);
     const holderClient = await connectKeriaClient(holderPasscode);
+    const issuerAid = await resolveIdentifierAid(
+        issuerClient,
+        issuerAlias,
+        issuerAidHint
+    );
+    const holderAid = await resolveIdentifierAid(
+        holderClient,
+        holderAlias,
+        holderAidHint
+    );
 
     await connectBrowserWallet(issuer.page, issuerPasscode, 'issuer');
     await connectBrowserWallet(holder.page, holderPasscode, 'holder');
-    await startIssuerW3CIssuance(issuer.page);
+    await startIssuerW3CIssuance(issuer.page, issuerAid);
     await waitForHolderHeldCredential(holderClient);
 
     const page = holder.page;
     const client = holderClient;
+    const presentationControlsSelector = `[data-testid="w3c-presentation-controls-${credentialSaid}"]`;
+    const presentationButtonSelector = `[data-testid="w3c-present-button"][data-credential-said="${credentialSaid}"]`;
 
     logStage('credential.goto', { credentialSaid });
     await navigateInApp(
         page,
-        `/dashboard/credentials/${encodeURIComponent(credentialSaid)}`
-    );
-    await waitForDomState(
-        page,
-        'credential detail',
-        () =>
-            globalThis.document.querySelector(
-                '[data-testid="dashboard-credential-detail"]'
-            ) !== null
+        `/credentials/${encodeURIComponent(holderAid)}/wallet`
     );
     await waitForDomState(
         page,
         'W3C presentation controls',
         () =>
             globalThis.document
-                .querySelector('[data-testid="w3c-presentation-status"]')
+                .querySelector(
+                    `[data-testid="w3c-presentation-status"][data-credential-said="${credentialSaid}"]`
+                )
                 ?.getAttribute('data-state') === 'ready'
     );
     logStage('credential.ready', { credentialSaid });
 
-    for (const descriptor of verifierRequests) {
-        if (typeof descriptor !== 'object' || descriptor === null) {
+    for (const expectedDescriptor of verifierRequests) {
+        if (
+            typeof expectedDescriptor !== 'object' ||
+            expectedDescriptor === null
+        ) {
             throw new Error(
-                `Verifier descriptor must be a JSON object: ${JSON.stringify(descriptor)}`
+                `Verifier descriptor must be a JSON object: ${JSON.stringify(expectedDescriptor)}`
+            );
+        }
+        const verifierId = uiVerifierId(expectedDescriptor);
+        if (verifierId === undefined) {
+            throw new Error(
+                `Verifier descriptor must identify one UI verifier preset: ${JSON.stringify(expectedDescriptor)}`
             );
         }
 
         logStage('presentation.submit', {
-            verifierId:
-                descriptor.verifierId ?? descriptorResponseUri(descriptor),
-            aud: descriptorAudience(descriptor),
-            nonce: descriptor.nonce ?? null,
+            verifierId,
+            aud: descriptorAudience(expectedDescriptor),
         });
         await waitForDomState(page, 'W3C presentation button ready', () => {
             const button = globalThis.document.querySelector(
-                '[data-testid="w3c-present-button"]'
+                presentationButtonSelector
             );
-            return button instanceof HTMLButtonElement && !button.disabled;
+            return (
+                button instanceof globalThis.HTMLButtonElement &&
+                !button.disabled
+            );
         });
-        const descriptorJson = JSON.stringify(descriptor, null, 2);
-        await setInputValue(
+        await selectVerifierPreset(
             page,
-            '[data-testid="w3c-verifier-request-input"] textarea',
-            descriptorJson
+            verifierId,
+            presentationControlsSelector,
+            presentationButtonSelector
         );
-        await waitForDomState(
+        const beforeClickDescriptor = await readVerifierRequestDescriptor(
             page,
-            'W3C verifier request input update',
-            (expectedValue) => {
-                const input = globalThis.document.querySelector(
-                    '[data-testid="w3c-verifier-request-input"] textarea'
-                );
-                const button = globalThis.document.querySelector(
-                    '[data-testid="w3c-present-button"]'
-                );
-                return (
-                    input instanceof HTMLTextAreaElement &&
-                    input.value === expectedValue &&
-                    button instanceof HTMLButtonElement &&
-                    !button.disabled
-                );
-            },
-            30000,
-            descriptorJson
+            presentationControlsSelector
         );
-        await dispatchClick(page, '[data-testid="w3c-present-button"]');
+        if (
+            descriptorAudience(expectedDescriptor) !== null &&
+            descriptorAudience(beforeClickDescriptor) !==
+                descriptorAudience(expectedDescriptor)
+        ) {
+            throw new Error(
+                `UI verifier audience mismatch: expected ${descriptorAudience(expectedDescriptor)}, got ${descriptorAudience(beforeClickDescriptor)}`
+            );
+        }
+        if (
+            descriptorResponseUri(expectedDescriptor) !== null &&
+            descriptorResponseUri(beforeClickDescriptor) !==
+                descriptorResponseUri(expectedDescriptor)
+        ) {
+            throw new Error(
+                `UI verifier response_uri mismatch: expected ${descriptorResponseUri(expectedDescriptor)}, got ${descriptorResponseUri(beforeClickDescriptor)}`
+            );
+        }
+        await dispatchClick(page, presentationButtonSelector);
+        const descriptor = await readSubmittedVerifierRequestDescriptor(
+            page,
+            presentationControlsSelector,
+            verifierId,
+            beforeClickDescriptor.nonce
+        );
 
         const tx = await waitForPresentationTx(client, descriptor);
         const operation = await waitForVerifierOperation(descriptor, tx);

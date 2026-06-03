@@ -3,6 +3,11 @@
 The Docker image runs the wallet used by a KERIA+Signify W3C crosswalk stack. 
 It builds from this repository plus package/image inputs.
 
+Default stack builds should consume published packages, immutable Git SHAs, or
+OCI images. Do not make the portable W3C stack depend on a sibling
+`signify-ts` source checkout. Local tree overrides are acceptable only as
+explicit developer experiments outside the default build contract.
+
 ## Build and publish
 
 Use the repo-owned Make targets to build or publish the wallet image:
@@ -43,3 +48,7 @@ context. It does not modify the working tree and does not regenerate
 `pnpm-lock.yaml`. Because the Dockerfile uses `pnpm install --frozen-lockfile`,
 the checked-in lockfile must already be compatible with the requested
 `SIGNIFY_TS_PACKAGE`.
+
+For cross-repo W3C validation, prefer a pushed GitHub SHA from the intended
+`signify-ts` branch over a `file:` dependency. That keeps browser, Docker, and
+headless runs reproducible across machines.

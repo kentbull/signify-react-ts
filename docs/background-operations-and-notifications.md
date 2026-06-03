@@ -76,12 +76,14 @@ Current keys:
 - Contact mutation: `contact:<contactId>`
 - Challenge response/request/verify:
   `challenge:<action>:<counterpartyAid>:<localIdentifier-or-challengeId>`
+- W3C issuance: `credential:<said>:w3c-issue`
+- W3C presentation: `credential:<said>:w3c-present`
 
 Expected future keys:
 
 - Schema resolution: `schema:<said>`
 - Registry creation: `registry:issuer:<aid>`
-- Credential flows: `credential:<said>`
+- Additional credential flows: `credential:<said>:<action>`
 
 The UI should disable only the conflicting action, not the whole app. For
 example, rotating one identifier should disable only that identifier's rotate
@@ -132,6 +134,25 @@ protocol inventory and synthetic challenge request hydration require KERIA.
 The global `LoadingOverlay` is for foreground work only: connect, passcode
 generation, route navigation, and loader/fetcher pending state. Background
 operations must not trigger the blocking overlay.
+
+## W3C Issuance And Presentation Notes
+
+W3C VRD issuance and presentation use the same operation records and
+notifications as other credential work, but the signing model is stricter than
+a passive KERIA operation wait.
+
+QVI-side W3C issuance starts as an app action and KERIA enters
+`pending_signature` until the browser edge signs the issuer VC proof and
+VC-JWT signing inputs. The workflow must run a scoped `W3CEdgeAutomator` while
+it waits. A background or foreground wrapper that only polls the issuance record
+will time out because KERIA is correctly waiting for edge signatures.
+
+Holder presentation records a local approval after KERIA creates the
+presentation transaction. The session did:webs/W3C worker handles the holder
+VP-JWT signing request through SSE or polling fallback, but only when the live
+transaction still matches the approved holder, credential SAID, audience, and
+nonce. Holder presentation signing must never be approved by a generic default
+policy.
 
 ## Adding A Background Flow
 

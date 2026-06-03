@@ -607,7 +607,7 @@ try {
         },
         {
             path: '/dashboard/credentials/not-found',
-            selector: '[data-testid="dashboard-credential-detail"]',
+            selector: '[data-testid="dashboard-held-credentials-detail"]',
         },
     ]) {
         await navigateSpa(page, path);

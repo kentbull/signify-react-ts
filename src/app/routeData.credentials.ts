@@ -13,6 +13,7 @@ import type {
     RouteDataRuntime,
 } from './routeData.types';
 import { formString, toRouteError } from './routeData.shared';
+import { appConfig } from '../config';
 
 /**
  * Credential route action boundary.
@@ -70,10 +71,14 @@ export const loadCredentials = async (
             runtime.credentials.syncInventory({ signal: request?.signal }),
         ]);
         await runtime.credentials.syncIpexActivity({ signal: request?.signal });
-        return { status: 'ready', verifiers: [] };
+        return {
+            status: 'ready',
+            verifiers: [...appConfig.w3cVerifiers],
+        };
     } catch (error) {
         return {
             status: 'error',
+            verifiers: [...appConfig.w3cVerifiers],
             message: `Unable to refresh credential inventory: ${toRouteError(error).message}`,
         };
     }

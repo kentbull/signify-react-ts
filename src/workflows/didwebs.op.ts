@@ -9,23 +9,17 @@ import {
     DidWebsAutoApprover,
     DWS_SIGNING_ROUTE,
     type DidWebsAutoApproveResult,
-    defaultSigningPolicy,
     type SignifyClient,
     type SignedReplyEnvelope,
-    W3C,
     W3C_IMPORT_ROUTE,
-    W3C_PURPOSE_HOLDER_VP_JWT,
     W3C_SIGNING_ROUTE,
     W3CEdgeAutomator,
     type W3CAutomationResult,
-    type W3CHeldCredential,
-    type W3CSigningPolicy,
-    type W3CSigningRequest,
 } from 'signify-ts';
 import { callPromise, toErrorText } from '../effects/promise';
 import { AppServicesContext, type AppServices } from '../effects/contexts';
 import { appNotificationRecorded } from '../state/appNotifications.slice';
-import { getW3CHolderPresentationApproval } from '../domain/credentials/w3cPresentationApprovals';
+import { createHolderPresentationSigningPolicy } from '../domain/credentials/w3cPresentationApprovals';
 import {
     didWebsDidFailed,
     didWebsDidLoaded,
@@ -34,6 +28,8 @@ import {
     didWebsReadyObserved,
     type DidWebsDidPayload,
 } from '../state/didwebs.slice';
+
+export { createHolderPresentationSigningPolicy } from '../domain/credentials/w3cPresentationApprovals';
 
 const minimumDidWebsPollingMs = 7000;
 const DWS_READY_ROUTE = '/didwebs/ready';
@@ -54,65 +50,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const stringValue = (value: unknown): string | null =>
     typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-
-export const createHolderPresentationSigningPolicy = (
-    client: SignifyClient
-): W3CSigningPolicy => {
-    const w3c = new W3C(client);
-    return async (request: W3CSigningRequest): Promise<boolean | string> => {
-        if (request.purpose !== W3C_PURPOSE_HOLDER_VP_JWT) {
-            return defaultSigningPolicy(request);
-        }
-
-        // Holder VP signing is never auto-approved by the default policy. The
-        // UI records an explicit presentation approval, then this policy binds
-        // the live KERIA tx back to that approval before the browser signs.
-        const presentTxId = request.related;
-        const approval = getW3CHolderPresentationApproval(presentTxId);
-        if (approval === undefined) {
-            return `holder presentation ${presentTxId} was not explicitly approved`;
-        }
-        if (
-            approval.holderAlias !== request.name ||
-            approval.holderAid !== request.aid
-        ) {
-            return `holder presentation ${presentTxId} targets ${request.name}/${request.aid}, but approval is for ${approval.holderAlias}/${approval.holderAid}`;
-        }
-
-        const tx = await w3c.presentTx(request.name, presentTxId);
-        if (
-            tx.holderAid !== approval.holderAid ||
-            tx.holderName !== approval.holderAlias
-        ) {
-            return `holder presentation ${presentTxId} no longer matches the approved holder`;
-        }
-        const requestId = request.requestId ?? request.d;
-        if (tx.signingRequestId !== requestId) {
-            return `holder presentation ${presentTxId} signing request does not match the approved transaction`;
-        }
-        if (stringValue(tx.aud) !== approval.aud) {
-            return `holder presentation ${presentTxId} audience does not match the approved request`;
-        }
-        if (stringValue(tx.nonce) !== approval.nonce) {
-            return `holder presentation ${presentTxId} nonce does not match the approved request`;
-        }
-
-        const selectedCredentialId = stringValue(tx.selectedCredentialId);
-        if (selectedCredentialId === null) {
-            return `holder presentation ${presentTxId} did not select a held credential`;
-        }
-        const held = (await w3c.credential(
-            request.name,
-            selectedCredentialId
-        )) as W3CHeldCredential;
-        if (
-            stringValue(held.sourceCredentialSaid) !== approval.credentialSaid
-        ) {
-            return `holder presentation ${presentTxId} selected credential does not match the approved source credential`;
-        }
-        return true;
-    };
-};
 
 /**
  * Incremental parser for JSON-valued Server-Sent Event frames.

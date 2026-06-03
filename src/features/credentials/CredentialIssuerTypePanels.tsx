@@ -42,7 +42,6 @@ import { statusTone } from './credentialDisplay';
 import { CredentialRecordRows } from './CredentialShared';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import { CredentialW3CIssuanceControls } from './CredentialW3CIssuanceControls';
-import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
 import type { CredentialActionData } from '../../app/routeData';
 
 /**
@@ -356,13 +355,9 @@ export const IssuedCredentialsForTypePanel = ({
     schemasBySaid,
     identifiers,
     didWebsReadyByAid,
-    verifiers,
-    selectedVerifierId,
     issuanceAction,
     onGrant,
     onStartW3CIssuance,
-    onVerifierChange,
-    onPresent,
 }: {
     credentials: readonly CredentialSummaryRecord[];
     actionRunning: boolean;
@@ -370,19 +365,11 @@ export const IssuedCredentialsForTypePanel = ({
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers: readonly unknown[];
-    selectedVerifierId: string;
     issuanceAction?: CredentialActionData | null;
     onGrant: (credential: CredentialSummaryRecord) => void;
     onStartW3CIssuance: (
         credential: CredentialSummaryRecord,
         issuer: IdentifierSummary
-    ) => void;
-    onVerifierChange: (verifierRequestJson: string) => void;
-    onPresent: (
-        credential: CredentialSummaryRecord,
-        presenter: IdentifierSummary,
-        verifierRequestJson: string
     ) => void;
 }) => (
     <ConsolePanel
@@ -454,16 +441,6 @@ export const IssuedCredentialsForTypePanel = ({
                                 actionRunning={actionRunning}
                                 issuanceAction={issuanceAction}
                                 onStartIssuance={onStartW3CIssuance}
-                            />
-                            <CredentialW3CPresentationControls
-                                credential={credential}
-                                identifiers={identifiers}
-                                didWebsReadyByAid={didWebsReadyByAid}
-                                verifiers={verifiers}
-                                selectedVerifierId={selectedVerifierId}
-                                actionRunning={actionRunning}
-                                onVerifierChange={onVerifierChange}
-                                onPresent={onPresent}
                             />
                         </Stack>
                     </Box>

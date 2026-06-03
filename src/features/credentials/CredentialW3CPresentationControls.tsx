@@ -1,5 +1,16 @@
-import { Button, Stack, TextField, Typography } from '@mui/material';
+import { useMemo, useState } from 'react';
+import {
+    Button,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
+    TextField,
+    Typography,
+} from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import { appConfig } from '../../config';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import {
     isW3CPresentableVrdCredential,
@@ -8,16 +19,21 @@ import {
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { CredentialActionData } from '../../app/routeData';
+import {
+    buildW3CVerifierRequestJson,
+    verifierPresetForSelection,
+    type W3CVerifierRequestPreset,
+} from '../../domain/credentials/w3cVerifierPresets';
 
 interface CredentialW3CPresentationControlsProps {
     credential: CredentialSummaryRecord;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers?: readonly unknown[];
+    verifiers?: readonly W3CVerifierRequestPreset[];
     selectedVerifierId: string;
     actionRunning: boolean;
     presentationAction?: CredentialActionData | null;
-    onVerifierChange: (verifierRequestJson: string) => void;
+    onVerifierChange: (verifierId: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
         presenter: IdentifierSummary,
@@ -27,18 +43,6 @@ interface CredentialW3CPresentationControlsProps {
 
 const controlId = (credentialSaid: string): string =>
     `w3c-verifier-request-${credentialSaid.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-
-const defaultVerifierRequestJson = (credentialSaid: string): string =>
-    JSON.stringify(
-        {
-            aud: 'https://verifier.example',
-            nonce: `nonce-${credentialSaid.slice(0, 12)}`,
-            response_uri: 'https://verifier.example/verify',
-            formats: ['vp+jwt'],
-        },
-        null,
-        2
-    );
 
 const parseVerifierRequest = (
     value: string
@@ -55,6 +59,12 @@ const parseVerifierRequest = (
     }
 };
 
+type VerifierRequestOverride = {
+    key: string;
+    value: string;
+    manual: boolean;
+};
+
 /**
  * Shared W3C presentation controls for admitted VRD credentials.
  *
@@ -66,6 +76,7 @@ export const CredentialW3CPresentationControls = ({
     credential,
     identifiers,
     didWebsReadyByAid,
+    verifiers = appConfig.w3cVerifiers,
     selectedVerifierId,
     actionRunning,
     presentationAction = null,
@@ -73,10 +84,45 @@ export const CredentialW3CPresentationControls = ({
     onPresent,
 }: CredentialW3CPresentationControlsProps) => {
     const presenter = selectCredentialW3CPresenter(credential, identifiers);
-    const effectiveVerifierRequestJson =
-        selectedVerifierId || defaultVerifierRequestJson(credential.said);
-    const verifierRequest = parseVerifierRequest(effectiveVerifierRequestJson);
+    const availableVerifiers =
+        verifiers.length > 0 ? verifiers : appConfig.w3cVerifiers;
+    const selectedVerifier = verifierPresetForSelection(
+        selectedVerifierId,
+        availableVerifiers
+    );
+    const verifierRequestKey = [
+        credential.said,
+        selectedVerifier.id,
+        selectedVerifier.publicBaseUrl,
+        selectedVerifier.submissionBaseUrl,
+        selectedVerifier.verifyVpPath,
+    ].join('|');
+    const defaultVerifierRequestJson = useMemo(
+        () =>
+            buildW3CVerifierRequestJson({
+                preset: selectedVerifier,
+                credentialSaid: credential.said,
+            }),
+        [credential.said, selectedVerifier]
+    );
+    const [verifierRequestOverride, setVerifierRequestOverride] =
+        useState<VerifierRequestOverride | null>(null);
+    const activeVerifierRequestOverride =
+        verifierRequestOverride?.key === verifierRequestKey
+            ? verifierRequestOverride
+            : null;
+    const verifierRequestJson =
+        activeVerifierRequestOverride?.value ?? defaultVerifierRequestJson;
+    const manualVerifierRequest =
+        activeVerifierRequestOverride?.manual === true;
+    const verifierRequest = parseVerifierRequest(verifierRequestJson);
+    const buildSelectedVerifierRequestJson = () =>
+        buildW3CVerifierRequestJson({
+            preset: selectedVerifier,
+            credentialSaid: credential.said,
+        });
     const verifierLabelId = controlId(credential.said);
+    const verifierSelectorLabelId = `${verifierLabelId}-selector-label`;
     const schemaSupported = isW3CPresentableVrdCredential(credential);
     const statusPresentable =
         credential.status === 'admitted' ||
@@ -94,7 +140,7 @@ export const CredentialW3CPresentationControls = ({
         : !schemaSupported
           ? 'Only supported VRD credentials can be presented through W3C.'
           : presenter === null
-            ? 'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
+            ? 'This wallet does not control the credential holder AID required for W3C Present.'
             : verifierRequest === null
               ? 'Enter a valid runtime verifier request JSON object.'
               : !didWebsReady
@@ -110,18 +156,50 @@ export const CredentialW3CPresentationControls = ({
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
         >
-            <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1}
-                sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}
-            >
+            <Stack spacing={1}>
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <InputLabel id={verifierSelectorLabelId}>
+                        Verifier
+                    </InputLabel>
+                    <Select
+                        labelId={verifierSelectorLabelId}
+                        label="Verifier"
+                        value={selectedVerifier.id}
+                        disabled={actionRunning}
+                        data-testid="w3c-verifier-selector"
+                        onChange={(event) => {
+                            const nextVerifier = verifierPresetForSelection(
+                                event.target.value,
+                                availableVerifiers
+                            );
+                            onVerifierChange(nextVerifier.id);
+                            setVerifierRequestOverride(null);
+                        }}
+                    >
+                        {availableVerifiers.map((verifier) => (
+                            <MenuItem
+                                key={verifier.id}
+                                value={verifier.id}
+                                data-testid={`w3c-verifier-option-${verifier.id}`}
+                            >
+                                {verifier.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
                 <TextField
                     id={verifierLabelId}
                     label="Verifier request"
                     size="small"
                     data-testid="w3c-verifier-request-input"
-                    value={effectiveVerifierRequestJson}
-                    onChange={(event) => onVerifierChange(event.target.value)}
+                    value={verifierRequestJson}
+                    onChange={(event) => {
+                        setVerifierRequestOverride({
+                            key: verifierRequestKey,
+                            value: event.target.value,
+                            manual: true,
+                        });
+                    }}
                     disabled={actionRunning}
                     multiline
                     minRows={3}
@@ -140,10 +218,20 @@ export const CredentialW3CPresentationControls = ({
                             presenter !== null &&
                             verifierRequest !== null
                         ) {
+                            const requestJson = manualVerifierRequest
+                                ? verifierRequestJson
+                                : buildSelectedVerifierRequestJson();
+                            if (!manualVerifierRequest) {
+                                setVerifierRequestOverride({
+                                    key: verifierRequestKey,
+                                    value: requestJson,
+                                    manual: false,
+                                });
+                            }
                             onPresent(
                                 credential,
                                 presenter,
-                                effectiveVerifierRequestJson
+                                requestJson
                             );
                         }
                     }}
@@ -153,6 +241,7 @@ export const CredentialW3CPresentationControls = ({
             </Stack>
             <Typography
                 data-testid="w3c-presentation-status"
+                data-credential-said={credential.said}
                 data-state={blocker === null ? 'ready' : 'blocked'}
                 data-presenter-aid={presenter?.prefix ?? ''}
                 variant="caption"
@@ -165,6 +254,7 @@ export const CredentialW3CPresentationControls = ({
             {presentationActionResult !== null && (
                 <Typography
                     data-testid="w3c-presentation-action-result"
+                    data-credential-said={credential.said}
                     data-state={
                         presentationActionResult.ok ? 'accepted' : 'error'
                     }
