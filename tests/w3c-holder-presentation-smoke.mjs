@@ -348,6 +348,90 @@ const waitForElement = async (page, selector, timeoutMs = 30000) =>
         selector
     );
 
+const waitForElementAttribute = async (
+    page,
+    selector,
+    attribute,
+    expectedValue,
+    label,
+    timeoutMs = 30000
+) =>
+    waitForDomState(
+        page,
+        label,
+        (targetSelector, targetAttribute, targetValue) => {
+            const element = globalThis.document.querySelector(targetSelector);
+            if (!(element instanceof globalThis.HTMLElement)) {
+                return `missing element ${targetSelector}`;
+            }
+            const actual = element.getAttribute(targetAttribute);
+            if (actual === targetValue) {
+                return true;
+            }
+            return {
+                actual,
+                text: element.textContent?.trim() ?? '',
+            };
+        },
+        timeoutMs,
+        selector,
+        attribute,
+        expectedValue
+    );
+
+const waitForEnabledButton = async (
+    page,
+    selector,
+    label,
+    timeoutMs = 30000
+) =>
+    waitForDomState(
+        page,
+        label,
+        (targetSelector) => {
+            const button = globalThis.document.querySelector(targetSelector);
+            if (!(button instanceof globalThis.HTMLButtonElement)) {
+                return `missing button ${targetSelector}`;
+            }
+            if (button.disabled) {
+                return {
+                    disabled: true,
+                    text: button.textContent?.trim() ?? '',
+                };
+            }
+            return true;
+        },
+        timeoutMs,
+        selector
+    );
+
+const waitForAcceptedActionResult = async (
+    page,
+    selector,
+    label,
+    timeoutMs = 30000
+) =>
+    waitForDomState(
+        page,
+        label,
+        (targetSelector) => {
+            const result = globalThis.document.querySelector(targetSelector);
+            if (!(result instanceof globalThis.HTMLElement)) {
+                return `missing action result ${targetSelector}`;
+            }
+            const state = result.getAttribute('data-state');
+            if (state === 'accepted') {
+                return true;
+            }
+            return {
+                state,
+                text: result.textContent?.trim() ?? '',
+            };
+        },
+        timeoutMs,
+        selector
+    );
+
 const navigateInApp = async (page, path) => {
     await page.evaluate((nextPath) => {
         globalThis.history.pushState({}, '', nextPath);
@@ -585,48 +669,32 @@ const waitForHolderHeldCredential = async (client) => {
 
 const startIssuerW3CIssuance = async (page, issuerAid) => {
     const issuanceButtonSelector = `[data-testid="w3c-start-issuance-button"][data-credential-said="${credentialSaid}"]`;
+    const issuanceStatusSelector = `[data-testid="w3c-issuance-status"][data-credential-said="${credentialSaid}"]`;
+    const issuanceActionResultSelector = `[data-testid="w3c-issuance-action-result"][data-credential-said="${credentialSaid}"]`;
     logStage('issuer.credential.goto', { issuerAlias, credentialSaid });
     await navigateInApp(
         page,
         `/credentials/${encodeURIComponent(issuerAid)}/issuer`
     );
-    await waitForDomState(
+    await waitForElementAttribute(
         page,
+        issuanceStatusSelector,
+        'data-state',
+        'ready',
         'W3C issuance controls',
-        () =>
-            globalThis.document
-                .querySelector(
-                    `[data-testid="w3c-issuance-status"][data-credential-said="${credentialSaid}"]`
-                )
-                ?.getAttribute('data-state') === 'ready',
         120000
     );
     logStage('issuer.issuance.ready', { issuerAlias, credentialSaid });
-    await waitForDomState(page, 'W3C issuance button ready', () => {
-        const button = globalThis.document.querySelector(
-            `[data-testid="w3c-start-issuance-button"][data-credential-said="${credentialSaid}"]`
-        );
-        return (
-            button instanceof globalThis.HTMLButtonElement && !button.disabled
-        );
-    });
-    await dispatchClick(page, issuanceButtonSelector);
-    await waitForDomState(
+    await waitForEnabledButton(
         page,
+        issuanceButtonSelector,
+        'W3C issuance button ready'
+    );
+    await dispatchClick(page, issuanceButtonSelector);
+    await waitForAcceptedActionResult(
+        page,
+        issuanceActionResultSelector,
         'W3C issuance action accepted',
-        () => {
-            const result = globalThis.document.querySelector(
-                `[data-testid="w3c-issuance-action-result"][data-credential-said="${credentialSaid}"]`
-            );
-            if (!(result instanceof globalThis.HTMLElement)) {
-                return 'missing action result';
-            }
-            const state = result.getAttribute('data-state');
-            if (state === 'error') {
-                return { state, text: result.textContent };
-            }
-            return state === 'accepted';
-        },
         30000
     );
     logStage('issuer.issuance.started', { issuerAlias, credentialSaid });
@@ -636,6 +704,8 @@ const waitForPresentationTx = async (client, descriptor) => {
     const expectedAud = descriptorAudience(descriptor);
     const expectedNonce = descriptor.nonce ?? null;
     const expectedResponseUri = descriptorResponseUri(descriptor);
+    let lastMatchingTx = null;
+    let lastLoggedTxState = null;
 
     for (let attempt = 0; attempt < 180; attempt += 1) {
         const body = await getJson(
@@ -653,6 +723,18 @@ const waitForPresentationTx = async (client, descriptor) => {
             );
         });
 
+        if (tx !== undefined) {
+            lastMatchingTx = tx;
+            const stateKey = `${tx.presentTxId ?? ''}:${tx.state ?? ''}`;
+            if (stateKey !== lastLoggedTxState) {
+                lastLoggedTxState = stateKey;
+                logStage('presentation.tx.state', {
+                    presentTxId: tx.presentTxId ?? null,
+                    state: tx.state ?? null,
+                    signingRequestId: tx.signingRequestId ?? null,
+                });
+            }
+        }
         if (tx?.state === 'failed') {
             throw new Error(
                 `KERIA presentation transaction failed: ${tx.error ?? JSON.stringify(tx)}`
@@ -668,6 +750,11 @@ const waitForPresentationTx = async (client, descriptor) => {
         await sleep(1000);
     }
 
+    if (lastMatchingTx !== null) {
+        throw new Error(
+            `Timed out waiting for W3C presentation transaction ${lastMatchingTx.presentTxId}. Last state: ${lastMatchingTx.state}.`
+        );
+    }
     throw new Error(
         `Timed out waiting for KERIA presentation tx for nonce ${expectedNonce}`
     );
@@ -826,21 +913,19 @@ try {
     const client = holderClient;
     const presentationControlsSelector = `[data-testid="w3c-presentation-controls-${credentialSaid}"]`;
     const presentationButtonSelector = `[data-testid="w3c-present-button"][data-credential-said="${credentialSaid}"]`;
+    const presentationStatusSelector = `[data-testid="w3c-presentation-status"][data-credential-said="${credentialSaid}"]`;
 
     logStage('credential.goto', { credentialSaid });
     await navigateInApp(
         page,
         `/credentials/${encodeURIComponent(holderAid)}/wallet`
     );
-    await waitForDomState(
+    await waitForElementAttribute(
         page,
+        presentationStatusSelector,
+        'data-state',
+        'ready',
         'W3C presentation controls',
-        () =>
-            globalThis.document
-                .querySelector(
-                    `[data-testid="w3c-presentation-status"][data-credential-said="${credentialSaid}"]`
-                )
-                ?.getAttribute('data-state') === 'ready'
     );
     logStage('credential.ready', { credentialSaid });
 
@@ -864,15 +949,11 @@ try {
             verifierId,
             aud: descriptorAudience(expectedDescriptor),
         });
-        await waitForDomState(page, 'W3C presentation button ready', () => {
-            const button = globalThis.document.querySelector(
-                presentationButtonSelector
-            );
-            return (
-                button instanceof globalThis.HTMLButtonElement &&
-                !button.disabled
-            );
-        });
+        await waitForEnabledButton(
+            page,
+            presentationButtonSelector,
+            'W3C presentation button ready'
+        );
         await selectVerifierPreset(
             page,
             verifierId,
