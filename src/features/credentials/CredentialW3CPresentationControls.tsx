@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react';
+import {
+    useMemo,
+    useState,
+    type ChangeEvent,
+} from 'react';
 import {
     Button,
     FormControl,
@@ -10,6 +14,7 @@ import {
     Typography,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import { appConfig } from '../../config';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import {
@@ -149,6 +154,49 @@ export const CredentialW3CPresentationControls = ({
                   ? 'A credential command is already running.'
                   : null;
 
+    function selectVerifier(
+        event: SelectChangeEvent<string>
+    ): void {
+        const nextVerifier = verifierPresetForSelection(
+            event.target.value,
+            availableVerifiers
+        );
+        onVerifierChange(nextVerifier.id);
+        setVerifierRequestOverride(null);
+    }
+
+    function verifierRequestChange(
+        event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ): void {
+        setVerifierRequestOverride({
+            key: verifierRequestKey,
+            value: event.target.value,
+            manual: true,
+        });
+    }
+
+    function presentW3C(): void {
+        if (
+            blocker !== null ||
+            presenter === null ||
+            verifierRequest === null
+        ) {
+            return;
+        }
+
+        const requestJson = manualVerifierRequest
+            ? verifierRequestJson
+            : buildSelectedVerifierRequestJson();
+        if (!manualVerifierRequest) {
+            setVerifierRequestOverride({
+                key: verifierRequestKey,
+                value: requestJson,
+                manual: false,
+            });
+        }
+        onPresent(credential, presenter, requestJson);
+    }
+
     return (
         <Stack
             spacing={0.75}
@@ -167,14 +215,7 @@ export const CredentialW3CPresentationControls = ({
                         value={selectedVerifier.id}
                         disabled={actionRunning}
                         data-testid="w3c-verifier-selector"
-                        onChange={(event) => {
-                            const nextVerifier = verifierPresetForSelection(
-                                event.target.value,
-                                availableVerifiers
-                            );
-                            onVerifierChange(nextVerifier.id);
-                            setVerifierRequestOverride(null);
-                        }}
+                        onChange={selectVerifier}
                     >
                         {availableVerifiers.map((verifier) => (
                             <MenuItem
@@ -193,13 +234,7 @@ export const CredentialW3CPresentationControls = ({
                     size="small"
                     data-testid="w3c-verifier-request-input"
                     value={verifierRequestJson}
-                    onChange={(event) => {
-                        setVerifierRequestOverride({
-                            key: verifierRequestKey,
-                            value: event.target.value,
-                            manual: true,
-                        });
-                    }}
+                    onChange={verifierRequestChange}
                     disabled={actionRunning}
                     multiline
                     minRows={3}
@@ -212,29 +247,7 @@ export const CredentialW3CPresentationControls = ({
                     data-testid="w3c-present-button"
                     data-credential-said={credential.said}
                     data-ui-sound={UI_SOUND_HOVER_VALUE}
-                    onClick={() => {
-                        if (
-                            blocker === null &&
-                            presenter !== null &&
-                            verifierRequest !== null
-                        ) {
-                            const requestJson = manualVerifierRequest
-                                ? verifierRequestJson
-                                : buildSelectedVerifierRequestJson();
-                            if (!manualVerifierRequest) {
-                                setVerifierRequestOverride({
-                                    key: verifierRequestKey,
-                                    value: requestJson,
-                                    manual: false,
-                                });
-                            }
-                            onPresent(
-                                credential,
-                                presenter,
-                                requestJson
-                            );
-                        }
-                    }}
+                    onClick={presentW3C}
                 >
                     Present
                 </Button>
