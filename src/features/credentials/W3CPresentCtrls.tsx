@@ -19,7 +19,7 @@ import { appConfig } from '../../config';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import {
     isW3CPresentableVrdCredential,
-    selectCredentialW3CPresenter,
+    selectW3CPresenter,
 } from '../../domain/credentials/credentialPresentation';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
@@ -30,7 +30,7 @@ import {
     type W3CVerifierRequestPreset,
 } from '../../domain/credentials/w3cVerifierPresets';
 
-interface CredentialW3CPresentationControlsProps {
+interface W3CPresentCtrlsProps {
     credential: CredentialSummaryRecord;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
@@ -77,7 +77,7 @@ type VerifierRequestOverride = {
  * This component accepts a runtime verifier request descriptor instead of a
  * deployment-time verifier allowlist entry.
  */
-export const CredentialW3CPresentationControls = ({
+export const W3CPresentCtrls = ({
     credential,
     identifiers,
     didWebsReadyByAid,
@@ -87,8 +87,8 @@ export const CredentialW3CPresentationControls = ({
     presentationAction = null,
     onVerifierChange,
     onPresent,
-}: CredentialW3CPresentationControlsProps) => {
-    const presenter = selectCredentialW3CPresenter(credential, identifiers);
+}: W3CPresentCtrlsProps) => {
+    const presenter = selectW3CPresenter(credential, identifiers);
     const availableVerifiers =
         verifiers.length > 0 ? verifiers : appConfig.w3cVerifiers;
     const selectedVerifier = verifierPresetForSelection(
@@ -140,35 +140,29 @@ export const CredentialW3CPresentationControls = ({
             ? presentationAction
             : null;
 
-    function getW3CPresentationBlockerMessage(): string | null {
+    function getW3CPresentBlockerMsg(): string | null {
         if (!statusPresentable) {
             return `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`;
         }
-
         if (!schemaSupported) {
             return 'Only supported VRD credentials can be presented through W3C.';
         }
-
         if (presenter === null) {
             return 'This wallet does not control the credential holder AID required for W3C Present.';
         }
-
         if (verifierRequest === null) {
             return 'Enter a valid runtime verifier request JSON object.';
         }
-
         if (!didWebsReady) {
             return 'The presenter did:webs DID is not ready.';
         }
-
         if (actionRunning) {
             return 'A credential command is already running.';
         }
-
         return null;
     }
 
-    const blockerMsg = getW3CPresentationBlockerMessage();
+    const blockerMsg = getW3CPresentBlockerMsg();
 
     function selectVerifier(
         event: SelectChangeEvent<string>

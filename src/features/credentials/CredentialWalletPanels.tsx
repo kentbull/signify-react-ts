@@ -19,7 +19,7 @@ import type { W3CVerifierRequestPreset } from '../../domain/credentials/w3cVerif
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { CredentialWalletStats } from './credentialViewModels';
 import { schemaLabel, schemaStatusTone, statusTone } from './credentialDisplay';
-import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
+import { W3CPresentCtrls } from './W3CPresentCtrls.tsx';
 
 /**
  * Holder-side credential type readiness panel.
@@ -337,7 +337,7 @@ export const HeldCredentialsPanel = ({
                             <Typography variant="body2" sx={monoValueSx}>
                                 {abbreviateMiddle(credential.said, 28)}
                             </Typography>
-                            <CredentialW3CPresentationControls
+                            <W3CPresentCtrls
                                 credential={credential}
                                 identifiers={identifiers}
                                 didWebsReadyByAid={didWebsReadyByAid}

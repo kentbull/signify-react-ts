@@ -2,12 +2,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialWalletPanels';
 import { CredentialW3CIssuanceControls } from '../../src/features/credentials/CredentialW3CIssuanceControls';
-import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
+import { W3CPresentCtrls } from '../../src/features/credentials/W3CPresentCtrls';
 import { IssuedCredentialsForTypePanel } from '../../src/features/credentials/CredentialIssuerTypePanels';
 import { appConfig } from '../../src/config';
 import {
     selectCredentialW3CIssuer,
-    selectCredentialW3CPresenter,
+    selectW3CPresenter,
     W3C_PRESENTABLE_VRD_SCHEMA_SAID,
 } from '../../src/domain/credentials/credentialPresentation';
 import type {
@@ -58,10 +58,10 @@ describe('wallet credential panels', () => {
             'Eissuer'
         );
         expect(
-            selectCredentialW3CPresenter(credential, identifiers)?.prefix
+            selectW3CPresenter(credential, identifiers)?.prefix
         ).toBe('Eholder');
         expect(
-            selectCredentialW3CPresenter(
+            selectW3CPresenter(
                 { ...credential, direction: 'issued' },
                 identifiers
             )
@@ -95,7 +95,7 @@ describe('wallet credential panels', () => {
 
     it('renders the shared verifier selector and explicit W3C Present blockers', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
@@ -121,7 +121,7 @@ describe('wallet credential panels', () => {
 
     it('uses a local holder as the presenter for held VRD credentials', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
@@ -143,7 +143,7 @@ describe('wallet credential panels', () => {
 
     it('does not present issued VRD credentials through the issuer role', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     direction: 'issued',

@@ -39,7 +39,7 @@ export const selectCredentialW3CIssuer = (
 };
 
 /** Select the local AID that should run W3C Present for this credential. */
-export const selectCredentialW3CPresenter = (
+export const selectW3CPresenter = (
     credential: CredentialSummaryRecord,
     identifiers: readonly IdentifierSummary[]
 ): IdentifierSummary | null => {

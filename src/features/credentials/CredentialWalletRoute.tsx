@@ -26,7 +26,7 @@ import {
     WalletStatsPanel,
 } from './CredentialWalletPanels';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
-import { selectCredentialW3CPresenter } from '../../domain/credentials/credentialPresentation';
+import { selectW3CPresenter } from '../../domain/credentials/credentialPresentation';
 
 /**
  * Wallet route for one selected local AID.
@@ -81,7 +81,7 @@ export const CredentialWalletRoute = () => {
                 new Map(
                     selectedAidHeldCredentials
                         .map((credential) =>
-                            selectCredentialW3CPresenter(
+                            selectW3CPresenter(
                                 credential,
                                 identifiers
                             )
