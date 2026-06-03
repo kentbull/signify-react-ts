@@ -140,19 +140,35 @@ export const CredentialW3CPresentationControls = ({
             ? presentationAction
             : null;
 
-    const blocker = !statusPresentable
-        ? `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`
-        : !schemaSupported
-          ? 'Only supported VRD credentials can be presented through W3C.'
-          : presenter === null
-            ? 'This wallet does not control the credential holder AID required for W3C Present.'
-            : verifierRequest === null
-              ? 'Enter a valid runtime verifier request JSON object.'
-              : !didWebsReady
-                ? 'The presenter did:webs DID is not ready.'
-                : actionRunning
-                  ? 'A credential command is already running.'
-                  : null;
+    function getW3CPresentationBlockerMessage(): string | null {
+        if (!statusPresentable) {
+            return `Credential status is ${credential.status}; W3C Present requires an active issued or admitted VRD credential.`;
+        }
+
+        if (!schemaSupported) {
+            return 'Only supported VRD credentials can be presented through W3C.';
+        }
+
+        if (presenter === null) {
+            return 'This wallet does not control the credential holder AID required for W3C Present.';
+        }
+
+        if (verifierRequest === null) {
+            return 'Enter a valid runtime verifier request JSON object.';
+        }
+
+        if (!didWebsReady) {
+            return 'The presenter did:webs DID is not ready.';
+        }
+
+        if (actionRunning) {
+            return 'A credential command is already running.';
+        }
+
+        return null;
+    }
+
+    const blockerMsg = getW3CPresentationBlockerMessage();
 
     function selectVerifier(
         event: SelectChangeEvent<string>
@@ -176,11 +192,9 @@ export const CredentialW3CPresentationControls = ({
     }
 
     function presentW3C(): void {
-        if (
-            blocker !== null ||
+        if (blockerMsg !== null ||
             presenter === null ||
-            verifierRequest === null
-        ) {
+              verifierRequest === null ){
             return;
         }
 
@@ -243,7 +257,7 @@ export const CredentialW3CPresentationControls = ({
                 <Button
                     variant="outlined"
                     startIcon={<SendIcon />}
-                    disabled={blocker !== null}
+                    disabled={blockerMsg !== null}
                     data-testid="w3c-present-button"
                     data-credential-said={credential.said}
                     data-ui-sound={UI_SOUND_HOVER_VALUE}
@@ -255,13 +269,13 @@ export const CredentialW3CPresentationControls = ({
             <Typography
                 data-testid="w3c-presentation-status"
                 data-credential-said={credential.said}
-                data-state={blocker === null ? 'ready' : 'blocked'}
+                data-state={blockerMsg === null ? 'ready' : 'blocked'}
                 data-presenter-aid={presenter?.prefix ?? ''}
                 variant="caption"
-                color={blocker === null ? 'text.secondary' : 'warning.main'}
+                color={blockerMsg === null ? 'text.secondary' : 'warning.main'}
                 sx={{ overflowWrap: 'anywhere' }}
             >
-                {blocker ??
+                {blockerMsg ??
                     'Ready to create a KERIA W3C presentation transaction from this verifier request.'}
             </Typography>
             {presentationActionResult !== null && (
