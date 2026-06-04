@@ -30,11 +30,12 @@ const w3cMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('signify-w3c', () => ({
+    W3C_GRANT_ROUTE: '/w3c/vc/grant',
     issueW3CCredential: w3cMocks.issueW3CCredential,
     presentW3CCredential: w3cMocks.presentW3CCredential,
     W3CKeriaClient: vi.fn().mockImplementation(function () {
         return {
-        credentials: w3cMocks.credentials,
+            credentials: w3cMocks.credentials,
         };
     }),
 }));

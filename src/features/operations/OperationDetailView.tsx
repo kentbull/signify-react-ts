@@ -129,7 +129,9 @@ export const OperationDetailView = () => {
                 {operation.notificationId && (
                     <Link
                         component={RouterLink}
-                        to="/notifications"
+                        to={`/notifications/${encodeURIComponent(
+                            operation.notificationId
+                        )}`}
                         sx={{ alignSelf: 'center' }}
                     >
                         View notification

@@ -162,6 +162,7 @@ export const AppNotificationsView = () => {
                                             details={
                                                 notification.payloadDetails
                                             }
+                                            showStructured={false}
                                         />
                                         <Stack
                                             direction="row"
@@ -302,6 +303,27 @@ export const AppNotificationsView = () => {
                                                             notification
                                                                 .delegationRequest
                                                                 .delegateAid
+                                                        }
+                                                    </Typography>
+                                                )}
+                                            {notification.w3cVcGrant !== null &&
+                                                notification.w3cVcGrant !==
+                                                    undefined && (
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        W3C source{' '}
+                                                        {
+                                                            notification
+                                                                .w3cVcGrant
+                                                                .sourceCredentialSaid
+                                                        }{' '}
+                                                        / status{' '}
+                                                        {
+                                                            notification
+                                                                .w3cVcGrant
+                                                                .status
                                                         }
                                                     </Typography>
                                                 )}

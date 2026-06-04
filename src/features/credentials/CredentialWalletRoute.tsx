@@ -191,7 +191,9 @@ export const CredentialWalletRoute = () => {
                 verifiers={w3cVerifiers}
                 selectedVerifierId={effectiveVerifierId}
                 presentationAction={
-                    actionStatus?.intent === 'presentCredential'
+                    actionStatus !== null &&
+                    'intent' in actionStatus &&
+                    actionStatus.intent === 'presentCredential'
                         ? actionStatus
                         : null
                 }

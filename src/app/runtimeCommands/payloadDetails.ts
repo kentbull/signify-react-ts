@@ -18,6 +18,14 @@ const stringArray = (value: unknown): string[] =>
 const detailId = (label: string, index: number): string =>
     `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${index}`;
 
+const jsonText = (value: unknown): string | null => {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return null;
+    }
+};
+
 const aliasForAid = (state: RootState, aid: string): string | null => {
     const localAlias = state.identifiers.byPrefix[aid]?.name?.trim();
     if (localAlias !== undefined && localAlias.length > 0) {
@@ -191,10 +199,21 @@ export const w3cPresentationPayloadDetails = (
     const state = stringValue(result.state);
     const submissionState = stringValue(result.submissionState);
     const submissionEndpoint = stringValue(result.submissionEndpoint);
+    const vpJwt = stringValue(result.vpJwt);
+    const vcJwt = stringValue(result.vcJwt);
+    const verifierRequest = isRecord(result.verifierRequest)
+        ? result.verifierRequest
+        : isRecord(result.requestDescriptor)
+          ? result.requestDescriptor
+          : null;
     const verifierResponse = isRecord(result.verifierResponse)
         ? result.verifierResponse
         : null;
     const verifierOperation = stringValue(verifierResponse?.name);
+    const verifierRequestText =
+        verifierRequest === null ? null : jsonText(verifierRequest);
+    const verifierResponseText =
+        verifierResponse === null ? null : jsonText(verifierResponse);
 
     if (presentTxId !== null) {
         details.push({
@@ -238,6 +257,42 @@ export const w3cPresentationPayloadDetails = (
             label: 'Submission Endpoint',
             value: submissionEndpoint,
             kind: 'url',
+            copyable: true,
+        });
+    }
+    if (vpJwt !== null) {
+        details.push({
+            id: detailId('w3c-vp-jwt', details.length),
+            label: 'VP-JWT',
+            value: vpJwt,
+            kind: 'jwt',
+            copyable: true,
+        });
+    }
+    if (vcJwt !== null) {
+        details.push({
+            id: detailId('w3c-vc-jwt', details.length),
+            label: 'VC-JWT',
+            value: vcJwt,
+            kind: 'jwt',
+            copyable: true,
+        });
+    }
+    if (verifierRequestText !== null) {
+        details.push({
+            id: detailId('w3c-verifier-request', details.length),
+            label: 'Verifier Request',
+            value: verifierRequestText,
+            kind: 'json',
+            copyable: true,
+        });
+    }
+    if (verifierResponseText !== null) {
+        details.push({
+            id: detailId('w3c-verifier-response', details.length),
+            label: 'Verifier Response',
+            value: verifierResponseText,
+            kind: 'json',
             copyable: true,
         });
     }

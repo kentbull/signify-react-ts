@@ -789,6 +789,110 @@ const startIssuerW3CIssuance = async (page, issuerAid) => {
     logStage('issuer.issuance.started', { issuerAlias, credentialSaid });
 };
 
+const openNotificationDetailByText = async (page, label, textFragment) => {
+    await waitForDomState(
+        page,
+        `${label} notification list item`,
+        (fragment) => {
+            const links = [
+                ...globalThis.document.querySelectorAll(
+                    'a[href^="/notifications/"]'
+                ),
+            ];
+            const link = links.find((candidate) => {
+                const container =
+                    candidate.closest('li') ??
+                    candidate.closest('[data-testid$="notification-card"]') ??
+                    candidate;
+                return container.textContent?.includes(fragment) === true;
+            });
+            if (link instanceof globalThis.HTMLAnchorElement) {
+                link.click();
+                return true;
+            }
+            return {
+                linkCount: links.length,
+                body: globalThis.document.body.textContent?.slice(0, 1000),
+            };
+        },
+        60000,
+        textFragment
+    );
+};
+
+const waitForHolderW3CGrantNotification = async (page) => {
+    await navigateInApp(page, '/notifications');
+    await waitForDomState(
+        page,
+        'holder W3C grant materialized notification',
+        (sourceCredentialSaid) => {
+            const body = globalThis.document.body.textContent ?? '';
+            return (
+                body.includes('W3C VC-JWT grant materialized') &&
+                body.includes(sourceCredentialSaid) &&
+                body.includes('materialized')
+            );
+        },
+        120000,
+        credentialSaid
+    );
+    await openNotificationDetailByText(
+        page,
+        'W3C grant',
+        'W3C VC-JWT grant materialized'
+    );
+    await waitForDomState(
+        page,
+        'W3C grant detail VC-JWT payload',
+        () => {
+            const body = globalThis.document.body.textContent ?? '';
+            return (
+                body.includes('Granted VC-JWT') &&
+                body.includes('JOSE header') &&
+                body.includes('JWT payload') &&
+                body.includes('Raw compact token')
+            );
+        },
+        60000
+    );
+    logStage('holder.w3cGrant.notification.materialized', {
+        credentialSaid,
+    });
+};
+
+const waitForPresentationNotificationDetail = async (page) => {
+    await navigateInApp(page, '/notifications');
+    await waitForDomState(
+        page,
+        'credential presented app notification',
+        () =>
+            (globalThis.document.body.textContent ?? '').includes(
+                'Credential presented'
+            ),
+        60000
+    );
+    await openNotificationDetailByText(
+        page,
+        'presentation',
+        'Credential presented'
+    );
+    await waitForDomState(
+        page,
+        'presentation notification W3C artifact details',
+        () => {
+            const body = globalThis.document.body.textContent ?? '';
+            return (
+                body.includes('VP-JWT') &&
+                body.includes('VC-JWT') &&
+                body.includes('Verifier Request') &&
+                body.includes('Nested VC-JWTs')
+            );
+        },
+        60000
+    );
+    logStage('presentation.notification.artifacts.visible');
+};
+
 const presentationIds = async (client) => {
     const body = await getJson(
         client,
@@ -1066,6 +1170,7 @@ try {
     const existingHeldCredentialIds = await heldW3CCredentialIds(holderClient);
     await startIssuerW3CIssuance(issuer.page, issuerAid);
     await waitForHolderHeldCredential(holderClient, existingHeldCredentialIds);
+    await waitForHolderW3CGrantNotification(holder.page);
 
     const page = holder.page;
     const client = holderClient;
@@ -1181,6 +1286,7 @@ try {
                 `KERIA tx binding mismatch: expected ${JSON.stringify(binding)}, got ${JSON.stringify({ aud: tx.aud, responseUri: tx.responseUri })}`
             );
         }
+        await waitForPresentationNotificationDetail(page);
         console.log(
             JSON.stringify({
                 stage: 'presentation.accepted',
