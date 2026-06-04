@@ -38,13 +38,26 @@ const startViteIfNeeded = async () => {
         return null;
     }
 
-    const child = spawn('pnpm', ['exec', 'vite', '--host', '127.0.0.1'], {
-        stdio: 'ignore',
-        env: {
-            ...process.env,
-            BROWSER: 'none',
-        },
-    });
+    const url = new URL(appUrl);
+    const child = spawn(
+        'pnpm',
+        [
+            'exec',
+            'vite',
+            '--host',
+            url.hostname,
+            '--port',
+            url.port,
+            '--strictPort',
+        ],
+        {
+            stdio: 'ignore',
+            env: {
+                ...process.env,
+                BROWSER: 'none',
+            },
+        }
+    );
 
     await waitForApp();
     return child;

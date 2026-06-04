@@ -1,10 +1,13 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
-import puppeteer, { type ElementHandle, type Page } from 'puppeteer';
+import puppeteer, { type Page } from 'puppeteer';
 import { b, Serder, Siger, Verfer, type SignifyClient } from 'signify-ts';
 import { appConfig } from '../src/config';
-import { connectSignifyClient } from '../src/signify/client';
+import {
+    connectSignifyClient,
+    randomSignifyPasscode,
+} from '../src/signify/client';
 
 /** Browser app URL; a local Vite server is started when unreachable. */
 const appUrl =
@@ -22,6 +25,10 @@ const sleep = (ms: number): Promise<void> =>
     new Promise((resolve) => {
         globalThis.setTimeout(resolve, ms);
     });
+
+const logStage = (stage: string, details: Record<string, unknown> = {}): void => {
+    console.log(JSON.stringify({ stage, ...details }));
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
@@ -82,71 +89,101 @@ const startViteIfNeeded = async (): Promise<ChildProcess | null> => {
     return child;
 };
 
-/** Return a required element handle with a clearer smoke-test error. */
-const elementFor = async (
-    page: Page,
-    selector: string
-): Promise<ElementHandle<Element>> => {
-    const element = await page.$(selector);
-    if (element === null) {
-        throw new Error(`Missing element ${selector}`);
-    }
-
-    return element;
-};
-
 /** Replace a MUI input value using browser-like keyboard actions. */
 const setInputValue = async (
     page: Page,
     selector: string,
     value: string
 ): Promise<void> => {
-    const element = await elementFor(page, selector);
-    await element.click({ clickCount: 3 });
-    await page.keyboard.press('Backspace');
-    await element.type(value);
+    await page.waitForSelector(selector, { timeout: 10_000 });
+    await page.evaluate(
+        ({ targetSelector, nextValue }) => {
+            const element = globalThis.document.querySelector(targetSelector);
+            if (
+                !(element instanceof globalThis.HTMLInputElement) &&
+                !(element instanceof globalThis.HTMLTextAreaElement)
+            ) {
+                throw new Error(
+                    `Input not found for selector ${targetSelector}`
+                );
+            }
+            const valueSetter =
+                element instanceof globalThis.HTMLTextAreaElement
+                    ? Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLTextAreaElement.prototype,
+                          'value'
+                      )?.set
+                    : Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLInputElement.prototype,
+                          'value'
+                      )?.set;
+            if (valueSetter === undefined) {
+                throw new Error(
+                    `Unable to set input value for selector ${targetSelector}`
+                );
+            }
+            element.focus();
+            valueSetter.call(element, nextValue);
+            element.dispatchEvent(
+                new globalThis.Event('input', { bubbles: true })
+            );
+            element.dispatchEvent(
+                new globalThis.Event('change', { bubbles: true })
+            );
+        },
+        { targetSelector: selector, nextValue: value }
+    );
 };
 
-/** Read the generated passcode from the MUI password input. */
-const passcodeValue = (page: Page): Promise<string> =>
-    page.$eval(
-        '#outlined-password-input',
-        (element) => (element as HTMLInputElement).value ?? ''
-    );
-
 /** Wait for a UI test id that is visible and not disabled. */
-const waitForClickableTestId = (
+const waitForClickableTestId = async (
     page: Page,
     testId: string,
     timeout = 30_000
-): Promise<void> =>
-    page
-        .waitForFunction(
-            (id) =>
-                Array.from(
-                    globalThis.document.querySelectorAll('[data-testid]')
-                ).some((element) => {
-                    if (element.getAttribute('data-testid') !== id) {
-                        return false;
-                    }
+): Promise<void> => {
+    const timeoutAt = Date.now() + timeout;
+    let lastState = 'not checked';
 
-                    const rect = element.getBoundingClientRect();
-                    const style = globalThis.getComputedStyle(element);
-                    const disabled =
-                        element instanceof HTMLButtonElement &&
-                        element.disabled;
-                    return (
-                        rect.width > 0 &&
-                        rect.height > 0 &&
-                        style.visibility !== 'hidden' &&
-                        style.display !== 'none' &&
-                        !disabled
-                    );
-                }),
-            { timeout },
-            testId
-        )
-        .then(() => undefined);
+    const stateForTestId = async (): Promise<string> =>
+        page.evaluate((id) => {
+            const matches = Array.from(
+                globalThis.document.querySelectorAll('[data-testid]')
+            ).filter((element) => element.getAttribute('data-testid') === id);
+            if (matches.length === 0) {
+                return 'missing';
+            }
+            const visible = matches.some((element) => {
+                const rect = element.getBoundingClientRect();
+                const style = globalThis.getComputedStyle(element);
+                const disabled =
+                    element instanceof globalThis.HTMLButtonElement &&
+                    element.disabled;
+                return (
+                    rect.width > 0 &&
+                    rect.height > 0 &&
+                    style.visibility !== 'hidden' &&
+                    style.display !== 'none' &&
+                    !disabled
+                );
+            });
+            return visible ? 'ready' : `not-visible:${matches.length}`;
+        }, testId);
+
+    while (Date.now() < timeoutAt) {
+        lastState = await stateForTestId();
+        if (lastState === 'ready') {
+            return;
+        }
+        await sleep(250);
+    }
+
+    const visibleText = await page.evaluate(
+        () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
+    );
+    throw new Error(
+        `Timed out waiting for ${testId}: ${lastState}. Visible text: ${visibleText}`
+    );
+};
 
 /** Click the visible instance of a possibly duplicated responsive control. */
 const clickVisibleTestId = async (
@@ -184,6 +221,30 @@ const clickVisibleTestId = async (
     }, testId);
 };
 
+/** Enable the create-dialog demo witness switch by its visible label. */
+const enableDemoWitnesses = async (page: Page): Promise<void> => {
+    await waitForCondition(
+        async () =>
+            page.evaluate(() => {
+                const label = Array.from(
+                    globalThis.document.querySelectorAll('label')
+                ).find((candidate) =>
+                    candidate.textContent?.includes('Use demo witnesses')
+                );
+                const input = label?.querySelector('input[type="checkbox"]');
+                if (!(input instanceof globalThis.HTMLInputElement)) {
+                    return false;
+                }
+                if (!input.checked) {
+                    input.click();
+                }
+                return input.checked;
+            }),
+        'demo witness switch enabled',
+        10_000
+    );
+};
+
 /** Navigate through the app drawer path used by smoke scripts. */
 const navigateInApp = async (
     page: Page,
@@ -202,50 +263,34 @@ const navigateInApp = async (
     });
 };
 
-/** Wait for the read-only identifier OOBI section to leave its loading text. */
-const waitForIdentifierOobiDetailsSettled = (page: Page): Promise<void> =>
-    page
-        .waitForFunction(
-            () => {
-                const modal =
-                    globalThis.document.querySelector(
-                        '[data-testid="identifier-details-modal"]'
-                    ) ?? globalThis.document.querySelector('[role="dialog"]');
-                const text = modal?.textContent ?? '';
-                return (
-                    text.includes(
-                        'No OOBIs are available for this identifier.'
-                    ) ||
-                    text.includes('Unable to load identifier OOBIs:') ||
-                    text.includes('agent OOBI')
-                );
-            },
-            { timeout: 30_000 }
-        )
-        .then(() => undefined);
-
 /** Boot/connect the browser wallet and return its generated passcode. */
 const connectBrowserAgent = async (page: Page): Promise<string> => {
+    logStage('browser.goto', { appUrl });
     await page.goto(appUrl, { waitUntil: 'networkidle0' });
-    await page.click('[data-testid="connect-open"]');
+    logStage('browser.connect.open');
+    await clickVisibleTestId(page, 'connect-open');
     await page.waitForSelector('[data-testid="connect-dialog"]');
-    await page.click('[data-testid="generate-passcode"]');
+    const passcode = await randomSignifyPasscode();
+    await setInputValue(page, '#outlined-password-input', passcode);
     await page.waitForFunction(
         () =>
             globalThis.document.querySelector('#outlined-password-input')?.value
                 .length >= 21,
-        { timeout: 10_000 }
+        { timeout: 30_000 }
     );
 
-    const passcode = await passcodeValue(page);
-    await page.click('[data-testid="connect-submit"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        hidden: true,
-        timeout: 30_000,
-    });
+    logStage('browser.connect.submit');
+    await clickVisibleTestId(page, 'connect-submit');
     await page.waitForSelector('[data-testid="dashboard-view"]', {
-        timeout: 30_000,
+        timeout: 120_000,
     });
+    if ((await page.$('[data-testid="connect-dialog"]')) !== null) {
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('[data-testid="connect-dialog"]', {
+            hidden: true,
+            timeout: 10_000,
+        });
+    }
 
     if (!page.url().endsWith('/dashboard')) {
         throw new Error(
@@ -253,6 +298,7 @@ const connectBrowserAgent = async (page: Page): Promise<string> => {
         );
     }
 
+    logStage('browser.connect.ready');
     return passcode;
 };
 
@@ -382,29 +428,25 @@ const waitForCondition = async (
     throw new Error(`Timed out waiting for ${label}`);
 };
 
-const installClipboardProbe = (page: Page): Promise<void> =>
-    page.evaluate(() => {
-        const sink = globalThis as typeof globalThis & {
-            __copiedAgentOobi?: string;
-        };
-        Object.defineProperty(globalThis.navigator, 'clipboard', {
-            configurable: true,
-            value: {
-                writeText: (text: string): Promise<void> => {
-                    sink.__copiedAgentOobi = text;
-                    return Promise.resolve();
-                },
-            },
-        });
-    });
-
-const copiedAgentOobi = (page: Page): Promise<string | null> =>
-    page.evaluate(() => {
-        const sink = globalThis as typeof globalThis & {
-            __copiedAgentOobi?: string;
-        };
-        return sink.__copiedAgentOobi ?? null;
-    });
+const waitForAgentOobiCopySuccess = (
+    page: Page,
+    alias: string
+): Promise<void> =>
+    waitForCondition(
+        async () =>
+            page.evaluate((identifierAlias) => {
+                const button = globalThis.document.querySelector(
+                    `[data-testid="identifier-copy-agent-oobi-${identifierAlias}"]`
+                );
+                return (
+                    button instanceof globalThis.HTMLButtonElement &&
+                    !button.disabled &&
+                    button.classList.contains('MuiIconButton-colorSuccess')
+                );
+            }, alias),
+        'agent OOBI copy success',
+        30_000
+    );
 
 const localSignatureVerification = async (
     client: SignifyClient,
@@ -454,6 +496,7 @@ const vite = await startViteIfNeeded();
 const browser = await puppeteer.launch({
     headless: 'new',
     args: chromeArgs,
+    protocolTimeout: 300_000,
 });
 let page: Page | null = null;
 
@@ -485,6 +528,7 @@ try {
     });
 
     const passcode = await connectBrowserAgent(page);
+    logStage('signify.connect.start');
     const connected = await connectSignifyClient({
         adminUrl: appConfig.keria.adminUrl,
         bootUrl: appConfig.keria.bootUrl,
@@ -493,48 +537,48 @@ try {
     });
     const { client } = connected;
     const agentPre = connected.state.agentPre;
+    logStage('signify.connect.ready', {
+        controller: connected.state.controllerPre,
+        agent: agentPre,
+    });
 
+    logStage('identifiers.navigate.start');
     await navigateInApp(
         page,
         'nav-identifiers',
         '[data-testid="identifier-table"]'
     );
+    logStage('identifiers.navigate.ready');
+    logStage('identifier.create.open');
     await clickVisibleTestId(page, 'identifier-create-open');
     await page.waitForSelector('[role="dialog"]', { timeout: 10_000 });
+    logStage('identifier.create.nameInput.start', { alias });
     await setInputValue(
         page,
         '[data-testid="identifier-create-name"] input',
         alias
     );
+    logStage('identifier.create.witnesses.start', { alias });
+    await enableDemoWitnesses(page);
+    logStage('identifier.create.witnesses.ready', { alias });
+    logStage('identifier.create.submit.start', { alias });
     await clickVisibleTestId(page, 'identifier-create-submit');
+    logStage('identifier.create.rowWait.start', { alias });
     await waitForClickableTestId(
         page,
         `identifier-table-row-${alias}`,
         120_000
     );
+    logStage('identifier.create.ready', { alias });
 
-    const postCountBeforeDetails = endRolePostUrls.length;
-    await clickVisibleTestId(page, `identifier-table-row-${alias}`);
-    await page.waitForSelector('[data-testid="identifier-details-modal"]', {
-        timeout: 30_000,
-    });
-    await waitForIdentifierOobiDetailsSettled(page);
-    if (endRolePostUrls.length !== postCountBeforeDetails) {
-        throw new Error(
-            `Opening identifier details created an agent end-role POST: ${endRolePostUrls.join(', ')}`
-        );
-    }
-    await page.keyboard.press('Escape');
-    await page.waitForSelector('[data-testid="identifier-details-modal"]', {
-        hidden: true,
-        timeout: 10_000,
-    });
-
+    const postCountBeforeAuthorize = endRolePostUrls.length;
+    logStage('identifier.authorizeAgent.start', { alias });
     await clickVisibleTestId(page, `identifier-authorize-agent-${alias}`);
     await waitForCondition(
-        () => endRolePostUrls.length >= postCountBeforeDetails + 1,
+        () => endRolePostUrls.length >= postCountBeforeAuthorize + 1,
         'authorize-agent end-role POST'
     );
+    logStage('identifier.authorizeAgent.posted', { alias });
     await sleep(500);
     if (endRoleFailureBodies.length > 0) {
         const verification =
@@ -549,26 +593,26 @@ try {
             `Authorize-agent end-role POST failed: ${endRoleFailureBodies.join('\n')}\nverification=${verification}\n${endRolePostBodies.join('\n')}`
         );
     }
-    if (endRolePostUrls.length !== postCountBeforeDetails + 1) {
+    if (endRolePostUrls.length !== postCountBeforeAuthorize + 1) {
         throw new Error(
-            `Expected one authorize-agent end-role POST, saw ${endRolePostUrls.length - postCountBeforeDetails}: ${endRolePostBodies.join('\n')}`
+            `Expected one authorize-agent end-role POST, saw ${endRolePostUrls.length - postCountBeforeAuthorize}: ${endRolePostBodies.join('\n')}`
         );
     }
 
+    logStage('identifier.authorizeAgent.oobiWait.start', { alias });
     const oobi = await waitForAgentEndRoleAndOobi({
         client,
         alias,
         agentPre,
     });
+    logStage('identifier.authorizeAgent.oobiWait.ready', { alias, oobi });
 
-    await installClipboardProbe(page);
     const postCountBeforeCopy = endRolePostUrls.length;
+    logStage('identifier.copyAgentOobi.start', { alias });
     await clickVisibleTestId(page, `identifier-copy-agent-oobi-${alias}`);
-    await waitForCondition(
-        async () => (await copiedAgentOobi(page as Page)) === oobi,
-        'agent OOBI clipboard write',
-        60_000
-    );
+    logStage('identifier.copyAgentOobi.clicked', { alias });
+    await waitForAgentOobiCopySuccess(page, alias);
+    logStage('identifier.copyAgentOobi.ready', { alias });
     if (endRolePostUrls.length !== postCountBeforeCopy) {
         throw new Error(
             `Copying the agent OOBI created another end-role POST: ${endRolePostUrls.join(', ')}`

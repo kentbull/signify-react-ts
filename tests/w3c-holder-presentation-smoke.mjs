@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import puppeteer from 'puppeteer';
-import { SignifyClient, Tier, W3C, ready } from 'signify-ts';
+import { SignifyClient, Tier, ready } from 'signify-ts';
 
 /**
  * Browser smoke for the holder-based W3C VRD presentation path.
@@ -294,22 +294,7 @@ const dispatchClick = async (page, selector) => {
             );
         }
         element.focus();
-        for (const type of ['mousedown', 'mouseup']) {
-            element.dispatchEvent(
-                new globalThis.MouseEvent(type, {
-                    bubbles: true,
-                    cancelable: true,
-                    view: globalThis,
-                })
-            );
-        }
-        element.dispatchEvent(
-            new globalThis.MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: globalThis,
-            })
-        );
+        element.click();
     }, selector);
 };
 
@@ -432,6 +417,83 @@ const waitForAcceptedActionResult = async (
         selector
     );
 
+const relevantBrowserRequest = (request) => {
+    const url = new URL(request.url());
+    const method = request.method();
+    if (
+        url.origin === appUrl.replace(/\/$/, '') &&
+        url.pathname === '/credentials' &&
+        method !== 'GET'
+    ) {
+        return true;
+    }
+    if (url.origin === keriaAdminUrl.replace(/\/$/, '')) {
+        return url.pathname.includes('/w3c/');
+    }
+    return (
+        url.pathname === '/verify/vp' ||
+        url.pathname.startsWith('/operations/')
+    );
+};
+
+const clickWithDiagnostics = async (page, selector, label) => {
+    logStage(`${label}.click.start`);
+    const hitState = await page.evaluate((targetSelector) => {
+        const element = globalThis.document.querySelector(targetSelector);
+        if (!(element instanceof globalThis.HTMLButtonElement)) {
+            return { found: false };
+        }
+        element.scrollIntoView({
+            block: 'center',
+            inline: 'center',
+            behavior: 'instant',
+        });
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const hit = globalThis.document.elementFromPoint(centerX, centerY);
+        const hitInsideTarget =
+            hit instanceof globalThis.Node ? element.contains(hit) : false;
+        return {
+            found: true,
+            disabled: element.disabled,
+            hitInsideTarget,
+            text: element.textContent?.trim() ?? '',
+            rect: {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+            },
+            hitTag: hit?.tagName ?? null,
+            hitTestId:
+                hit instanceof globalThis.HTMLElement
+                    ? hit.dataset.testid ?? null
+                    : null,
+            hitText:
+                hit instanceof globalThis.HTMLElement
+                    ? hit.textContent?.trim() ?? ''
+                    : '',
+        };
+    }, selector);
+    await sleep(250);
+
+    if (hitState.found !== true || hitState.disabled === true) {
+        throw new Error(
+            `Cannot click ${selector}. Hit state: ${JSON.stringify(hitState)}`
+        );
+    }
+
+    await page.evaluate((targetSelector) => {
+        const element = globalThis.document.querySelector(targetSelector);
+        if (!(element instanceof globalThis.HTMLButtonElement)) {
+            throw new Error(`Clickable button not found for ${targetSelector}`);
+        }
+        globalThis.setTimeout(() => element.click(), 0);
+    }, selector);
+    logStage(`${label}.click.dispatched`, { hitState });
+};
+
 const navigateInApp = async (page, path) => {
     await page.evaluate((nextPath) => {
         globalThis.history.pushState({}, '', nextPath);
@@ -540,17 +602,63 @@ const readVerifierRequestDescriptor = async (page, controlsSelector) =>
         return JSON.parse(input.value);
     }, controlsSelector);
 
+const verifierDescriptorMatches = (actual, expected, verifierId) =>
+    actual.verifierId === verifierId &&
+    (descriptorAudience(expected) === null ||
+        descriptorAudience(actual) === descriptorAudience(expected)) &&
+    (descriptorResponseUri(expected) === null ||
+        descriptorResponseUri(actual) === descriptorResponseUri(expected));
+
 const selectVerifierPreset = async (
     page,
     verifierId,
     controlsSelector,
-    presentButtonSelector
+    presentButtonSelector,
+    expectedDescriptor
 ) => {
+    logStage('presentation.verifier.select.start', { verifierId });
     await waitForElement(page, controlsSelector, 10000);
-    await page.click(
-        `${controlsSelector} [data-testid="w3c-verifier-selector"]`
+    const currentDescriptor = await readVerifierRequestDescriptor(
+        page,
+        controlsSelector
     );
+    const currentSelectionReady = await page.evaluate((buttonSelector) => {
+        const button = globalThis.document.querySelector(buttonSelector);
+        return button instanceof globalThis.HTMLButtonElement
+            ? !button.disabled
+            : false;
+    }, presentButtonSelector);
+    if (
+        currentSelectionReady &&
+        verifierDescriptorMatches(
+            currentDescriptor,
+            expectedDescriptor,
+            verifierId
+        )
+    ) {
+        logStage('presentation.verifier.select.skip', { verifierId });
+        return;
+    }
+
+    logStage('presentation.verifier.select.open', { verifierId });
+    await page.evaluate((selector) => {
+        const root = globalThis.document.querySelector(selector);
+        const trigger =
+            root?.querySelector('[role="combobox"]') ??
+            (root instanceof globalThis.HTMLElement ? root : null);
+        if (!(trigger instanceof globalThis.HTMLElement)) {
+            throw new Error(`Verifier selector trigger not found for ${selector}`);
+        }
+        trigger.dispatchEvent(
+            new globalThis.MouseEvent('mousedown', {
+                bubbles: true,
+                cancelable: true,
+                view: globalThis.window,
+            })
+        );
+    }, `${controlsSelector} [data-testid="w3c-verifier-selector"]`);
     const optionSelector = `[data-testid="w3c-verifier-option-${verifierId}"]`;
+    logStage('presentation.verifier.option.wait', { verifierId });
     await waitForDomState(
         page,
         `W3C verifier option ${verifierId}`,
@@ -561,7 +669,8 @@ const selectVerifierPreset = async (
         30000,
         optionSelector
     );
-    await page.click(optionSelector);
+    logStage('presentation.verifier.option.click', { verifierId });
+    await dispatchClick(page, optionSelector);
     await waitForDomState(
         page,
         `W3C verifier ${verifierId} selected`,
@@ -592,46 +701,41 @@ const selectVerifierPreset = async (
         controlsSelector,
         presentButtonSelector
     );
+    logStage('presentation.verifier.select.ready', { verifierId });
 };
 
-const readSubmittedVerifierRequestDescriptor = async (
-    page,
-    controlsSelector,
-    verifierId,
-    previousNonce
-) => {
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-        const descriptor = await readVerifierRequestDescriptor(
-            page,
-            controlsSelector
-        );
-        if (
-            descriptor.verifierId === verifierId &&
-            typeof descriptor.nonce === 'string' &&
-            descriptor.nonce.length > 0 &&
-            descriptor.nonce !== previousNonce
-        ) {
-            return descriptor;
-        }
-        await sleep(250);
-    }
-    return readVerifierRequestDescriptor(page, controlsSelector);
+const heldW3CCredentialIds = async (client) => {
+    const body = await getJson(
+        client,
+        `/identifiers/${encodeURIComponent(holderAlias)}/w3c/credentials`
+    );
+    const credentials = Array.isArray(body.credentials) ? body.credentials : [];
+    return new Set(
+        credentials
+            .map((credential) => credential.credentialId)
+            .filter((id) => typeof id === 'string' && id.length > 0)
+    );
 };
 
-const waitForHolderHeldCredential = async (client) => {
-    const w3c = new W3C(client);
-    const eligibleStates = new Set(['imported', 'pending_admit', 'admitted']);
-
+const waitForHolderHeldCredential = async (client, existingIds) => {
     for (let attempt = 0; attempt < 240; attempt += 1) {
-        const credentials = await w3c.credentials(holderAlias);
+        const body = await getJson(
+            client,
+            `/identifiers/${encodeURIComponent(holderAlias)}/w3c/credentials`
+        );
+        const credentials = Array.isArray(body.credentials)
+            ? body.credentials
+            : [];
         const eligible = credentials.filter(
             (credential) =>
+                typeof credential.credentialId === 'string' &&
+                !existingIds.has(credential.credentialId) &&
                 credential.sourceCredentialSaid === credentialSaid &&
-                eligibleStates.has(credential.state)
+                credential.state === 'admitted'
         );
         if (eligible.length === 1) {
             logStage('holder.heldCredential.ready', {
-                credentialId: eligible[0].credentialId ?? eligible[0].d,
+                credentialId: eligible[0].credentialId,
                 state: eligible[0].state,
             });
             return eligible[0];
@@ -639,23 +743,8 @@ const waitForHolderHeldCredential = async (client) => {
         if (eligible.length > 1) {
             throw new Error(
                 `Holder has multiple eligible W3C credentials for ${credentialSaid}: ${eligible
-                    .map((credential) => credential.credentialId ?? credential.d)
+                    .map((credential) => credential.credentialId)
                     .join(', ')}`
-            );
-        }
-
-        const imports = await w3c.importRequests(holderAlias, true);
-        const relatedImports = imports.filter(
-            (request) => request.sourceCredentialSaid === credentialSaid
-        );
-        const failed = relatedImports.find((request) =>
-            ['failed', 'expired', 'blocked_native_vrd'].includes(
-                request.state ?? ''
-            )
-        );
-        if (failed !== undefined) {
-            throw new Error(
-                `Holder W3C import ${failed.d ?? failed.importRequestId} is ${failed.state}: ${failed.error ?? JSON.stringify(failed)}`
             );
         }
 
@@ -663,7 +752,7 @@ const waitForHolderHeldCredential = async (client) => {
     }
 
     throw new Error(
-        `Timed out waiting for holder W3C credential imported from ${credentialSaid}`
+        `Timed out waiting for holder W3C credential admitted from ${credentialSaid}`
     );
 };
 
@@ -700,9 +789,21 @@ const startIssuerW3CIssuance = async (page, issuerAid) => {
     logStage('issuer.issuance.started', { issuerAlias, credentialSaid });
 };
 
-const waitForPresentationTx = async (client, descriptor) => {
+const presentationIds = async (client) => {
+    const body = await getJson(
+        client,
+        `/identifiers/${encodeURIComponent(holderAlias)}/w3c/presentations`
+    );
+    const txs = Array.isArray(body.presentations) ? body.presentations : [];
+    return new Set(
+        txs
+            .map((tx) => tx.presentationId)
+            .filter((id) => typeof id === 'string' && id.length > 0)
+    );
+};
+
+const waitForPresentationTx = async (client, descriptor, existingIds) => {
     const expectedAud = descriptorAudience(descriptor);
-    const expectedNonce = descriptor.nonce ?? null;
     const expectedResponseUri = descriptorResponseUri(descriptor);
     let lastMatchingTx = null;
     let lastLoggedTxState = null;
@@ -717,9 +818,11 @@ const waitForPresentationTx = async (client, descriptor) => {
             : [];
         const tx = txs.find((candidate) => {
             const request = candidate.requestDescriptor ?? {};
+            const presentationId = candidate.presentationId;
             return (
+                typeof presentationId === 'string' &&
+                !existingIds.has(presentationId) &&
                 candidate.aud === expectedAud &&
-                candidate.nonce === expectedNonce &&
                 candidate.responseUri === expectedResponseUri &&
                 request.credentialSaid === credentialSaid
             );
@@ -727,7 +830,7 @@ const waitForPresentationTx = async (client, descriptor) => {
 
         if (tx !== undefined) {
             lastMatchingTx = tx;
-            const presentationId = tx.presentationId ?? tx.presentTxId ?? null;
+            const presentationId = tx.presentationId ?? null;
             const stateKey = `${presentationId ?? ''}:${tx.state ?? ''}`;
             if (stateKey !== lastLoggedTxState) {
                 lastLoggedTxState = stateKey;
@@ -753,14 +856,12 @@ const waitForPresentationTx = async (client, descriptor) => {
     }
 
     if (lastMatchingTx !== null) {
-        const presentationId =
-            lastMatchingTx.presentationId ?? lastMatchingTx.presentTxId;
         throw new Error(
-            `Timed out waiting for W3C presentation ${presentationId}. Last state: ${lastMatchingTx.state}.`
+            `Timed out waiting for W3C presentation ${lastMatchingTx.presentationId}. Last state: ${lastMatchingTx.state}.`
         );
     }
     throw new Error(
-        `Timed out waiting for KERIA presentation tx for nonce ${expectedNonce}`
+        `Timed out waiting for new KERIA presentation tx for ${credentialSaid}`
     );
 };
 
@@ -814,33 +915,67 @@ const waitForVerifierOperation = async (descriptor, tx) => {
     );
 };
 
-const waitForDashboardPresentation = async (tx) => {
-    const presentationId = `urn:said:${tx.presentationId ?? tx.presentTxId}`;
+const dashboardPresentationEvents = async () => {
     const apiUrl = new URL('/api/presentations', dashboardUrl).toString();
+    const response = await fetch(apiUrl, {
+        headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+        throw new Error(
+            `Dashboard presentation fetch failed: ${response.status} ${response.statusText}`
+        );
+    }
+    const events = await response.json();
+    if (!Array.isArray(events)) {
+        throw new Error(
+            `Dashboard presentation API did not return a list: ${JSON.stringify(events)}`
+        );
+    }
+    return events;
+};
+
+const dashboardEventKey = (event) => {
+    if (typeof event?.eventId === 'string' && event.eventId.length > 0) {
+        return event.eventId;
+    }
+    const presentationId = event?.presentation?.id ?? '';
+    const receivedAt = event?.receivedAt ?? '';
+    return `${receivedAt}:${presentationId}`;
+};
+
+const dashboardEventKeys = async () =>
+    new Set((await dashboardPresentationEvents()).map(dashboardEventKey));
+
+const waitForDashboardPresentation = async (tx, descriptor, existingEventKeys) => {
+    const expectedCredentialId = `urn:said:${credentialSaid}`;
+    const expectedVerifierId = uiVerifierId(descriptor) ?? descriptor.verifierId;
 
     for (let attempt = 0; attempt < 120; attempt += 1) {
-        const response = await fetch(apiUrl, {
-            headers: { Accept: 'application/json' },
+        const events = await dashboardPresentationEvents();
+        const event = events.find((candidate) => {
+            if (existingEventKeys.has(dashboardEventKey(candidate))) {
+                return false;
+            }
+            const verifierId =
+                candidate?.verifier?.id ?? candidate?.verifier?.type ?? null;
+            const credentials = Array.isArray(
+                candidate?.presentation?.credentials
+            )
+                ? candidate.presentation.credentials
+                : [];
+            return (
+                verifierId === expectedVerifierId &&
+                credentials.some(
+                    (credential) => credential?.id === expectedCredentialId
+                )
+            );
         });
-        if (!response.ok) {
-            throw new Error(
-                `Dashboard presentation fetch failed: ${response.status} ${response.statusText}`
-            );
-        }
-        const events = await response.json();
-        if (!Array.isArray(events)) {
-            throw new Error(
-                `Dashboard presentation API did not return a list: ${JSON.stringify(events)}`
-            );
-        }
-        const event = events.find(
-            (candidate) => candidate?.presentation?.id === presentationId
-        );
         if (event !== undefined) {
             logStage('dashboard.presentation.received', {
-                presentationId: tx.presentationId ?? tx.presentTxId,
+                presentationId: tx.presentationId,
                 eventId: event.eventId ?? null,
                 verifierId: event.verifier?.id ?? event.verifier?.type ?? null,
+                credentialId: expectedCredentialId,
             });
             return event;
         }
@@ -848,7 +983,7 @@ const waitForDashboardPresentation = async (tx) => {
     }
 
     throw new Error(
-        `Timed out waiting for dashboard webhook event for ${presentationId}`
+        `Timed out waiting for dashboard webhook event for ${expectedCredentialId}`
     );
 };
 
@@ -890,6 +1025,24 @@ try {
                 );
             }
         });
+        page.on('request', (request) => {
+            if (relevantBrowserRequest(request)) {
+                logStage('browser.request', {
+                    role,
+                    method: request.method(),
+                    url: request.url(),
+                });
+            }
+        });
+        page.on('response', (response) => {
+            if (relevantBrowserRequest(response.request())) {
+                logStage('browser.response', {
+                    role,
+                    status: response.status(),
+                    url: response.url(),
+                });
+            }
+        });
         return { context, page };
     };
 
@@ -910,8 +1063,9 @@ try {
 
     await connectBrowserWallet(issuer.page, issuerPasscode, 'issuer');
     await connectBrowserWallet(holder.page, holderPasscode, 'holder');
+    const existingHeldCredentialIds = await heldW3CCredentialIds(holderClient);
     await startIssuerW3CIssuance(issuer.page, issuerAid);
-    await waitForHolderHeldCredential(holderClient);
+    await waitForHolderHeldCredential(holderClient, existingHeldCredentialIds);
 
     const page = holder.page;
     const client = holderClient;
@@ -934,6 +1088,17 @@ try {
     logStage('credential.ready', { credentialSaid });
 
     for (const expectedDescriptor of verifierRequests) {
+        await navigateInApp(
+            page,
+            `/credentials/${encodeURIComponent(holderAid)}/wallet`
+        );
+        await waitForElementAttribute(
+            page,
+            presentationStatusSelector,
+            'data-state',
+            'ready',
+            'W3C presentation controls',
+        );
         if (
             typeof expectedDescriptor !== 'object' ||
             expectedDescriptor === null
@@ -962,7 +1127,8 @@ try {
             page,
             verifierId,
             presentationControlsSelector,
-            presentationButtonSelector
+            presentationButtonSelector,
+            expectedDescriptor
         );
         const beforeClickDescriptor = await readVerifierRequestDescriptor(
             page,
@@ -986,24 +1152,33 @@ try {
                 `UI verifier response_uri mismatch: expected ${descriptorResponseUri(expectedDescriptor)}, got ${descriptorResponseUri(beforeClickDescriptor)}`
             );
         }
-        await dispatchClick(page, presentationButtonSelector);
-        const descriptor = await readSubmittedVerifierRequestDescriptor(
+        const existingPresentationIds = await presentationIds(client);
+        const existingDashboardEventKeys = await dashboardEventKeys();
+        await clickWithDiagnostics(
             page,
-            presentationControlsSelector,
-            verifierId,
-            beforeClickDescriptor.nonce
+            presentationButtonSelector,
+            'presentation'
         );
+        const descriptor = beforeClickDescriptor;
 
-        const tx = await waitForPresentationTx(client, descriptor);
+        const tx = await waitForPresentationTx(
+            client,
+            descriptor,
+            existingPresentationIds
+        );
         const operation = await waitForVerifierOperation(descriptor, tx);
-        await waitForDashboardPresentation(tx);
+        await waitForDashboardPresentation(
+            tx,
+            descriptor,
+            existingDashboardEventKeys
+        );
         const binding = {
             aud: descriptorAudience(descriptor),
-            nonce: descriptor.nonce ?? null,
+            responseUri: descriptorResponseUri(descriptor),
         };
-        if (tx.aud !== binding.aud || tx.nonce !== binding.nonce) {
+        if (tx.aud !== binding.aud || tx.responseUri !== binding.responseUri) {
             throw new Error(
-                `KERIA tx binding mismatch: expected ${JSON.stringify(binding)}, got ${JSON.stringify({ aud: tx.aud, nonce: tx.nonce })}`
+                `KERIA tx binding mismatch: expected ${JSON.stringify(binding)}, got ${JSON.stringify({ aud: tx.aud, responseUri: tx.responseUri })}`
             );
         }
         console.log(
@@ -1011,7 +1186,7 @@ try {
                 stage: 'presentation.accepted',
                 verifierId:
                     descriptor.verifierId ?? descriptorResponseUri(descriptor),
-                presentationId: tx.presentationId ?? tx.presentTxId,
+                presentationId: tx.presentationId,
                 verifierOperation: operation.name,
                 accepted: true,
             })
@@ -1023,7 +1198,10 @@ try {
         const pages = await browser.pages();
         const page = pages[pages.length - 1];
         if (page !== undefined) {
-            await page.screenshot({ path: screenshot, fullPage: true });
+            await Promise.race([
+                page.screenshot({ path: screenshot, fullPage: true }),
+                sleep(5000),
+            ]);
         }
     } catch {
         // Keep the original error as the failure signal.

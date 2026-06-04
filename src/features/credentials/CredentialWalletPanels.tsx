@@ -7,6 +7,7 @@ import {
     StatusPill,
     TelemetryRow,
 } from '../../app/Console';
+import type { CredentialActionData } from '../../app/routeData';
 import { monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
@@ -272,6 +273,7 @@ export const HeldCredentialsPanel = ({
     didWebsReadyByAid,
     verifiers,
     selectedVerifierId,
+    presentationAction,
     actionRunning,
     onVerifierChange,
     onPresent,
@@ -283,6 +285,7 @@ export const HeldCredentialsPanel = ({
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
     verifiers: readonly W3CVerifierRequestPreset[];
     selectedVerifierId: string;
+    presentationAction?: CredentialActionData | null;
     actionRunning: boolean;
     onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
@@ -343,6 +346,7 @@ export const HeldCredentialsPanel = ({
                                 didWebsReadyByAid={didWebsReadyByAid}
                                 verifiers={verifiers}
                                 selectedVerifierId={selectedVerifierId}
+                                presentationAction={presentationAction}
                                 actionRunning={actionRunning}
                                 onVerifierChange={onVerifierChange}
                                 onPresent={onPresent}

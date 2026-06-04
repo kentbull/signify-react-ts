@@ -869,6 +869,9 @@ export const TopBarNotificationsPopover = ({
                         >
                             <ListItemText
                                 primary={notification.title}
+                                slotProps={{
+                                    secondary: { component: 'div' },
+                                }}
                                 secondary={
                                     <Box>
                                         {formatTimestamp(

@@ -38,6 +38,7 @@ export const CredentialWalletRoute = () => {
     const runtime = useAppRuntime();
     const {
         actionRunning,
+        actionStatus,
         selectedIdentifier,
         identifiers,
         submitResolveSchema,
@@ -189,6 +190,11 @@ export const CredentialWalletRoute = () => {
                 didWebsReadyByAid={didWebsReadyByAid}
                 verifiers={w3cVerifiers}
                 selectedVerifierId={effectiveVerifierId}
+                presentationAction={
+                    actionStatus?.intent === 'presentCredential'
+                        ? actionStatus
+                        : null
+                }
                 actionRunning={actionRunning}
                 onVerifierChange={setSelectedVerifierId}
                 onPresent={submitPresent}

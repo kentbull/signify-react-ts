@@ -249,8 +249,8 @@ the issuer/holder/verifier services. The stack must provide:
 
 1. live KERIA with W3C enabled,
 2. a seeded holder wallet passcode and alias,
-3. a W3C VRD credential already issued/imported/admitted or a manifest that
-   lets the harness locate that state,
+3. a seeded native VRD credential that can be issued as an edge-built W3C
+   credential and materialized as an admitted holder credential,
 4. live Python, Node, and Go verifier services exposing `/verify/vp` and
    `/operations`,
 5. a React app build using the intended `signify-ts` package or pinned Git SHA.
@@ -270,11 +270,12 @@ Common environment variables:
 | `W3C_NODE_VERIFIER_URL` | Node verifier host URL for evidence polling. |
 | `W3C_GO_VERIFIER_URL` | Go verifier host URL for evidence polling. |
 
-The smoke succeeds only when KERIA creates presentation transactions, the holder
-edge signs the VP-JWT through the app worker, KERIA submits to live verifier
-services, and the verifier operations reach terminal accepted state. Verifier
-test doubles, direct library calls, or CLI-only commands are not
-acceptance evidence for this browser path.
+The smoke succeeds only when the issuer browser action builds and submits the
+VC-JWT, KERIA validates and forwards the W3C credential to the holder, the
+holder browser action builds and submits the VP-JWT, KERIA validates and
+forwards the presentation to live verifier services, and verifier operations
+reach terminal accepted state. Verifier test doubles, direct library calls, or
+CLI-only commands are not acceptance evidence for this browser path.
 
 ## Configuration
 
