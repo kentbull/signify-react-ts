@@ -113,28 +113,6 @@ export const didWebsSlice = createSlice({
             record.error = payload.error;
             record.updatedAt = payload.updatedAt;
         },
-        didWebsPendingObserved(
-            state,
-            {
-                payload,
-            }: PayloadAction<{
-                aid: string;
-                updatedAt: string;
-            }>
-        ) {
-            const record = recordFor(state, payload.aid);
-            if (record.did === null) {
-                record.loadState = 'pending';
-            }
-            record.error = null;
-            record.updatedAt = payload.updatedAt;
-        },
-        didWebsReadyObserved(
-            state,
-            { payload }: PayloadAction<DidWebsDidPayload>
-        ) {
-            applyDidPayload(recordFor(state, payload.aid), payload);
-        },
     },
     extraReducers: (builder) => {
         builder
@@ -149,8 +127,6 @@ export const {
     didWebsDidFailed,
     didWebsDidLoaded,
     didWebsDidLoading,
-    didWebsPendingObserved,
-    didWebsReadyObserved,
 } = didWebsSlice.actions;
 
 /** Reducer mounted at `state.didwebs`. */

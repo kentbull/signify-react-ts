@@ -153,9 +153,6 @@ export const W3CPresentCtrls = ({
         if (verifierRequest === null) {
             return 'Enter a valid runtime verifier request JSON object.';
         }
-        if (!didWebsReady) {
-            return 'The presenter did:webs DID is not ready.';
-        }
         if (actionRunning) {
             return 'A credential command is already running.';
         }
@@ -163,6 +160,9 @@ export const W3CPresentCtrls = ({
     }
 
     const blockerMsg = getW3CPresentBlockerMsg();
+    const readyMessage = didWebsReady
+        ? 'Ready to create a KERIA W3C presentation transaction from this verifier request.'
+        : 'DID/webs setup will run before W3C presentation.';
 
     function selectVerifier(
         event: SelectChangeEvent<string>
@@ -186,9 +186,11 @@ export const W3CPresentCtrls = ({
     }
 
     function presentW3C(): void {
-        if (blockerMsg !== null ||
+        if (
+            blockerMsg !== null ||
             presenter === null ||
-              verifierRequest === null ){
+            verifierRequest === null
+        ) {
             return;
         }
 
@@ -269,8 +271,7 @@ export const W3CPresentCtrls = ({
                 color={blockerMsg === null ? 'text.secondary' : 'warning.main'}
                 sx={{ overflowWrap: 'anywhere' }}
             >
-                {blockerMsg ??
-                    'Ready to create a KERIA W3C presentation transaction from this verifier request.'}
+                {blockerMsg ?? readyMessage}
             </Typography>
             {presentationActionResult !== null && (
                 <Typography

@@ -726,12 +726,14 @@ const waitForHolderHeldCredential = async (client, existingIds) => {
         const credentials = Array.isArray(body.credentials)
             ? body.credentials
             : [];
-        const eligible = credentials.filter(
+        const admitted = credentials.filter(
             (credential) =>
                 typeof credential.credentialId === 'string' &&
-                !existingIds.has(credential.credentialId) &&
                 credential.sourceCredentialSaid === credentialSaid &&
                 credential.state === 'admitted'
+        );
+        const eligible = admitted.filter(
+            (credential) => !existingIds.has(credential.credentialId)
         );
         if (eligible.length === 1) {
             logStage('holder.heldCredential.ready', {
@@ -743,6 +745,23 @@ const waitForHolderHeldCredential = async (client, existingIds) => {
         if (eligible.length > 1) {
             throw new Error(
                 `Holder has multiple eligible W3C credentials for ${credentialSaid}: ${eligible
+                    .map((credential) => credential.credentialId)
+                    .join(', ')}`
+            );
+        }
+        if (
+            admitted.length === 1 &&
+            existingIds.has(admitted[0].credentialId)
+        ) {
+            logStage('holder.heldCredential.reuseExisting', {
+                credentialId: admitted[0].credentialId,
+                state: admitted[0].state,
+            });
+            return admitted[0];
+        }
+        if (admitted.length > 1) {
+            throw new Error(
+                `Holder has multiple admitted W3C credentials for ${credentialSaid}: ${admitted
                     .map((credential) => credential.credentialId)
                     .join(', ')}`
             );

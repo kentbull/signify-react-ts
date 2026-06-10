@@ -47,12 +47,15 @@ importers:
       react-router-dom:
         specifier: ^7.14.2
         version: 7.14.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      signify-did-webs:
+        specifier: github:GLEIF-IT/w3c-crosswalk#2d057b19cb8475b8113b55990f09828f9b030b2f&path:/packages/signify-did-webs
+        version: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f#path:/packages/signify-did-webs(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3)
       signify-ts:
-        specifier: github:kentbull/signify-ts#4857945
-        version: https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18
+        specifier: github:kentbull/signify-ts#8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3
+        version: https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3
       signify-w3c:
-        specifier: github:GLEIF-IT/w3c-crosswalk#3854fda
-        version: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/3854fda8d4d52460dcfa6c16e999087c52953f81(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18)(web-streams-polyfill@3.3.3)
+        specifier: github:GLEIF-IT/w3c-crosswalk#2d057b19cb8475b8113b55990f09828f9b030b2f
+        version: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3)(web-streams-polyfill@3.3.3)
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -1971,12 +1974,18 @@ packages:
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
 
-  signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18}
+  signify-did-webs@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f#path:/packages/signify-did-webs:
+    resolution: {gitHosted: true, integrity: sha512-wUgd9/GZuZvGp5lLexXT3WaFuU6xB5EL/lWO1i7gUJ4SEt96ukOOO3rOexfECsZb9zgYb5P4nefZhyIEM9iAzQ==, tarball: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f}
+    version: 0.1.0
+    peerDependencies:
+      signify-ts: '*'
+
+  signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3:
+    resolution: {gitHosted: true, integrity: sha512-zp6zNU5yFlQOoc1w3iCfWA6DlrgA6VAodN5k7YTKC/yzyQmlcP6S5img6PqLwB2EW9rj6rCp0/VLYYpCnro52g==, tarball: https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3}
     version: 0.4.0
 
-  signify-w3c@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/3854fda8d4d52460dcfa6c16e999087c52953f81:
-    resolution: {gitHosted: true, integrity: sha512-O/0l9Xjdq11K9fdm/aoFi1aYjtiS2Ndqq7yLyZ2F7OnGZOhUa6tKbVxFw68oJthoJX21kqezo/6/mUQlow6j3Q==, tarball: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/3854fda8d4d52460dcfa6c16e999087c52953f81}
+  signify-w3c@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f:
+    resolution: {gitHosted: true, integrity: sha512-wUgd9/GZuZvGp5lLexXT3WaFuU6xB5EL/lWO1i7gUJ4SEt96ukOOO3rOexfECsZb9zgYb5P4nefZhyIEM9iAzQ==, tarball: https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f}
     version: 0.1.0
     peerDependencies:
       signify-ts: '*'
@@ -4118,7 +4127,11 @@ snapshots:
 
   siginfo@2.0.0: {}
 
-  signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18:
+  signify-did-webs@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f#path:/packages/signify-did-webs(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3):
+    dependencies:
+      signify-ts: https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3
+
+  signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3:
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
@@ -4127,11 +4140,11 @@ snapshots:
       mathjs: 15.2.0
       structured-headers: 0.5.0
 
-  signify-w3c@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/3854fda8d4d52460dcfa6c16e999087c52953f81(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18)(web-streams-polyfill@3.3.3):
+  signify-w3c@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f(signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3)(web-streams-polyfill@3.3.3):
     dependencies:
       '@noble/hashes': 1.8.0
       jsonld: 8.3.3(web-streams-polyfill@3.3.3)
-      signify-ts: https://codeload.github.com/kentbull/signify-ts/tar.gz/4857945c0b1d05ecb553100d0d216404352ecf18
+      signify-ts: https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3
     transitivePeerDependencies:
       - web-streams-polyfill
 

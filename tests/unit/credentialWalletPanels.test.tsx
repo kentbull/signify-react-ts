@@ -141,6 +141,29 @@ describe('wallet credential panels', () => {
         );
     });
 
+    it('allows W3C presentation while presenter did:webs setup is pending', () => {
+        const markup = renderToStaticMarkup(
+            <W3CPresentCtrls
+                credential={{
+                    ...credential,
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
+                didWebsReadyByAid={new Map([['Eholder', false]])}
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
+                actionRunning={false}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Present');
+        expect(markup).toContain(
+            'DID/webs setup will run before W3C presentation.'
+        );
+    });
+
     it('does not present issued VRD credentials through the issuer role', () => {
         const markup = renderToStaticMarkup(
             <W3CPresentCtrls
@@ -184,6 +207,28 @@ describe('wallet credential panels', () => {
         expect(markup).toContain('Start W3C issuance');
         expect(markup).toContain(
             'Ready to start QVI-side W3C VC-JWT issuance from this native VRD.'
+        );
+    });
+
+    it('allows W3C issuance while issuer did:webs setup is pending', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CIssuanceControls
+                credential={{
+                    ...credential,
+                    direction: 'issued',
+                    status: 'issued',
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', false]])}
+                actionRunning={false}
+                onStartIssuance={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Start W3C issuance');
+        expect(markup).toContain(
+            'DID/webs setup will run before QVI-side W3C VC-JWT issuance.'
         );
     });
 
