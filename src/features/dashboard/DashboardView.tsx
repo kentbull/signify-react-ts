@@ -1,29 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
-    useFetcher,
+    Navigate,
     useLoaderData,
     useLocation,
     useNavigate,
     useParams,
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
-import { useAppRuntime, useAppSession } from '../../app/runtimeHooks';
-import type {
-    CredentialActionData,
-    DashboardLoaderData,
-} from '../../app/routeData';
-import { submitCredentialAction } from '../../app/credentialActionSubmit';
+import { useAppSession } from '../../app/runtimeHooks';
+import type { DashboardLoaderData } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
-    selectCredentialAcdcsBySaid,
-    selectCredentialAcdc,
-    selectCredentialChainGraph,
-    selectCredentialIpexActivity,
-    selectCredentialRegistries,
     selectDashboardCounts,
-    selectCredentialGrantNotifications,
-    selectDidWebsDidsByAid,
     selectHeldCredentials,
     selectIdentifiers,
     selectIssuedCredentials,
@@ -36,30 +25,22 @@ import {
 } from '../../state/selectors';
 import { DashboardOverview } from './DashboardOverview';
 import {
-    CredentialRecordDetail,
     CredentialsDetail,
     ResolvedSchemasDetail,
 } from './DashboardDetailViews';
 import {
-    buildCredentialActivity,
     buildDashboardAidAliases,
-    buildDashboardRegistryMap,
-    credentialDetailPath,
+    canonicalCredentialWorkflowPath,
     dashboardModeForPath,
+    legacyDashboardCredentialRedirectPath,
 } from './dashboardViewModels';
-import { CredentialW3CIssuanceControls } from '../credentials/CredentialW3CIssuanceControls';
-import { CredentialW3CPresentationControls } from '../credentials/CredentialW3CPresentationControls';
 import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
-import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
-import { selectCredentialW3CPresenter } from '../../domain/credentials/credentialPresentation';
 
 /**
  * Route view that summarizes session health, activity, and credential inventory.
  */
 export const DashboardView = () => {
     const loaderData = useLoaderData() as DashboardLoaderData;
-    const fetcher = useFetcher<CredentialActionData>();
-    const runtime = useAppRuntime();
     const location = useLocation();
     const navigate = useNavigate();
     const { credentialSaid = '' } = useParams();
@@ -77,155 +58,21 @@ export const DashboardView = () => {
     const resolvedSchemas = useAppSelector(selectResolvedCredentialSchemas);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const heldCredentials = useAppSelector(selectHeldCredentials);
-    const grantNotifications = useAppSelector(
-        selectCredentialGrantNotifications
-    );
-    const selectedCredentialExchangeActivities = useAppSelector(
-        selectCredentialIpexActivity(credentialSaid)
-    );
-    const selectedCredentialAcdc = useAppSelector(
-        selectCredentialAcdc(credentialSaid)
-    );
-    const selectedCredentialChainGraph = useAppSelector(
-        selectCredentialChainGraph(credentialSaid)
-    );
-    const credentialAcdcsBySaid = useAppSelector(selectCredentialAcdcsBySaid);
-    const registries = useAppSelector(selectCredentialRegistries);
     const contacts = useAppSelector(selectContacts);
     const identifiers = useAppSelector(selectIdentifiers);
-    const didWebsByAid = useAppSelector(selectDidWebsDidsByAid);
     const connection = runtimeSnapshot.connection;
-    const w3cVerifiers =
-        loaderData.status === 'blocked' ? [] : loaderData.verifiers;
-    const [selectedVerifierId, setSelectedVerifierId] = useState('');
-    const actionRunning = fetcher.state !== 'idle';
     const connectionUrl =
         connection.status === 'connected' ? connection.client.url : null;
-    const registriesById = useMemo(
-        () => buildDashboardRegistryMap(registries),
-        [registries]
-    );
     const aidAliases = useMemo(
         () => buildDashboardAidAliases({ contacts, identifiers }),
         [contacts, identifiers]
-    );
-    const credentials = useMemo(
-        () => [...issuedCredentials, ...heldCredentials],
-        [issuedCredentials, heldCredentials]
     );
     const schemasBySaid = useMemo(
         () => new Map(resolvedSchemas.map((schema) => [schema.said, schema])),
         [resolvedSchemas]
     );
-    const didWebsReadyByAid = useMemo(
-        () =>
-            new Map(
-                Object.entries(didWebsByAid).map(([aid, did]) => [
-                    aid,
-                    did.loadState === 'ready' && did.did !== null,
-                ])
-            ),
-        [didWebsByAid]
-    );
-    const selectedCredential = useMemo(
-        () =>
-            credentials.find(
-                (credential) => credential.said === credentialSaid
-            ) ?? null,
-        [credentialSaid, credentials]
-    );
-    const selectedCredentialSchema = useMemo(
-        () =>
-            selectedCredential?.schemaSaid === null ||
-            selectedCredential?.schemaSaid === undefined
-                ? null
-                : (resolvedSchemas.find(
-                      (schema) => schema.said === selectedCredential.schemaSaid
-                  ) ?? null),
-        [resolvedSchemas, selectedCredential]
-    );
-    const selectedCredentialActivity = useMemo(
-        () =>
-            selectedCredential === null
-                ? []
-                : buildCredentialActivity({
-                      credential: selectedCredential,
-                      grantNotifications,
-                      exchangeActivities: selectedCredentialExchangeActivities,
-                  }),
-        [
-            grantNotifications,
-            selectedCredential,
-            selectedCredentialExchangeActivities,
-        ]
-    );
-    const selectedPresentationPresenter = useMemo(
-        () =>
-            selectedCredential === null
-                ? null
-                : selectCredentialW3CPresenter(selectedCredential, identifiers),
-        [identifiers, selectedCredential]
-    );
-    const selectedPresentationPresenterName =
-        selectedPresentationPresenter?.name ?? '';
-    const selectedPresentationPresenterPrefix =
-        selectedPresentationPresenter?.prefix ?? '';
-    useEffect(() => {
-        if (
-            selectedPresentationPresenterName.length === 0 ||
-            selectedPresentationPresenterPrefix.length === 0
-        ) {
-            return undefined;
-        }
-
-        const controller = new AbortController();
-        void runtime.didwebs
-            .refreshIdentifierDid(
-                selectedPresentationPresenterName,
-                selectedPresentationPresenterPrefix,
-                {
-                    signal: controller.signal,
-                    track: false,
-                }
-            )
-            .catch(() => undefined);
-
-        return () => controller.abort();
-    }, [
-        runtime,
-        selectedPresentationPresenterName,
-        selectedPresentationPresenterPrefix,
-    ]);
-    const openCredential = (said: string) => {
-        navigate(credentialDetailPath(said));
-    };
-    const submitStartW3CIssuance = (
-        credential: CredentialSummaryRecord,
-        issuer: IdentifierSummary
-    ) => {
-        const formData = new FormData();
-        formData.set('intent', 'startW3CIssuance');
-        formData.set('issuerAlias', issuer.name);
-        formData.set('issuerAid', issuer.prefix);
-        formData.set('credentialSaid', credential.said);
-        submitCredentialAction(fetcher, formData);
-    };
-    const submitPresent = (
-        credential: CredentialSummaryRecord,
-        presenter: IdentifierSummary,
-        verifierRequestJson: string
-    ) => {
-        if (verifierRequestJson.length === 0) {
-            return;
-        }
-
-        const formData = new FormData();
-        formData.set('intent', 'presentCredential');
-        formData.set('presenterAlias', presenter.name);
-        formData.set('presenterAid', presenter.prefix);
-        formData.set('credentialSaid', credential.said);
-        formData.set('verifierRequest', verifierRequestJson);
-        submitCredentialAction(fetcher, formData);
+    const openCredential = (credential: CredentialSummaryRecord) => {
+        navigate(canonicalCredentialWorkflowPath(credential) ?? '/credentials');
     };
 
     if (loaderData.status === 'blocked') {
@@ -271,48 +118,13 @@ export const DashboardView = () => {
 
     if (mode === 'credentialDetail') {
         return (
-            <CredentialRecordDetail
-                loaderData={loaderData}
-                credential={selectedCredential}
-                schema={selectedCredentialSchema}
-                registriesById={registriesById}
-                aidAliases={aidAliases}
-                activity={selectedCredentialActivity}
-                acdc={selectedCredentialAcdc}
-                chainGraph={selectedCredentialChainGraph}
-                acdcsBySaid={credentialAcdcsBySaid}
-                schemasBySaid={schemasBySaid}
-                issuanceControls={
-                    selectedCredential === null ? null : (
-                        <CredentialW3CIssuanceControls
-                            credential={selectedCredential}
-                            identifiers={identifiers}
-                            didWebsReadyByAid={didWebsReadyByAid}
-                            actionRunning={actionRunning}
-                            issuanceAction={
-                                fetcher.data?.intent === 'startW3CIssuance'
-                                    ? fetcher.data
-                                    : null
-                            }
-                            onStartIssuance={submitStartW3CIssuance}
-                        />
-                    )
-                }
-                presentationControls={
-                    selectedCredential === null ? null : (
-                        <CredentialW3CPresentationControls
-                            credential={selectedCredential}
-                            identifiers={identifiers}
-                            didWebsReadyByAid={didWebsReadyByAid}
-                            verifiers={w3cVerifiers}
-                            selectedVerifierId={selectedVerifierId}
-                            actionRunning={actionRunning}
-                            presentationAction={fetcher.data ?? null}
-                            onVerifierChange={setSelectedVerifierId}
-                            onPresent={submitPresent}
-                        />
-                    )
-                }
+            <Navigate
+                to={legacyDashboardCredentialRedirectPath({
+                    credentialSaid,
+                    heldCredentials,
+                    issuedCredentials,
+                })}
+                replace
             />
         );
     }

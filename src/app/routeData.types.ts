@@ -15,6 +15,7 @@ import type {
     MultisigRuntimeCommands,
     NotificationRuntimeCommands,
 } from './runtimeCommands';
+import type { W3CVerifierRequestPreset } from '../domain/credentials/w3cVerifierPresets';
 
 /**
  * Canonical route used for startup redirects, unknown paths, and successful
@@ -22,11 +23,7 @@ import type {
  */
 export const DEFAULT_APP_PATH = '/dashboard';
 
-export interface W3CVerifierRequestPreset {
-    id: string;
-    label: string;
-    descriptor: Record<string, unknown>;
-}
+export type { W3CVerifierRequestPreset };
 
 /**
  * Loader result used when a connected Signify client is required.
@@ -104,7 +101,11 @@ export type ClientLoaderData =
  */
 export type CredentialsLoaderData =
     | { status: 'ready'; verifiers: W3CVerifierRequestPreset[] }
-    | { status: 'error'; message: string }
+    | {
+          status: 'error';
+          message: string;
+          verifiers: W3CVerifierRequestPreset[];
+      }
     | BlockedRouteData;
 
 /**

@@ -48,20 +48,20 @@ export const CredentialW3CIssuanceControls = ({
             ? issuanceAction
             : null;
 
-    // Keep the fallback narrow: W3C issuance needs the active native VRD, the
-    // local issuer AID, and a ready did:webs DID because the browser edge will
-    // sign the issuer VC proof/JWT bytes after KERIA stages the request.
+    // Keep the fallback narrow: W3C issuance needs the active native VRD and
+    // the local issuer AID. DID/webs setup is performed as part of the action.
     const blocker = !schemaSupported
         ? 'Only issuer-side VRD credentials can start W3C issuance.'
         : !statusIssuable
           ? `Credential status is ${credential.status}; W3C issuance requires an active issuer-side VRD credential.`
           : issuer === null
             ? 'This wallet does not control the credential issuer AID.'
-            : !didWebsReady
-              ? 'The issuer did:webs DID is not ready.'
-              : actionRunning
-                ? 'A credential command is already running.'
-                : null;
+            : actionRunning
+              ? 'A credential command is already running.'
+              : null;
+    const readyMessage = didWebsReady
+        ? 'Ready to start QVI-side W3C VC-JWT issuance from this native VRD.'
+        : 'DID/webs setup will run before QVI-side W3C VC-JWT issuance.';
 
     return (
         <Stack
@@ -93,18 +93,19 @@ export const CredentialW3CIssuanceControls = ({
             </Stack>
             <Typography
                 data-testid="w3c-issuance-status"
+                data-credential-said={credential.said}
                 data-state={blocker === null ? 'ready' : 'blocked'}
                 data-issuer-aid={issuer?.prefix ?? ''}
                 variant="caption"
                 color={blocker === null ? 'text.secondary' : 'warning.main'}
                 sx={{ overflowWrap: 'anywhere' }}
             >
-                {blocker ??
-                    'Ready to start QVI-side W3C VC-JWT issuance from this native VRD.'}
+                {blocker ?? readyMessage}
             </Typography>
             {issuanceActionResult !== null && (
                 <Typography
                     data-testid="w3c-issuance-action-result"
+                    data-credential-said={credential.said}
                     data-state={issuanceActionResult.ok ? 'accepted' : 'error'}
                     data-request-id={issuanceActionResult.requestId ?? ''}
                     data-operation-route={

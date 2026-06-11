@@ -7,7 +7,8 @@ import {
     StatusPill,
     TelemetryRow,
 } from '../../app/Console';
-import { clickablePanelSx, monoValueSx } from '../../app/consoleStyles';
+import type { CredentialActionData } from '../../app/routeData';
+import { monoValueSx } from '../../app/consoleStyles';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import type {
@@ -15,10 +16,11 @@ import type {
     CredentialSummaryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
+import type { W3CVerifierRequestPreset } from '../../domain/credentials/w3cVerifierPresets';
 import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { CredentialWalletStats } from './credentialViewModels';
 import { schemaLabel, schemaStatusTone, statusTone } from './credentialDisplay';
-import { CredentialW3CPresentationControls } from './CredentialW3CPresentationControls';
+import { W3CPresentCtrls } from './W3CPresentCtrls.tsx';
 
 /**
  * Holder-side credential type readiness panel.
@@ -261,8 +263,7 @@ export const InboundGrantsPanel = ({
 );
 
 /**
- * Holder-side admitted credential list. Rows navigate to the full dashboard
- * credential detail route; W3C Present remains a row-local command.
+ * Holder-side admitted credential list. W3C Present stays a row-local command.
  */
 export const HeldCredentialsPanel = ({
     credentials,
@@ -272,8 +273,8 @@ export const HeldCredentialsPanel = ({
     didWebsReadyByAid,
     verifiers,
     selectedVerifierId,
+    presentationAction,
     actionRunning,
-    onOpenCredential,
     onVerifierChange,
     onPresent,
 }: {
@@ -282,10 +283,10 @@ export const HeldCredentialsPanel = ({
     schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     identifiers: readonly IdentifierSummary[];
     didWebsReadyByAid: ReadonlyMap<string, boolean>;
-    verifiers: readonly unknown[];
+    verifiers: readonly W3CVerifierRequestPreset[];
     selectedVerifierId: string;
+    presentationAction?: CredentialActionData | null;
     actionRunning: boolean;
-    onOpenCredential: (credentialSaid: string) => void;
     onVerifierChange: (verifierRequestJson: string) => void;
     onPresent: (
         credential: CredentialSummaryRecord,
@@ -304,25 +305,13 @@ export const HeldCredentialsPanel = ({
                 {credentials.map((credential) => (
                     <Box
                         key={credential.said}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onOpenCredential(credential.said)}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                onOpenCredential(credential.said);
-                            }
+                        sx={{
+                            border: 1,
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            p: 1.5,
+                            bgcolor: 'background.paper',
                         }}
-                        sx={[
-                            {
-                                border: 1,
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                p: 1.5,
-                                bgcolor: 'background.paper',
-                            },
-                            clickablePanelSx,
-                        ]}
                     >
                         <Stack spacing={1}>
                             <Stack
@@ -351,12 +340,13 @@ export const HeldCredentialsPanel = ({
                             <Typography variant="body2" sx={monoValueSx}>
                                 {abbreviateMiddle(credential.said, 28)}
                             </Typography>
-                            <CredentialW3CPresentationControls
+                            <W3CPresentCtrls
                                 credential={credential}
                                 identifiers={identifiers}
                                 didWebsReadyByAid={didWebsReadyByAid}
                                 verifiers={verifiers}
                                 selectedVerifierId={selectedVerifierId}
+                                presentationAction={presentationAction}
                                 actionRunning={actionRunning}
                                 onVerifierChange={onVerifierChange}
                                 onPresent={onPresent}

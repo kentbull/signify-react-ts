@@ -39,23 +39,17 @@ export const selectCredentialW3CIssuer = (
 };
 
 /** Select the local AID that should run W3C Present for this credential. */
-export const selectCredentialW3CPresenter = (
+export const selectW3CPresenter = (
     credential: CredentialSummaryRecord,
     identifiers: readonly IdentifierSummary[]
 ): IdentifierSummary | null => {
-    const localByAid = new Map(
-        identifiers.map((identifier) => [identifier.prefix, identifier])
-    );
-    const issuer =
-        credential.issuerAid === null
-            ? null
-            : (localByAid.get(credential.issuerAid) ?? null);
-    const holder =
-        credential.holderAid === null
-            ? null
-            : (localByAid.get(credential.holderAid) ?? null);
+    if (credential.direction !== 'held' || credential.holderAid === null) {
+        return null;
+    }
 
-    return credential.direction === 'held'
-        ? (holder ?? issuer)
-        : (issuer ?? holder);
+    return (
+        identifiers.find(
+            (identifier) => identifier.prefix === credential.holderAid
+        ) ?? null
+    );
 };

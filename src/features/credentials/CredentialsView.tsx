@@ -56,7 +56,7 @@ export const CredentialsView = () => {
         identifiers.find((identifier) => identifier.prefix === selectedAid) ??
         null;
     const w3cVerifiers =
-        loaderData.status === 'ready' ? loaderData.verifiers : [];
+        loaderData.status === 'blocked' ? [] : loaderData.verifiers;
 
     useEffect(() => {
         if (aidParam === undefined && walletSelectedAid !== null) {

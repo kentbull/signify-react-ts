@@ -19,6 +19,7 @@ import {
     rootAction,
     type RouteDataRuntime,
 } from '../../src/app/routeData';
+import { appConfig } from '../../src/config';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type {
     SignifyClientConfig,
@@ -393,7 +394,7 @@ describe('route loaders', () => {
 
         await expect(loadDashboard(runtime)).resolves.toEqual({
             status: 'ready',
-            verifiers: [],
+            verifiers: appConfig.w3cVerifiers,
         });
         expect(runtime.refreshState).toHaveBeenCalledOnce();
         expect(runtime.identifiers.list).toHaveBeenCalledOnce();
@@ -414,7 +415,7 @@ describe('route loaders', () => {
 
         await expect(loadDashboard(runtime)).resolves.toEqual({
             status: 'ready',
-            verifiers: [],
+            verifiers: appConfig.w3cVerifiers,
         });
     });
 
@@ -523,7 +524,7 @@ describe('route loaders', () => {
 
         await expect(loadCredentials(runtime)).resolves.toEqual({
             status: 'ready',
-            verifiers: [],
+            verifiers: appConfig.w3cVerifiers,
         });
         expect(calls[0]).toBe('identifiers');
         expect(calls).toEqual(

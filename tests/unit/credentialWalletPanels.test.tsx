@@ -2,11 +2,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HeldCredentialsPanel } from '../../src/features/credentials/CredentialWalletPanels';
 import { CredentialW3CIssuanceControls } from '../../src/features/credentials/CredentialW3CIssuanceControls';
-import { CredentialW3CPresentationControls } from '../../src/features/credentials/CredentialW3CPresentationControls';
+import { W3CPresentCtrls } from '../../src/features/credentials/W3CPresentCtrls';
 import { IssuedCredentialsForTypePanel } from '../../src/features/credentials/CredentialIssuerTypePanels';
+import { appConfig } from '../../src/config';
 import {
     selectCredentialW3CIssuer,
-    selectCredentialW3CPresenter,
+    selectW3CPresenter,
     W3C_PRESENTABLE_VRD_SCHEMA_SAID,
 } from '../../src/domain/credentials/credentialPresentation';
 import type {
@@ -57,17 +58,17 @@ describe('wallet credential panels', () => {
             'Eissuer'
         );
         expect(
-            selectCredentialW3CPresenter(credential, identifiers)?.prefix
+            selectW3CPresenter(credential, identifiers)?.prefix
         ).toBe('Eholder');
         expect(
-            selectCredentialW3CPresenter(
+            selectW3CPresenter(
                 { ...credential, direction: 'issued' },
                 identifiers
-            )?.prefix
-        ).toBe('Eissuer');
+            )
+        ).toBeNull();
     });
 
-    it('renders held credential rows as detail navigation targets without inline expansion details', () => {
+    it('renders held credential rows as inline workflow cards without detail navigation', () => {
         const markup = renderToStaticMarkup(
             <HeldCredentialsPanel
                 credentials={[credential]}
@@ -78,13 +79,12 @@ describe('wallet credential panels', () => {
                 verifiers={[]}
                 selectedVerifierId=""
                 actionRunning={false}
-                onOpenCredential={vi.fn()}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
             />
         );
 
-        expect(markup).toContain('role="button"');
+        expect(markup).not.toContain('role="button"');
         expect(markup).toContain('Verifiable Reference Data (VRD) Credential');
         expect(markup).toContain('Present');
         expect(markup).toContain('Ecredential');
@@ -95,22 +95,15 @@ describe('wallet credential panels', () => {
 
     it('renders the shared verifier selector and explicit W3C Present blockers', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
                 }}
                 identifiers={[]}
                 didWebsReadyByAid={new Map()}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -118,31 +111,25 @@ describe('wallet credential panels', () => {
         );
 
         expect(markup).toContain('Verifier request');
-        expect(markup).toContain('https://verifier.example');
+        expect(markup).toContain('Isomer Python');
+        expect(markup).toContain('http://127.0.0.1:8788/verify/vp');
         expect(markup).toContain('Present');
         expect(markup).toContain(
-            'This wallet controls neither the credential issuer nor holder AID required for W3C Present.'
+            'This wallet does not control the credential holder AID required for W3C Present.'
         );
     });
 
     it('uses a local holder as the presenter for held VRD credentials', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
                 }}
                 identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
                 didWebsReadyByAid={new Map([['Eholder', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -154,9 +141,32 @@ describe('wallet credential panels', () => {
         );
     });
 
-    it('uses a local issuer as the presenter for issued VRD credentials', () => {
+    it('allows W3C presentation while presenter did:webs setup is pending', () => {
         const markup = renderToStaticMarkup(
-            <CredentialW3CPresentationControls
+            <W3CPresentCtrls
+                credential={{
+                    ...credential,
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'holder', prefix: 'Eholder' }]}
+                didWebsReadyByAid={new Map([['Eholder', false]])}
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
+                actionRunning={false}
+                onVerifierChange={vi.fn()}
+                onPresent={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Present');
+        expect(markup).toContain(
+            'DID/webs setup will run before W3C presentation.'
+        );
+    });
+
+    it('does not present issued VRD credentials through the issuer role', () => {
+        const markup = renderToStaticMarkup(
+            <W3CPresentCtrls
                 credential={{
                     ...credential,
                     direction: 'issued',
@@ -165,15 +175,8 @@ describe('wallet credential panels', () => {
                 }}
                 identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
                 didWebsReadyByAid={new Map([['Eissuer', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
+                verifiers={appConfig.w3cVerifiers}
+                selectedVerifierId="isomer-python"
                 actionRunning={false}
                 onVerifierChange={vi.fn()}
                 onPresent={vi.fn()}
@@ -181,7 +184,7 @@ describe('wallet credential panels', () => {
         );
 
         expect(markup).toContain(
-            'Ready to create a KERIA W3C presentation transaction from this verifier request.'
+            'This wallet does not control the credential holder AID required for W3C Present.'
         );
     });
 
@@ -207,6 +210,28 @@ describe('wallet credential panels', () => {
         );
     });
 
+    it('allows W3C issuance while issuer did:webs setup is pending', () => {
+        const markup = renderToStaticMarkup(
+            <CredentialW3CIssuanceControls
+                credential={{
+                    ...credential,
+                    direction: 'issued',
+                    status: 'issued',
+                    schemaSaid: W3C_PRESENTABLE_VRD_SCHEMA_SAID,
+                }}
+                identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
+                didWebsReadyByAid={new Map([['Eissuer', false]])}
+                actionRunning={false}
+                onStartIssuance={vi.fn()}
+            />
+        );
+
+        expect(markup).toContain('Start W3C issuance');
+        expect(markup).toContain(
+            'DID/webs setup will run before QVI-side W3C VC-JWT issuance.'
+        );
+    });
+
     it('blocks W3C issuance fallback outside the local issuer role', () => {
         const markup = renderToStaticMarkup(
             <CredentialW3CIssuanceControls
@@ -227,7 +252,7 @@ describe('wallet credential panels', () => {
         );
     });
 
-    it('renders W3C Present controls alongside issuer IPEX Grant controls', () => {
+    it('renders W3C issuance alongside issuer IPEX Grant controls', () => {
         const markup = renderToStaticMarkup(
             <IssuedCredentialsForTypePanel
                 credentials={[
@@ -253,25 +278,14 @@ describe('wallet credential panels', () => {
                 }
                 identifiers={[{ name: 'issuer', prefix: 'Eissuer' }]}
                 didWebsReadyByAid={new Map([['Eissuer', true]])}
-                verifiers={[
-                    {
-                        id: 'isomer-python',
-                        label: 'Python Isomer',
-                        kind: 'isomer-python-vc-jwt',
-                        verifyUrl: 'http://verifier.example/verify',
-                    },
-                ]}
-                selectedVerifierId='{"aud":"https://verifier.example","nonce":"nonce-1"}'
                 onGrant={vi.fn()}
                 onStartW3CIssuance={vi.fn()}
-                onVerifierChange={vi.fn()}
-                onPresent={vi.fn()}
             />
         );
 
         expect(markup).toContain('Grant');
         expect(markup).toContain('Start W3C issuance');
-        expect(markup).toContain('Present');
-        expect(markup).toContain('Verifier request');
+        expect(markup).not.toContain('Present');
+        expect(markup).not.toContain('Verifier request');
     });
 });
