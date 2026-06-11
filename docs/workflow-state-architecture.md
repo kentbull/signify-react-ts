@@ -136,6 +136,27 @@ Current workflow groups:
   multisig have dedicated workflow modules. Avoid placeholder workflow files:
   add a real entry point when a domain operation has a caller and lifecycle.
 
+## W3C Credential Flow
+
+The W3C VRD path lives in the credential workflow:
+
+- Domain helpers identify issuer-side and holder-side VRD credentials and choose
+  the local issuer or holder AID for the foreground action.
+- `credentials.service.ts` uses `signify-did-webs` to ensure did:webs setup,
+  delegates VC-JWT and VP-JWT artifact assembly to `signify-w3c`, then submits
+  those edge-signed artifacts to KERIA.
+- `credentials.op.ts` and runtime command wiring expose those service calls
+  through normal Effection operation tracking.
+- `didwebs.op.ts` only refreshes projected did:webs DID state for display; it
+  does not own a session signing-request worker or service W3C queues.
+- Redux stores only serializable summaries and operation results. It does not
+  store raw clients, private keys, verifier service objects, or W3C signing
+  approvals.
+
+KERIA is the durable workflow source of truth and validator/forwarder. The
+React app is the edge policy and signing runtime. If a W3C change makes KERIA
+assemble or sign token material, it breaks the architecture.
+
 ## Redux State
 
 Redux state is a serializable projection of workflow progress and domain
