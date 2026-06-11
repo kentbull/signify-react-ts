@@ -23,7 +23,6 @@ describe('buildAppConfig', () => {
             minSleepMs: 1000,
             maxSleepMs: 5000,
             liveRefreshMs: 3000,
-            didWebsPollingMs: 7000,
         });
         expect(config.witnesses.aids).toHaveLength(3);
         expect(config.witnesses.toad).toBe(2);
@@ -58,7 +57,6 @@ describe('buildAppConfig', () => {
             VITE_OPERATION_MIN_SLEEP_MS: '250',
             VITE_OPERATION_MAX_SLEEP_MS: '2000',
             VITE_LIVE_REFRESH_MS: '750',
-            VITE_DIDWEBS_POLLING_MS: '10000',
             VITE_WITNESS_AIDS: 'aid-one, aid-two , aid-three',
             VITE_WITNESS_TOAD: '3',
             VITE_ISSUER_ALIAS: 'demo-issuer',
@@ -93,7 +91,6 @@ describe('buildAppConfig', () => {
         expect(config.operations.minSleepMs).toBe(250);
         expect(config.operations.maxSleepMs).toBe(2000);
         expect(config.operations.liveRefreshMs).toBe(750);
-        expect(config.operations.didWebsPollingMs).toBe(10000);
         expect(config.witnesses).toEqual({
             aids: ['aid-one', 'aid-two', 'aid-three'],
             toad: 3,

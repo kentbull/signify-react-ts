@@ -15,6 +15,7 @@ import {
     type W3CIssuanceContext,
     type W3CPresentationResult,
 } from 'signify-w3c';
+import { ensureDidWebsSetup } from 'signify-did-webs';
 import { callPromise, toErrorText } from '../effects/promise';
 import type { OperationLogger } from '../signify/client';
 import type {
@@ -738,6 +739,14 @@ export function* startW3CIssuanceService({
     const name = requireNonEmpty(issuerAlias, 'Issuer identifier');
     requireNonEmpty(issuerAid, 'Issuer AID');
     const sourceSaid = requireNonEmpty(credentialSaid, 'Credential SAID');
+    yield* callPromise(() =>
+        ensureDidWebsSetup({
+            client,
+            name,
+            timeoutMs,
+            pollMs,
+        })
+    );
     return yield* callPromise(() =>
         issueW3CCredential({
             client,
@@ -762,6 +771,8 @@ export function* presentCredentialService({
     presenterAid,
     credentialSaid,
     verifierRequest,
+    timeoutMs,
+    pollMs,
 }: {
     client: SignifyClient;
     presenterAlias: string;
@@ -777,6 +788,14 @@ export function* presentCredentialService({
     if (Object.keys(verifierRequest).length === 0) {
         throw new Error('Verifier request JSON is required.');
     }
+    yield* callPromise(() =>
+        ensureDidWebsSetup({
+            client,
+            name,
+            timeoutMs,
+            pollMs,
+        })
+    );
     const requestDescriptor = {
         ...verifierRequest,
         credentialSaid: said,

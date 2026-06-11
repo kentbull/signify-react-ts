@@ -28,15 +28,23 @@ const w3cMocks = vi.hoisted(() => ({
     issueW3CCredential: vi.fn(),
     presentW3CCredential: vi.fn(),
 }));
+const didWebsMocks = vi.hoisted(() => ({
+    ensureDidWebsSetup: vi.fn(),
+}));
 
 vi.mock('signify-w3c', () => ({
+    W3C_GRANT_ROUTE: '/w3c/vc/grant',
     issueW3CCredential: w3cMocks.issueW3CCredential,
     presentW3CCredential: w3cMocks.presentW3CCredential,
     W3CKeriaClient: vi.fn().mockImplementation(function () {
         return {
-        credentials: w3cMocks.credentials,
+            credentials: w3cMocks.credentials,
         };
     }),
+}));
+
+vi.mock('signify-did-webs', () => ({
+    ensureDidWebsSetup: didWebsMocks.ensureDidWebsSetup,
 }));
 
 const loadedAt = '2026-04-22T00:00:00.000Z';
@@ -169,6 +177,11 @@ describe('credential service helpers', () => {
         w3cMocks.credentials.mockReset();
         w3cMocks.issueW3CCredential.mockReset();
         w3cMocks.presentW3CCredential.mockReset();
+        didWebsMocks.ensureDidWebsSetup.mockReset();
+        didWebsMocks.ensureDidWebsSetup.mockResolvedValue({
+            ready: true,
+            dws: 'did:webs:example.com:dws:Eaid',
+        });
     });
 
     it('starts W3C issuance through the edge artifact builder', async () => {
@@ -198,7 +211,7 @@ describe('credential service helpers', () => {
                         issuerAid: 'Eissuer',
                         credentialSaid: 'Ecredential',
                         timeoutMs: 1000,
-                        pollMs: 0,
+                        pollMs: 1,
                     }),
                 {
                     scope: 'app',
@@ -215,12 +228,23 @@ describe('credential service helpers', () => {
                     grantSaid: 'grant-said',
                 })
             );
+            expect(didWebsMocks.ensureDidWebsSetup).toHaveBeenCalledWith({
+                client,
+                name: 'issuer',
+                timeoutMs: 1000,
+                pollMs: 1,
+            });
+            expect(
+                didWebsMocks.ensureDidWebsSetup.mock.invocationCallOrder[0]
+            ).toBeLessThan(
+                w3cMocks.issueW3CCredential.mock.invocationCallOrder[0]
+            );
             expect(w3cMocks.issueW3CCredential).toHaveBeenCalledWith({
                 client,
                 issuerName: 'issuer',
                 sourceCredentialSaid: 'Ecredential',
                 timeoutMs: 1000,
-                pollMs: 0,
+                pollMs: 1,
             });
         } finally {
             await runtime.destroy();
@@ -269,7 +293,7 @@ describe('credential service helpers', () => {
                             response_uri: 'http://verifier.example/verify/vp',
                         },
                         timeoutMs: 1000,
-                        pollMs: 0,
+                        pollMs: 1,
                     }),
                 {
                     scope: 'app',
@@ -286,6 +310,15 @@ describe('credential service helpers', () => {
                     verifierResponse: { ok: true },
                 })
             );
+            expect(didWebsMocks.ensureDidWebsSetup).toHaveBeenCalledWith({
+                client,
+                name: 'presenter',
+                timeoutMs: 1000,
+                pollMs: 1,
+            });
+            expect(
+                didWebsMocks.ensureDidWebsSetup.mock.invocationCallOrder[0]
+            ).toBeLessThan(w3cMocks.credentials.mock.invocationCallOrder[0]);
             expect(w3cMocks.credentials).toHaveBeenCalledWith('presenter');
             expect(w3cMocks.presentW3CCredential).toHaveBeenCalledWith({
                 client,
@@ -337,7 +370,7 @@ describe('credential service helpers', () => {
                                 nonce: 'nonce-1',
                             },
                             timeoutMs: 1000,
-                            pollMs: 0,
+                            pollMs: 1,
                         }),
                     {
                         scope: 'app',
@@ -393,7 +426,7 @@ describe('credential service helpers', () => {
                                 nonce: 'nonce-1',
                             },
                             timeoutMs: 1000,
-                            pollMs: 0,
+                            pollMs: 1,
                         }),
                     {
                         scope: 'app',
@@ -422,7 +455,7 @@ describe('credential service helpers', () => {
                             credentialSaid: 'Ecredential',
                             verifierRequest: {},
                             timeoutMs: 1000,
-                            pollMs: 0,
+                            pollMs: 1,
                         }),
                     {
                         scope: 'app',
