@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import puppeteer, { type ElementHandle, type Page } from 'puppeteer';
+import puppeteer, { type Page } from 'puppeteer';
 import { appConfig } from '../src/config';
 import {
     challengeWordsFingerprint,
@@ -10,7 +10,11 @@ import {
     CHALLENGE_TOPIC,
     responseSaidFromChallengeOperation,
 } from '../src/services/challenges.service';
-import { connectSignifyClient, waitOperation } from '../src/signify/client';
+import {
+    connectSignifyClient,
+    randomSignifyPasscode,
+    waitOperation,
+} from '../src/signify/client';
 import {
     addAgentEndRole,
     createRole,
@@ -31,6 +35,10 @@ const sleep = (ms: number): Promise<void> =>
     new Promise((resolve) => {
         globalThis.setTimeout(resolve, ms);
     });
+
+const logStage = (stage: string, details: Record<string, unknown> = {}): void => {
+    console.log(JSON.stringify({ stage, ...details }));
+};
 
 /** Check whether an existing dev server can serve the app. */
 const canReachApp = async (): Promise<boolean> => {
@@ -85,36 +93,65 @@ const startViteIfNeeded = async (): Promise<ChildProcess | null> => {
     return child;
 };
 
-/** Return a required element handle with a clearer smoke-test error. */
-const elementFor = async (
-    page: Page,
-    selector: string
-): Promise<ElementHandle<Element>> => {
-    const element = await page.$(selector);
-    if (element === null) {
-        throw new Error(`Missing element ${selector}`);
-    }
-
-    return element;
-};
-
-/** Read the generated passcode from the MUI password input. */
-const passcodeValue = (page: Page): Promise<string> =>
-    page.$eval(
-        '#outlined-password-input',
-        (element) => (element as HTMLInputElement).value ?? ''
-    );
-
 /** Replace a MUI input/textarea value using browser-like keyboard actions. */
 const setInputValue = async (
     page: Page,
     selector: string,
     value: string
 ): Promise<void> => {
-    const element = await elementFor(page, selector);
-    await element.click({ clickCount: 3 });
-    await page.keyboard.press('Backspace');
-    await element.type(value);
+    await page.waitForSelector(selector, { timeout: 10_000 });
+    await page.evaluate(
+        ({ targetSelector, nextValue }) => {
+            const element = globalThis.document.querySelector(targetSelector);
+            if (
+                !(element instanceof globalThis.HTMLInputElement) &&
+                !(element instanceof globalThis.HTMLTextAreaElement)
+            ) {
+                throw new Error(
+                    `Input not found for selector ${targetSelector}`
+                );
+            }
+            const valueSetter =
+                element instanceof globalThis.HTMLTextAreaElement
+                    ? Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLTextAreaElement.prototype,
+                          'value'
+                      )?.set
+                    : Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLInputElement.prototype,
+                          'value'
+                      )?.set;
+            if (valueSetter === undefined) {
+                throw new Error(
+                    `Unable to set input value for selector ${targetSelector}`
+                );
+            }
+            element.focus();
+            valueSetter.call(element, nextValue);
+            element.dispatchEvent(
+                new globalThis.Event('input', { bubbles: true })
+            );
+            element.dispatchEvent(
+                new globalThis.Event('change', { bubbles: true })
+            );
+        },
+        { targetSelector: selector, nextValue: value }
+    );
+};
+
+/** Click a visible control through DOM activation to avoid hit-test flake. */
+const dispatchClick = async (page: Page, selector: string): Promise<void> => {
+    await page.waitForSelector(selector, { timeout: 10_000 });
+    await page.evaluate((targetSelector) => {
+        const element = globalThis.document.querySelector(targetSelector);
+        if (!(element instanceof globalThis.HTMLElement)) {
+            throw new Error(
+                `Clickable element not found for ${targetSelector}`
+            );
+        }
+        element.focus();
+        element.click();
+    }, selector);
 };
 
 /** Wait until any visible matching element contains expected text. */
@@ -124,39 +161,106 @@ const waitForText = async (
     expected: string,
     timeout = 120_000
 ): Promise<void> => {
-    await page.waitForFunction(
-        (visibleSelector, text) =>
-            Array.from(
+    const timeoutAt = Date.now() + timeout;
+    let lastText = '';
+    while (Date.now() < timeoutAt) {
+        const texts = await page.evaluate((visibleSelector) => {
+            return Array.from(
                 globalThis.document.querySelectorAll(visibleSelector)
-            ).some((element) => element.textContent?.includes(text)),
-        { timeout },
-        selector,
-        expected
+            ).map((element) => element.textContent ?? '');
+        }, selector);
+        lastText = texts.join('\n');
+        if (texts.some((text) => text.includes(expected))) {
+            return;
+        }
+        await sleep(250);
+    }
+
+    throw new Error(
+        `Timed out waiting for ${selector} to include ${expected}. Last text: ${lastText}`
     );
+};
+
+/** Wait for a button to become enabled, then click through DOM activation. */
+const dispatchEnabledClick = async (
+    page: Page,
+    selector: string,
+    label: string
+): Promise<void> => {
+    const timeoutAt = Date.now() + 30_000;
+    let lastState = 'not checked';
+
+    while (Date.now() < timeoutAt) {
+        lastState = await page.evaluate((targetSelector) => {
+            const element = globalThis.document.querySelector(targetSelector);
+            if (!(element instanceof globalThis.HTMLButtonElement)) {
+                return 'missing';
+            }
+            return element.disabled ? 'disabled' : 'enabled';
+        }, selector);
+        if (lastState === 'enabled') {
+            await dispatchClick(page, selector);
+            return;
+        }
+        await sleep(250);
+    }
+
+    throw new Error(`${label} did not become enabled: ${lastState}`);
+};
+
+/** Wait for an element to exist using explicit polling and visible diagnostics. */
+const waitForElementPresent = async (
+    page: Page,
+    selector: string,
+    label: string,
+    timeout = 45_000
+): Promise<void> => {
+    const timeoutAt = Date.now() + timeout;
+    while (Date.now() < timeoutAt) {
+        const found = await page.evaluate(
+            (targetSelector) =>
+                globalThis.document.querySelector(targetSelector) !== null,
+            selector
+        );
+        if (found) {
+            return;
+        }
+        await sleep(250);
+    }
+
+    const visibleText = await page.evaluate(
+        () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
+    );
+    throw new Error(`${label} did not appear. Visible text: ${visibleText}`);
 };
 
 /** Boot/connect the browser wallet and return its generated passcode. */
 const connectBrowserAgent = async (page: Page): Promise<string> => {
+    logStage('browser.connect.open');
     await page.goto(appUrl, { waitUntil: 'networkidle0' });
-    await page.click('[data-testid="connect-open"]');
+    await dispatchClick(page, '[data-testid="connect-open"]');
     await page.waitForSelector('[data-testid="connect-dialog"]');
-    await page.click('[data-testid="generate-passcode"]');
+    const passcode = await randomSignifyPasscode();
+    await setInputValue(page, '#outlined-password-input', passcode);
     await page.waitForFunction(
         () =>
             globalThis.document.querySelector('#outlined-password-input')?.value
                 .length >= 21,
-        { timeout: 10_000 }
+        { timeout: 30_000 }
     );
 
-    const passcode = await passcodeValue(page);
-    await page.click('[data-testid="connect-submit"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        hidden: true,
-        timeout: 30_000,
-    });
+    await dispatchClick(page, '[data-testid="connect-submit"]');
     await page.waitForSelector('[data-testid="dashboard-view"]', {
-        timeout: 30_000,
+        timeout: 120_000,
     });
+    logStage('browser.connect.dashboard');
+    if ((await page.$('[data-testid="connect-dialog"]')) !== null) {
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('[data-testid="connect-dialog"]', {
+            hidden: true,
+            timeout: 10_000,
+        });
+    }
 
     return passcode;
 };
@@ -194,14 +298,16 @@ const navigateInApp = async (
     navTestId: string,
     readySelector: string
 ): Promise<void> => {
-    await page.click('[data-testid="nav-open"]');
+    logStage('nav.open.start', { navTestId });
+    await dispatchClick(page, '[data-testid="nav-open"]');
     await page.waitForSelector(`[data-testid="${navTestId}"]`, {
         timeout: 10_000,
     });
-    await page.click(`[data-testid="${navTestId}"]`);
+    await dispatchClick(page, `[data-testid="${navTestId}"]`);
     await page.waitForSelector(readySelector, {
         timeout: 30_000,
     });
+    logStage('nav.open.ready', { navTestId });
 };
 
 /** Wait until the contact card shows KERIA resolution has completed. */
@@ -209,19 +315,28 @@ const waitForResolvedContact = async (
     page: Page,
     alias: string
 ): Promise<void> => {
-    await page.waitForFunction(
-        (expectedAlias) =>
+    const timeoutAt = Date.now() + 120_000;
+    let cards: string[] = [];
+    while (Date.now() < timeoutAt) {
+        cards = await page.evaluate(() =>
             Array.from(
                 globalThis.document.querySelectorAll(
                     '[data-testid="contact-card"]'
                 )
-            ).some(
-                (element) =>
-                    element.textContent?.includes(expectedAlias) === true &&
-                    element.textContent.includes('resolved')
-            ),
-        { timeout: 120_000 },
-        alias
+            ).map((element) => element.textContent ?? '')
+        );
+        if (
+            cards.some(
+                (text) => text.includes(alias) && text.includes('resolved')
+            )
+        ) {
+            return;
+        }
+        await sleep(250);
+    }
+
+    throw new Error(
+        `Contact ${alias} did not reach resolved state. Cards: ${JSON.stringify(cards)}`
     );
 };
 
@@ -231,30 +346,46 @@ const resolveOobiInContacts = async (
     oobi: string,
     alias: string
 ): Promise<void> => {
+    logStage('contacts.resolve.start', { alias });
     if ((await page.$('[data-testid="contacts-view"]')) === null) {
+        logStage('contacts.navigate.start', { alias });
         await navigateInApp(
             page,
             'nav-contacts',
             '[data-testid="contacts-view"]'
         );
+        logStage('contacts.navigate.ready', { alias });
     }
+    logStage('contacts.resolve.oobiInput.start', { alias });
     await setInputValue(
         page,
         '[data-testid="contact-oobi-input"] textarea',
         oobi
     );
+    logStage('contacts.resolve.oobiInput.ready', { alias });
+    logStage('contacts.resolve.aliasInput.start', { alias });
     await setInputValue(
         page,
         '[data-testid="contact-alias-input"] input',
         alias
     );
-    await page.click('[data-testid="contact-resolve-submit"]');
+    logStage('contacts.resolve.aliasInput.ready', { alias });
+    logStage('contacts.resolve.submit.start', { alias });
+    await dispatchEnabledClick(
+        page,
+        '[data-testid="contact-resolve-submit"]',
+        'contact resolve submit'
+    );
+    logStage('contacts.resolve.submit.clicked', { alias });
+    logStage('contacts.resolve.cardWait.start', { alias });
     await waitForText(page, '[data-testid="contact-card"]', alias);
     await waitForResolvedContact(page, alias);
+    logStage('contacts.resolve.ready', { alias });
 };
 
 /** Open the contact detail route by visible contact alias. */
 const openContactDetail = async (page: Page, alias: string): Promise<void> => {
+    logStage('contacts.detail.open', { alias });
     await page.waitForFunction(
         (expectedAlias) =>
             Array.from(
@@ -278,6 +409,7 @@ const openContactDetail = async (page: Page, alias: string): Promise<void> => {
     await page.waitForSelector('[data-testid="contact-detail"]', {
         timeout: 30_000,
     });
+    logStage('contacts.detail.ready', { alias });
 };
 
 /** Read challenge words generated by the browser contact detail workflow. */
@@ -433,118 +565,254 @@ const verifyChallengeResponse = async ({
 /** Open the notification quick panel from any route state. */
 const openNotificationsBell = async (page: Page): Promise<void> => {
     await page.keyboard.press('Escape');
-    await page.click('[data-testid="notifications-open"]');
+    await dispatchClick(page, '[data-testid="notifications-open"]');
 };
 
-/** Wait for the synthetic challenge notification card and report visible text. */
-const waitForChallengeNotificationCard = async (page: Page): Promise<void> => {
+interface ChallengeNotificationCardSnapshot {
+    challengeId: string | null;
+    text: string;
+}
+
+/** Return visible challenge notification cards with hidden challenge ids. */
+const challengeNotificationCards = (
+    page: Page
+): Promise<ChallengeNotificationCardSnapshot[]> =>
+    page.evaluate(() =>
+        Array.from(
+            globalThis.document.querySelectorAll(
+                '[data-testid="challenge-notification-card"]'
+            )
+        ).map((card) => {
+            const input = card.querySelector('input[name="challengeId"]');
+            return {
+                challengeId:
+                    input instanceof globalThis.HTMLInputElement
+                        ? input.value
+                        : null,
+                text: card.textContent ?? '',
+            };
+        })
+    );
+
+/** Wait for the matching synthetic challenge notification card. */
+const waitForChallengeNotificationCard = async (
+    page: Page,
+    challengeId: string
+): Promise<void> => {
+    logStage('challenge.notification.open.start');
     await openNotificationsBell(page);
-    try {
-        await page.waitForSelector(
-            '[data-testid="challenge-notification-card"]',
-            {
-                timeout: 45_000,
-            }
-        );
-    } catch (error) {
-        const visibleText = await page.evaluate(
-            () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
-        );
-        throw new Error(
-            `Challenge notification card did not appear. Visible text: ${visibleText}`,
-            { cause: error }
-        );
+    logStage('challenge.notification.open.ready');
+
+    const timeoutAt = Date.now() + 45_000;
+    let cards: ChallengeNotificationCardSnapshot[] = [];
+    while (Date.now() < timeoutAt) {
+        cards = await challengeNotificationCards(page);
+        if (cards.some((card) => card.challengeId === challengeId)) {
+            logStage('challenge.notification.card.ready', { challengeId });
+            return;
+        }
+        await sleep(250);
     }
+
+    const visibleText = await page.evaluate(
+        () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
+    );
+    throw new Error(
+        `Challenge notification card ${challengeId} did not appear. Cards: ${JSON.stringify(cards)} Visible text: ${visibleText}`
+    );
 };
 
 /** Selector that avoids MUI's hidden autosize mirror textarea. */
 const visibleChallengeResponseTextarea = (scope: string): string =>
     `${scope} [data-testid="challenge-notification-response-input"] textarea:not([aria-hidden="true"])`;
 
-/** Respond to a challenge request from the top-bar notification card. */
-const respondFromBellNotification = async (
+/** Set words in the matching top-bar challenge notification card. */
+const setCardChallengeResponseWords = async (
     page: Page,
+    challengeId: string,
     words: readonly string[]
 ): Promise<void> => {
-    await waitForChallengeNotificationCard(page);
-    await setInputValue(
-        page,
-        visibleChallengeResponseTextarea(
-            '[data-testid="challenge-notification-card"]'
-        ),
-        words.join(' ')
-    );
-    await clickEnabledChallengeResponseSubmit(
-        page,
-        '[data-testid="challenge-notification-card"] [data-testid="challenge-notification-response-submit"]'
+    await page.evaluate(
+        ({ targetChallengeId, nextValue }) => {
+            const card = Array.from(
+                globalThis.document.querySelectorAll(
+                    '[data-testid="challenge-notification-card"]'
+                )
+            ).find((candidate) => {
+                const input = candidate.querySelector(
+                    'input[name="challengeId"]'
+                );
+                return (
+                    input instanceof globalThis.HTMLInputElement &&
+                    input.value === targetChallengeId
+                );
+            });
+            if (!(card instanceof globalThis.HTMLElement)) {
+                throw new Error(
+                    `Challenge card ${targetChallengeId} was not found.`
+                );
+            }
+            const textarea = card.querySelector(
+                '[data-testid="challenge-notification-response-input"] textarea:not([aria-hidden="true"])'
+            );
+            if (!(textarea instanceof globalThis.HTMLTextAreaElement)) {
+                throw new Error(
+                    `Challenge card ${targetChallengeId} response textarea was not found.`
+                );
+            }
+            const valueSetter = Object.getOwnPropertyDescriptor(
+                globalThis.HTMLTextAreaElement.prototype,
+                'value'
+            )?.set;
+            if (valueSetter === undefined) {
+                throw new Error('Unable to set challenge response words.');
+            }
+            textarea.focus();
+            valueSetter.call(textarea, nextValue);
+            textarea.dispatchEvent(
+                new globalThis.Event('input', { bubbles: true })
+            );
+            textarea.dispatchEvent(
+                new globalThis.Event('change', { bubbles: true })
+            );
+        },
+        { targetChallengeId: challengeId, nextValue: words.join(' ') }
     );
 };
 
-/** Wait for form validation to enable the challenge response submit button. */
-const clickEnabledChallengeResponseSubmit = async (
+/** Click the matching top-bar challenge response submit button. */
+const clickCardChallengeResponseSubmit = async (
     page: Page,
-    selector: string
+    challengeId: string
 ): Promise<void> => {
-    try {
-        await page.waitForFunction(
-            (submitSelector) => {
-                const element =
-                    globalThis.document.querySelector(submitSelector);
-                return (
-                    element instanceof globalThis.HTMLButtonElement &&
-                    !element.disabled
+    const timeoutAt = Date.now() + 30_000;
+    let lastState = 'not checked';
+
+    while (Date.now() < timeoutAt) {
+        lastState = await page.evaluate((targetChallengeId) => {
+            const card = Array.from(
+                globalThis.document.querySelectorAll(
+                    '[data-testid="challenge-notification-card"]'
+                )
+            ).find((candidate) => {
+                const input = candidate.querySelector(
+                    'input[name="challengeId"]'
                 );
-            },
-            { timeout: 10_000 },
-            selector
-        );
-    } catch (error) {
-        const visibleText = await page.evaluate(
-            () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
-        );
-        throw new Error(
-            `Challenge response submit did not become enabled for ${selector}. Visible text: ${visibleText}`,
-            { cause: error }
-        );
+                return (
+                    input instanceof globalThis.HTMLInputElement &&
+                    input.value === targetChallengeId
+                );
+            });
+            if (!(card instanceof globalThis.HTMLElement)) {
+                return 'missing-card';
+            }
+            const button = card.querySelector(
+                '[data-testid="challenge-notification-response-submit"]'
+            );
+            if (!(button instanceof globalThis.HTMLButtonElement)) {
+                return 'missing-button';
+            }
+            if (button.disabled) {
+                return 'disabled';
+            }
+            button.click();
+            return 'clicked';
+        }, challengeId);
+        if (lastState === 'clicked') {
+            return;
+        }
+        await sleep(250);
     }
 
-    await page.click(selector);
+    throw new Error(
+        `Challenge card ${challengeId} submit did not become enabled: ${lastState}`
+    );
+};
+
+/** Respond to a challenge request from the top-bar notification card. */
+const respondFromBellNotification = async (
+    page: Page,
+    words: readonly string[],
+    challengeId: string
+): Promise<void> => {
+    logStage('challenge.bell.response.start', { challengeId });
+    await waitForChallengeNotificationCard(page, challengeId);
+    await setCardChallengeResponseWords(page, challengeId, words);
+    await clickCardChallengeResponseSubmit(page, challengeId);
+    logStage('challenge.bell.response.submitted', { challengeId });
 };
 
 /** Respond to a challenge request from the notification detail route. */
 const respondFromNotificationDetail = async (
     page: Page,
-    words: readonly string[]
+    words: readonly string[],
+    challengeId: string
 ): Promise<void> => {
-    await waitForChallengeNotificationCard(page);
-    await page.click('[data-testid="challenge-notification-detail-link"]');
-    await page.waitForFunction(
-        () => globalThis.location.pathname.startsWith('/notifications/'),
-        { timeout: 10_000 }
-    );
-    try {
-        await page.waitForSelector(
-            visibleChallengeResponseTextarea('main'),
-            { timeout: 45_000 }
+    logStage('challenge.detail.response.start', { challengeId });
+    await waitForChallengeNotificationCard(page, challengeId);
+    logStage('challenge.detail.link.click.start');
+    await page.evaluate((targetChallengeId) => {
+        const card = Array.from(
+            globalThis.document.querySelectorAll(
+                '[data-testid="challenge-notification-card"]'
+            )
+        ).find((candidate) => {
+            const input = candidate.querySelector('input[name="challengeId"]');
+            return (
+                input instanceof globalThis.HTMLInputElement &&
+                input.value === targetChallengeId
+            );
+        });
+        const link = card?.querySelector(
+            '[data-testid="challenge-notification-detail-link"]'
         );
-    } catch (error) {
-        const visibleText = await page.evaluate(
-            () => globalThis.document.body.textContent?.slice(0, 4000) ?? ''
+        if (!(link instanceof globalThis.HTMLElement)) {
+            throw new Error(
+                `Challenge detail link for ${targetChallengeId} was not found.`
+            );
+        }
+        link.click();
+    }, challengeId);
+    logStage('challenge.detail.link.click.ready');
+    const timeoutAt = Date.now() + 10_000;
+    while (Date.now() < timeoutAt) {
+        const onDetail = await page.evaluate(() =>
+            globalThis.location.pathname.startsWith('/notifications/')
         );
-        throw new Error(
-            `Challenge notification detail did not render. Visible text: ${visibleText}`,
-            { cause: error }
-        );
+        if (onDetail) {
+            logStage('challenge.detail.route.ready', { url: page.url() });
+            break;
+        }
+        await sleep(250);
     }
+    if (
+        !(await page.evaluate(() =>
+            globalThis.location.pathname.startsWith('/notifications/')
+        ))
+    ) {
+        throw new Error(`Notification detail route did not open: ${page.url()}`);
+    }
+    logStage('challenge.detail.textarea.wait.start');
+    await waitForElementPresent(
+        page,
+        visibleChallengeResponseTextarea('main'),
+        'Challenge notification detail textarea'
+    );
+    logStage('challenge.detail.textarea.wait.ready');
+    logStage('challenge.detail.response.input.start');
     await setInputValue(
         page,
         visibleChallengeResponseTextarea('main'),
         words.join(' ')
     );
-    await clickEnabledChallengeResponseSubmit(
+    logStage('challenge.detail.response.input.ready');
+    logStage('challenge.detail.response.submit.start');
+    await dispatchEnabledClick(
         page,
-        'main [data-testid="challenge-notification-response-submit"]'
+        'main [data-testid="challenge-notification-response-submit"]',
+        'challenge detail response submit'
     );
+    logStage('challenge.detail.response.submitted');
 };
 
 const chromeArgs =
@@ -556,44 +824,73 @@ const vite = await startViteIfNeeded();
 const browser = await puppeteer.launch({
     headless: 'new',
     args: chromeArgs,
+    protocolTimeout: 300_000,
 });
 
 try {
     const page = await browser.newPage();
+    page.setDefaultTimeout(60_000);
+    page.setDefaultNavigationTimeout(60_000);
+    page.on('pageerror', (error) => {
+        console.error(`[browser:pageerror] ${error.message}`);
+    });
+    page.on('console', (message) => {
+        if (message.type() === 'error' || message.type() === 'warning') {
+            console.error(`[browser:${message.type()}] ${message.text()}`);
+        }
+    });
     const browserPasscode = await connectBrowserAgent(page);
     const browserRole = await roleFromPasscode(
         browserPasscode,
         'ui-challenge-browser'
     );
     const browserAlias = uniqueAlias('ui-challenge-browser');
+    logStage('browser.identifier.create.start', { browserAlias });
     const browserAid = await createWitnessedIdentifier(
         browserRole,
         browserAlias
     );
     const browserOobi = await addAgentEndRole(browserRole, browserAlias);
+    logStage('browser.identifier.ready', {
+        browserAlias,
+        browserAid: browserAid.prefix,
+    });
 
     const harness = await createRole('ui-challenge-harness');
     const harnessAlias = uniqueAlias('ui-challenge-harness');
+    logStage('harness.identifier.create.start', { harnessAlias });
     await createWitnessedIdentifier(harness, harnessAlias);
     const harnessOobi = await addAgentEndRole(harness, harnessAlias);
+    logStage('harness.identifier.ready', { harnessAlias });
+    logStage('harness.resolve.browser.start', { browserAlias });
     await resolveOobi(harness, browserOobi, browserAlias);
+    logStage('harness.resolve.browser.ready', { browserAlias });
 
     await resolveOobiInContacts(page, harnessOobi, harnessAlias);
     await openContactDetail(page, harnessAlias);
     await waitForText(page, '[data-testid="contact-detail"]', 'Unverified');
 
-    await page.click('[data-testid="challenge-generate-submit"]');
+    logStage('challenge.detail.generate.start');
+    await dispatchEnabledClick(
+        page,
+        '[data-testid="challenge-generate-submit"]',
+        'challenge generate submit'
+    );
     const words = await generatedChallengeWords(page);
+    logStage('challenge.detail.generate.ready', { wordCount: words.length });
 
+    logStage('harness.respond.browserChallenge.start');
     await harness.client
         .challenges()
         .respond(harnessAlias, browserAid.prefix, words);
+    logStage('harness.respond.browserChallenge.submitted');
     await waitForText(
         page,
         '[data-testid="contact-detail"]',
         'Verified',
         180_000
     );
+    logStage('challenge.detail.verified');
     await page.waitForFunction(
         () =>
             globalThis.document.querySelector(
@@ -603,36 +900,48 @@ try {
     );
 
     const detailWords = await generatedKeriaChallengeWords(harness);
+    logStage('harness.challenge.detail.send.start', {
+        wordCount: detailWords.length,
+    });
     const detailChallengeId = await sendChallengeRequest({
         challenger: harness,
         challengerAlias: harnessAlias,
         recipientAid: browserAid.prefix,
         words: detailWords,
     });
+    logStage('harness.challenge.detail.send.ready', { detailChallengeId });
     await waitForChallengeRequestExchange(browserRole, detailChallengeId);
-    await respondFromNotificationDetail(page, detailWords);
+    logStage('browser.challenge.detail.indexed', { detailChallengeId });
+    await respondFromNotificationDetail(page, detailWords, detailChallengeId);
     await verifyChallengeResponse({
         challenger: harness,
         responderAid: browserAid.prefix,
         words: detailWords,
         label: 'verifying detail challenge response',
     });
+    logStage('harness.challenge.detail.verified', { detailChallengeId });
 
     const bellWords = await generatedKeriaChallengeWords(harness);
+    logStage('harness.challenge.bell.send.start', {
+        wordCount: bellWords.length,
+    });
     const bellChallengeId = await sendChallengeRequest({
         challenger: harness,
         challengerAlias: harnessAlias,
         recipientAid: browserAid.prefix,
         words: bellWords,
     });
+    logStage('harness.challenge.bell.send.ready', { bellChallengeId });
     await waitForChallengeRequestExchange(browserRole, bellChallengeId);
-    await respondFromBellNotification(page, bellWords);
+    logStage('browser.challenge.bell.indexed', { bellChallengeId });
+    await respondFromBellNotification(page, bellWords, bellChallengeId);
     await verifyChallengeResponse({
         challenger: harness,
         responderAid: browserAid.prefix,
         words: bellWords,
         label: 'verifying bell challenge response',
     });
+    logStage('harness.challenge.bell.verified', { bellChallengeId });
 
     console.log(
         JSON.stringify(

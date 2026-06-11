@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import puppeteer from 'puppeteer';
-import { Algos, SignifyClient, Tier, randomPasscode, ready } from 'signify-ts';
+import { SignifyClient, Tier, randomPasscode, ready } from 'signify-ts';
 
 /**
  * Responsive browser smoke for the app shell and connected identifier table.
@@ -13,6 +13,18 @@ const appUrl = process.env.RESPONSIVE_SMOKE_URL ?? 'http://127.0.0.1:5175';
 const keriaAdminUrl =
     process.env.VITE_KERIA_ADMIN_URL ?? 'http://127.0.0.1:3901';
 const keriaBootUrl = process.env.VITE_KERIA_BOOT_URL ?? 'http://127.0.0.1:3903';
+const witnessAids = (
+    process.env.VITE_WITNESS_AIDS ??
+    [
+        'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha',
+        'BLskRTInXnMxWaGqcpSyMgo0nYbalW99cGZESrz3zapM',
+        'BIKKuvBwpmDVA4Ds-EpL5bt9OqPzWPja2LigFYZN2YfX',
+    ].join(',')
+)
+    .split(',')
+    .map((aid) => aid.trim())
+    .filter((aid) => aid.length > 0);
+const witnessToad = Number(process.env.VITE_WITNESS_TOAD ?? 2);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -206,7 +218,8 @@ const createIdentifierFixture = async () => {
     const client = await connectClient(passcode);
     const alias = responsiveAlias();
     const result = await client.identifiers().create(alias, {
-        algo: Algos.randy,
+        toad: witnessToad,
+        wits: witnessAids,
     });
     const operation = await result.op();
     await waitForOperation(client, operation, `creating ${alias}`);
@@ -607,7 +620,7 @@ try {
         },
         {
             path: '/dashboard/credentials/not-found',
-            selector: '[data-testid="dashboard-credential-detail"]',
+            selector: '[data-testid="dashboard-held-credentials-detail"]',
         },
     ]) {
         await navigateSpa(page, path);
