@@ -1,22 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-    approvePendingDidWebsAndW3CRequests,
     approvePendingDidWebsRequests,
-    approvePendingW3CRequests,
-    createHolderPresentationSigningPolicy,
     consumeDidWebsSignalStream,
     SseJsonEnvelopeParser,
 } from '../../src/workflows/didwebs.op';
-import { recordW3CHolderPresentationApproval } from '../../src/domain/credentials/w3cPresentationApprovals';
-import { W3C_PURPOSE_HOLDER_VP_JWT } from 'signify-ts';
 import type {
     DidWebsAutoApprover,
     DidWebsAutoApproveResult,
     SignifyClient,
     SignedReplyEnvelope,
-    W3CAutomationResult,
-    W3CEdgeAutomator,
-    W3CSigningRequest,
 } from 'signify-ts';
 
 const envelope = (agent = 'Eagent'): SignedReplyEnvelope => ({
@@ -50,76 +42,6 @@ const publicationEnvelope = (
     },
     sigs: ['signature'],
 });
-
-const holderVpRequest = (
-    overrides: Partial<W3CSigningRequest> = {}
-): W3CSigningRequest => ({
-    d: 'request-id',
-    requestId: 'request-id',
-    name: 'le',
-    aid: 'Ele',
-    purpose: W3C_PURPOSE_HOLDER_VP_JWT,
-    related: 'tx-id',
-    signingInputB64: 'YQ',
-    encoding: 'base64url',
-    verificationMethod: 'did:webs:example:dws:Ele#key-0',
-    created: '2026-04-29T00:00:00.000Z',
-    expires: '2030-04-29T00:10:00.000Z',
-    ...overrides,
-});
-
-const policyClient = ({
-    presentTxId = 'tx-id',
-    signingRequestId = 'request-id',
-    aud = 'https://verifier.example',
-    nonce = 'nonce-1',
-    sourceCredentialSaid = 'source-said',
-}: {
-    presentTxId?: string;
-    signingRequestId?: string;
-    aud?: string;
-    nonce?: string;
-    sourceCredentialSaid?: string;
-} = {}): SignifyClient =>
-    ({
-        fetch: vi.fn(async (path: string) => {
-            if (path.includes('/w3c/present-txs/')) {
-                return Response.json({
-                    presentTxId,
-                    holderName: 'le',
-                    holderAid: 'Ele',
-                    signingRequestId,
-                    aud,
-                    nonce,
-                    selectedCredentialId: 'held-id',
-                    state: 'pending_holder_signature',
-                });
-            }
-            if (path.includes('/w3c/credentials/held-id')) {
-                return Response.json({
-                    credentialId: 'held-id',
-                    sourceCredentialSaid,
-                });
-            }
-            return Response.json({});
-        }),
-    }) as unknown as SignifyClient;
-
-const approveHolderPresentation = (
-    overrides: Partial<
-        Parameters<typeof recordW3CHolderPresentationApproval>[0]
-    > = {}
-): void =>
-    recordW3CHolderPresentationApproval({
-        presentTxId: 'tx-id',
-        holderAlias: 'le',
-        holderAid: 'Ele',
-        credentialSaid: 'source-said',
-        aud: 'https://verifier.example',
-        nonce: 'nonce-1',
-        expiresAt: '2030-04-29T00:10:00.000Z',
-        ...overrides,
-    });
 
 describe('did:webs workflow SSE parsing', () => {
     it('ignores the retry prelude and parses JSON data frames across chunks', () => {
@@ -271,7 +193,7 @@ describe('did:webs workflow SSE parsing', () => {
         );
     });
 
-    it('routes W3C holder envelopes to the W3C approver', async () => {
+    it('ignores W3C envelopes because W3C artifact work is foreground-only', async () => {
         const signal = publicationEnvelope('/w3c/signing/request', {
             d: 'w3c-request-id',
             aid: 'Eaid',
@@ -300,21 +222,14 @@ describe('did:webs workflow SSE parsing', () => {
                 outcome: 'submitted',
             })),
         } as unknown as DidWebsAutoApprover;
-        const w3cApprover = {
-            handleEnvelope: vi.fn(async () => ({
-                outcome: 'submitted',
-            })),
-        } as unknown as W3CEdgeAutomator;
 
         await consumeDidWebsSignalStream({
             client,
             approver,
-            w3cApprover,
             signal: new AbortController().signal,
         });
 
         expect(approver.handleEnvelope).not.toHaveBeenCalled();
-        expect(w3cApprover.handleEnvelope).toHaveBeenCalledWith(signal);
     });
 
     it('polls pending requests and reconciles completion through one approver', async () => {
@@ -341,105 +256,4 @@ describe('did:webs workflow SSE parsing', () => {
         expect(approver.reconcile).toHaveBeenCalledTimes(1);
     });
 
-    it('polls pending W3C holder requests and reconciles completion', async () => {
-        const approver = {
-            pollOnce: vi.fn(async () => [
-                {
-                    outcome: 'submitted',
-                } satisfies W3CAutomationResult,
-            ]),
-            reconcile: vi.fn(async () => [
-                {
-                    id: 'w3c-request-id',
-                    aid: 'Eaid',
-                    kind: 'vc_jwt',
-                    status: 'complete',
-                    updated: '2026-04-29T00:00:00.000Z',
-                },
-            ]),
-        } as unknown as W3CEdgeAutomator;
-
-        await expect(approvePendingW3CRequests(approver)).resolves.toEqual({
-            pollResults: [{ outcome: 'submitted' }],
-            reconciled: 1,
-        });
-        expect(approver.pollOnce).toHaveBeenCalledTimes(1);
-        expect(approver.reconcile).toHaveBeenCalledTimes(1);
-    });
-
-    it('continues W3C polling when did:webs polling fails', async () => {
-        const didWebsApprover = {
-            pollOnce: vi.fn(async () => {
-                throw new Error('did:webs polling failed');
-            }),
-            reconcile: vi.fn(),
-        } as unknown as DidWebsAutoApprover;
-        const w3cApprover = {
-            pollOnce: vi.fn(async () => [
-                {
-                    outcome: 'submitted',
-                } satisfies W3CAutomationResult,
-            ]),
-            reconcile: vi.fn(async () => []),
-        } as unknown as W3CEdgeAutomator;
-
-        const results = await approvePendingDidWebsAndW3CRequests({
-            approver: didWebsApprover,
-            w3cApprover,
-        });
-
-        expect(results.didWebs.ok).toBe(false);
-        expect(results.w3c).toEqual({
-            ok: true,
-            value: {
-                pollResults: [{ outcome: 'submitted' }],
-                reconciled: 0,
-            },
-        });
-        expect(w3cApprover.pollOnce).toHaveBeenCalledTimes(1);
-        expect(w3cApprover.reconcile).toHaveBeenCalledTimes(1);
-    });
-
-    it('approves holder VP signing only for an explicitly approved transaction', async () => {
-        approveHolderPresentation();
-        const policy = createHolderPresentationSigningPolicy(policyClient());
-
-        await expect(policy(holderVpRequest())).resolves.toBe(true);
-    });
-
-    it('rejects holder VP signing without a matching approval', async () => {
-        const policy = createHolderPresentationSigningPolicy(policyClient());
-
-        await expect(
-            policy(holderVpRequest({ related: 'unapproved-tx' }))
-        ).resolves.toContain('was not explicitly approved');
-    });
-
-    it('rejects holder VP signing when nonce binding changes', async () => {
-        approveHolderPresentation({ presentTxId: 'tx-wrong-nonce' });
-        const policy = createHolderPresentationSigningPolicy(
-            policyClient({
-                presentTxId: 'tx-wrong-nonce',
-                nonce: 'other-nonce',
-            })
-        );
-
-        await expect(
-            policy(holderVpRequest({ related: 'tx-wrong-nonce' }))
-        ).resolves.toContain('nonce does not match');
-    });
-
-    it('rejects holder VP signing when the selected credential changes', async () => {
-        approveHolderPresentation({ presentTxId: 'tx-wrong-credential' });
-        const policy = createHolderPresentationSigningPolicy(
-            policyClient({
-                presentTxId: 'tx-wrong-credential',
-                sourceCredentialSaid: 'other-source-said',
-            })
-        );
-
-        await expect(
-            policy(holderVpRequest({ related: 'tx-wrong-credential' }))
-        ).resolves.toContain('selected credential does not match');
-    });
 });

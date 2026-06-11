@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import type {
-    CredentialResult,
-    Operation as KeriaOperation,
-    SignifyClient,
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    type CredentialResult,
+    type Operation as KeriaOperation,
+    type SignifyClient,
 } from 'signify-ts';
 import { createAppRuntime } from '../../src/app/runtime';
 import {
@@ -22,6 +22,22 @@ import type { IssueableCredentialTypeRecord } from '../../src/domain/credentials
 import { normalizeSediVoterAttributes } from '../../src/domain/credentials/sediVoterId';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type { NotificationRecord } from '../../src/state/notifications.slice';
+
+const w3cMocks = vi.hoisted(() => ({
+    credentials: vi.fn(),
+    issueW3CCredential: vi.fn(),
+    presentW3CCredential: vi.fn(),
+}));
+
+vi.mock('signify-w3c', () => ({
+    issueW3CCredential: w3cMocks.issueW3CCredential,
+    presentW3CCredential: w3cMocks.presentW3CCredential,
+    W3CKeriaClient: vi.fn().mockImplementation(function () {
+        return {
+        credentials: w3cMocks.credentials,
+        };
+    }),
+}));
 
 const loadedAt = '2026-04-22T00:00:00.000Z';
 
@@ -149,76 +165,29 @@ const makeAdmitClient = () => {
 };
 
 describe('credential service helpers', () => {
-    it('starts W3C issuance and resolves when KERIA returns a VC-JWT', async () => {
+    beforeEach(() => {
+        w3cMocks.credentials.mockReset();
+        w3cMocks.issueW3CCredential.mockReset();
+        w3cMocks.presentW3CCredential.mockReset();
+    });
+
+    it('starts W3C issuance through the edge artifact builder', async () => {
         const runtime = createAppRuntime({ storage: null });
-        const calls: Array<{ path: string; method: string; body: unknown }> =
-            [];
-        const client = {
-            manager: {
-                get: vi.fn(() => ({
-                    sign: vi.fn(async () => ['grant-exn-signature']),
-                })),
-            },
-            identifiers: () => ({
-                get: vi.fn(async () => ({ name: 'issuer', prefix: 'Eissuer' })),
-            }),
-            fetch: vi.fn(
-                async (path: string, method: string, body: unknown) => {
-                    calls.push({ path, method, body });
-                    if (
-                        method === 'POST' &&
-                        path === '/identifiers/issuer/w3c/credentials'
-                    ) {
-                        return Response.json({
-                            issuanceId: 'issuance-1',
-                            state: 'pending_signature',
-                            sourceCredentialSaid: 'Ecredential',
-                        });
-                    }
-                    if (
-                        method === 'POST' &&
-                        path ===
-                            '/identifiers/issuer/w3c/credentials/issuance-1/grant'
-                    ) {
-                        return Response.json({
-                            issuanceId: 'issuance-1',
-                            state: 'grant_sent',
-                            sourceCredentialSaid: 'Ecredential',
-                            holderAid: 'Eholder',
-                            holderDid: 'did:webs:example.com:dws:Eholder',
-                            issuerAid: 'Eissuer',
-                            issuerDid: 'did:webs:example.com:dws:Eissuer',
-                            schemaSaid: 'Eschema',
-                            statusUrl:
-                                'http://status.example/w3c/vc/status/Ecredential',
-                            profile: 'gleif-vrd-isomer-v1',
-                            vcJwt: 'vc.jwt',
-                            grantSaid: 'grant-said',
-                        });
-                    }
-                    if (path.endsWith('/w3c/credentials/import-requests')) {
-                        return Response.json({ requests: [] });
-                    }
-                    if (path.endsWith('/w3c/signing-requests')) {
-                        return Response.json({ requests: [] });
-                    }
-                    return Response.json({
-                        issuanceId: 'issuance-1',
-                        state: 'delivery_pending',
-                        sourceCredentialSaid: 'Ecredential',
-                        holderAid: 'Eholder',
-                        holderDid: 'did:webs:example.com:dws:Eholder',
-                        issuerAid: 'Eissuer',
-                        issuerDid: 'did:webs:example.com:dws:Eissuer',
-                        schemaSaid: 'Eschema',
-                        statusUrl:
-                            'http://status.example/w3c/vc/status/Ecredential',
-                        profile: 'gleif-vrd-isomer-v1',
-                        vcJwt: 'vc.jwt',
-                    });
-                }
-            ),
-        } as unknown as SignifyClient;
+        const client = {} as unknown as SignifyClient;
+        w3cMocks.issueW3CCredential.mockResolvedValue({
+            issuanceId: 'issuance-1',
+            state: 'grant_sent',
+            sourceCredentialSaid: 'Ecredential',
+            holderAid: 'Eholder',
+            holderDid: 'did:webs:example.com:dws:Eholder',
+            issuerAid: 'Eissuer',
+            issuerDid: 'did:webs:example.com:dws:Eissuer',
+            schemaSaid: 'Eschema',
+            statusUrl: 'http://status.example/w3c/vc/status/Ecredential',
+            profile: 'gleif-vrd-isomer-v1',
+            vcJwt: 'vc.jwt',
+            grantSaid: 'grant-said',
+        });
 
         try {
             const result = await runtime.runWorkflow(
@@ -246,174 +215,45 @@ describe('credential service helpers', () => {
                     grantSaid: 'grant-said',
                 })
             );
-            expect(calls.slice(0, 4)).toEqual([
-                {
-                    path: '/identifiers/issuer/w3c/credentials',
-                    method: 'POST',
-                    body: { sourceCredentialSaid: 'Ecredential' },
-                },
-                {
-                    path: '/identifiers/issuer/w3c/credentials/import-requests',
-                    method: 'GET',
-                    body: null,
-                },
-                {
-                    path: '/identifiers/issuer/w3c/signing-requests',
-                    method: 'GET',
-                    body: null,
-                },
-                {
-                    path: '/identifiers/issuer/w3c/credentials/issuance-1',
-                    method: 'GET',
-                    body: null,
-                },
-            ]);
-            const grantCall = calls.find(
-                (call) =>
-                    call.path ===
-                    '/identifiers/issuer/w3c/credentials/issuance-1/grant'
-            );
-            expect(grantCall).toEqual(
-                expect.objectContaining({
-                    method: 'POST',
-                    body: expect.objectContaining({
-                        rec: ['Eholder'],
-                        sigs: ['grant-exn-signature'],
-                    }),
-                })
-            );
+            expect(w3cMocks.issueW3CCredential).toHaveBeenCalledWith({
+                client,
+                issuerName: 'issuer',
+                sourceCredentialSaid: 'Ecredential',
+                timeoutMs: 1000,
+                pollMs: 0,
+            });
         } finally {
             await runtime.destroy();
         }
     });
 
-    it('redelivers an already finalized W3C issuance through a fresh grant EXN', async () => {
+    it('presents a held W3C credential through one edge-built VP-JWT submission', async () => {
         const runtime = createAppRuntime({ storage: null });
-        const calls: Array<{ path: string; method: string; body: unknown }> =
-            [];
-        const deliveryReadyIssuance = {
-            issuanceId: 'issuance-1',
-            state: 'delivery_pending',
-            sourceCredentialSaid: 'Ecredential',
-            holderAid: 'Eholder',
-            holderDid: 'did:webs:example.com:dws:Eholder',
-            issuerAid: 'Eissuer',
-            issuerDid: 'did:webs:example.com:dws:Eissuer',
-            schemaSaid: 'Eschema',
-            statusUrl: 'http://status.example/w3c/vc/status/Ecredential',
-            profile: 'gleif-vrd-isomer-v1',
-            vcJwt: 'vc.jwt',
-        };
-        const client = {
-            manager: {
-                get: vi.fn(() => ({
-                    sign: vi.fn(async () => ['grant-exn-signature']),
-                })),
+        const client = {} as unknown as SignifyClient;
+        w3cMocks.credentials.mockResolvedValue([
+            {
+                credentialId: 'held-id',
+                holderName: 'presenter',
+                holderAid: 'Epresenter',
+                holderDid: 'did:webs:example.com:dws:Epresenter',
+                issuerAid: 'Eissuer',
+                issuerDid: 'did:webs:example.com:dws:Eissuer',
+                sourceCredentialSaid: 'Ecredential',
+                schemaSaid: 'Eschema',
+                profile: 'gleif-vrd-isomer-v1',
+                statusUrl: 'http://status.example/w3c/vc/status/Ecredential',
+                vcJwt: 'vc.jwt',
+                state: 'admitted',
             },
-            identifiers: () => ({
-                get: vi.fn(async () => ({ name: 'issuer', prefix: 'Eissuer' })),
-            }),
-            fetch: vi.fn(
-                async (path: string, method: string, body: unknown) => {
-                    calls.push({ path, method, body });
-                    if (
-                        method === 'POST' &&
-                        path === '/identifiers/issuer/w3c/credentials'
-                    ) {
-                        return Response.json({
-                            ...deliveryReadyIssuance,
-                            state: 'grant_sent',
-                            grantSaid: 'old-grant-said',
-                        });
-                    }
-                    if (path.endsWith('/redeliver')) {
-                        return Response.json(deliveryReadyIssuance);
-                    }
-                    if (path.endsWith('/grant')) {
-                        return Response.json({
-                            ...deliveryReadyIssuance,
-                            state: 'grant_sent',
-                            grantSaid: 'new-grant-said',
-                        });
-                    }
-                    if (path.endsWith('/w3c/credentials/import-requests')) {
-                        return Response.json({ requests: [] });
-                    }
-                    if (path.endsWith('/w3c/signing-requests')) {
-                        return Response.json({ requests: [] });
-                    }
-                    return Response.json(deliveryReadyIssuance);
-                }
-            ),
-        } as unknown as SignifyClient;
-
-        try {
-            const result = await runtime.runWorkflow(
-                () =>
-                    startW3CIssuanceService({
-                        client,
-                        issuerAlias: 'issuer',
-                        issuerAid: 'Eissuer',
-                        credentialSaid: 'Ecredential',
-                        timeoutMs: 1000,
-                        pollMs: 0,
-                    }),
-                {
-                    scope: 'app',
-                    track: false,
-                    kind: 'w3cIssuance',
-                }
-            );
-
-            expect(result).toEqual(
-                expect.objectContaining({
-                    state: 'grant_sent',
-                    grantSaid: 'new-grant-said',
-                })
-            );
-            expect(calls).toEqual(
-                expect.arrayContaining([
-                    {
-                        path: '/identifiers/issuer/w3c/credentials/issuance-1/redeliver',
-                        method: 'POST',
-                        body: {},
-                    },
-                    expect.objectContaining({
-                        path: '/identifiers/issuer/w3c/credentials/issuance-1/grant',
-                        method: 'POST',
-                    }),
-                ])
-            );
-        } finally {
-            await runtime.destroy();
-        }
-    });
-
-    it('starts a W3C present-tx with the verifier request descriptor and resolves when submitted', async () => {
-        const runtime = createAppRuntime({ storage: null });
-        const calls: Array<{ path: string; method: string; body: unknown }> =
-            [];
-        const client = {
-            fetch: vi.fn(
-                async (path: string, method: string, body: unknown) => {
-                    calls.push({ path, method, body });
-                    if (method === 'POST') {
-                        return Response.json({
-                            presentTxId: 'present-tx-1',
-                            state: 'pending_holder_signature',
-                            aud: 'https://verifier.example',
-                            nonce: 'nonce-1',
-                            expires: '2030-04-22T00:10:00.000Z',
-                        });
-                    }
-                    return Response.json({
-                        presentTxId: 'present-tx-1',
-                        state: 'submitted',
-                        verifierResponse: { ok: true },
-                    });
-                }
-            ),
-        } as unknown as SignifyClient;
+        ]);
+        w3cMocks.presentW3CCredential.mockResolvedValue({
+            presentationId: 'presentation-1',
+            state: 'submitted',
+            holderName: 'presenter',
+            holderAid: 'Epresenter',
+            selectedCredentialId: 'held-id',
+            verifierResponse: { ok: true },
+        });
 
         try {
             const result = await runtime.runWorkflow(
@@ -440,51 +280,104 @@ describe('credential service helpers', () => {
 
             expect(result).toEqual(
                 expect.objectContaining({
-                    presentTxId: 'present-tx-1',
+                    presentationId: 'presentation-1',
+                    presentTxId: 'presentation-1',
                     state: 'submitted',
                     verifierResponse: { ok: true },
                 })
             );
-            expect(calls).toEqual([
-                {
-                    path: '/identifiers/presenter/w3c/present-txs',
-                    method: 'POST',
-                    body: {
-                        aud: 'https://verifier.example',
-                        nonce: 'nonce-1',
-                        response_uri: 'http://verifier.example/verify/vp',
-                        credentialSaid: 'Ecredential',
-                    },
+            expect(w3cMocks.credentials).toHaveBeenCalledWith('presenter');
+            expect(w3cMocks.presentW3CCredential).toHaveBeenCalledWith({
+                client,
+                holderName: 'presenter',
+                credentialId: 'held-id',
+                verifierRequest: {
+                    aud: 'https://verifier.example',
+                    nonce: 'nonce-1',
+                    response_uri: 'http://verifier.example/verify/vp',
+                    credentialSaid: 'Ecredential',
                 },
-                {
-                    path: '/identifiers/presenter/w3c/present-txs/present-tx-1',
-                    method: 'GET',
-                    body: null,
-                },
-            ]);
+            });
         } finally {
             await runtime.destroy();
         }
     });
 
-    it('fails W3C present-tx when KERIA reports a failed terminal state', async () => {
+    it('fails W3C presentation when no held W3C credential matches the clicked source credential', async () => {
         const runtime = createAppRuntime({ storage: null });
-        const client = {
-            fetch: vi.fn(async (_path: string, method: string) => {
-                if (method === 'POST') {
-                    return Response.json({
-                        presentTxId: 'present-tx-failed',
-                        state: 'failed',
-                        error: 'verifier rejected the presentation',
-                    });
-                }
-                return Response.json({
-                    presentTxId: 'present-tx-failed',
-                    state: 'failed',
-                    error: 'verifier rejected the presentation',
-                });
-            }),
-        } as unknown as SignifyClient;
+        const client = {} as unknown as SignifyClient;
+        w3cMocks.credentials.mockResolvedValue([
+            {
+                credentialId: 'other-held-id',
+                holderName: 'presenter',
+                holderAid: 'Epresenter',
+                holderDid: 'did:webs:example.com:dws:Epresenter',
+                issuerAid: 'Eissuer',
+                issuerDid: 'did:webs:example.com:dws:Eissuer',
+                sourceCredentialSaid: 'Eother',
+                schemaSaid: 'Eschema',
+                profile: 'gleif-vrd-isomer-v1',
+                statusUrl: 'http://status.example/w3c/vc/status/Eother',
+                vcJwt: 'other.vc.jwt',
+                state: 'admitted',
+            },
+        ]);
+
+        try {
+            await expect(
+                runtime.runWorkflow(
+                    () =>
+                        presentCredentialService({
+                            client,
+                            presenterAlias: 'presenter',
+                            presenterAid: 'Epresenter',
+                            credentialSaid: 'Ecredential',
+                            verifierRequest: {
+                                aud: 'https://verifier.example',
+                                nonce: 'nonce-1',
+                            },
+                            timeoutMs: 1000,
+                            pollMs: 0,
+                        }),
+                    {
+                        scope: 'app',
+                        track: false,
+                        kind: 'presentCredential',
+                    }
+                )
+            ).rejects.toThrow(
+                'No held W3C credential was found for source credential Ecredential.'
+            );
+            expect(w3cMocks.presentW3CCredential).not.toHaveBeenCalled();
+        } finally {
+            await runtime.destroy();
+        }
+    });
+
+    it('fails W3C presentation when KERIA reports a failed result', async () => {
+        const runtime = createAppRuntime({ storage: null });
+        const client = {} as unknown as SignifyClient;
+        w3cMocks.credentials.mockResolvedValue([
+            {
+                credentialId: 'held-id',
+                holderName: 'presenter',
+                holderAid: 'Epresenter',
+                holderDid: 'did:webs:example.com:dws:Epresenter',
+                issuerAid: 'Eissuer',
+                issuerDid: 'did:webs:example.com:dws:Eissuer',
+                sourceCredentialSaid: 'Ecredential',
+                schemaSaid: 'Eschema',
+                profile: 'gleif-vrd-isomer-v1',
+                statusUrl: 'http://status.example/w3c/vc/status/Ecredential',
+                vcJwt: 'vc.jwt',
+                state: 'admitted',
+            },
+        ]);
+        w3cMocks.presentW3CCredential.mockResolvedValue({
+            presentationId: 'presentation-failed',
+            state: 'failed',
+            error: 'verifier rejected the presentation',
+        });
 
         try {
             await expect(
@@ -514,58 +407,9 @@ describe('credential service helpers', () => {
         }
     });
 
-    it('reports W3C present-tx timeout state', async () => {
+    it('rejects W3C presentation without verifier request JSON', async () => {
         const runtime = createAppRuntime({ storage: null });
-        const client = {
-            fetch: vi.fn(async () =>
-                Response.json({
-                    presentTxId: 'present-tx-timeout',
-                    state: 'pending_holder_signature',
-                    aud: 'https://verifier.example',
-                    nonce: 'nonce-1',
-                    expires: '2030-04-22T00:10:00.000Z',
-                })
-            ),
-        } as unknown as SignifyClient;
-
-        try {
-            const error = await runtime
-                .runWorkflow(
-                    () =>
-                        presentCredentialService({
-                            client,
-                            presenterAlias: 'presenter',
-                            presenterAid: 'Epresenter',
-                            credentialSaid: 'Ecredential',
-                            verifierRequest: {
-                                aud: 'https://verifier.example',
-                                nonce: 'nonce-1',
-                            },
-                            timeoutMs: 0,
-                            pollMs: 0,
-                        }),
-                    {
-                        scope: 'app',
-                        track: false,
-                        kind: 'presentCredential',
-                    }
-                )
-                .catch((caught: unknown) => caught);
-
-            expect(error).toBeInstanceOf(Error);
-            expect((error as Error).message).toBe(
-                'Timed out waiting for W3C presentation transaction present-tx-timeout. Last state: pending_holder_signature.'
-            );
-        } finally {
-            await runtime.destroy();
-        }
-    });
-
-    it('rejects W3C present-tx without verifier request JSON', async () => {
-        const runtime = createAppRuntime({ storage: null });
-        const client = {
-            fetch: vi.fn(),
-        } as unknown as SignifyClient;
+        const client = {} as unknown as SignifyClient;
 
         try {
             await expect(
@@ -587,7 +431,8 @@ describe('credential service helpers', () => {
                     }
                 )
             ).rejects.toThrow('Verifier request');
-            expect(client.fetch).not.toHaveBeenCalled();
+            expect(w3cMocks.credentials).not.toHaveBeenCalled();
+            expect(w3cMocks.presentW3CCredential).not.toHaveBeenCalled();
         } finally {
             await runtime.destroy();
         }

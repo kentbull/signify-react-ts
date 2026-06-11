@@ -5,13 +5,16 @@ import {
     type CredentialState,
     type CredentialSubject,
     type Operation as KeriaOperation,
-    MemoryW3CAutomationStore,
     type SignifyClient,
-    W3C_PURPOSE_ISSUER_VC_JWT,
-    W3C,
-    W3CEdgeAutomator,
-    type W3CSigningRequest,
 } from 'signify-ts';
+import {
+    issueW3CCredential,
+    presentW3CCredential,
+    W3CKeriaClient,
+    type W3CHeldCredential,
+    type W3CIssuanceContext,
+    type W3CPresentationResult,
+} from 'signify-w3c';
 import { callPromise, toErrorText } from '../effects/promise';
 import type { OperationLogger } from '../signify/client';
 import type {
@@ -58,7 +61,6 @@ import {
     SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME,
     SEDI_VOTER_ID_SCHEMA_OOBI_ALIAS,
 } from '../domain/credentials/sediVoterId';
-import { recordW3CHolderPresentationApproval } from '../domain/credentials/w3cPresentationApprovals';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
 import { waitOperationService } from './signify.service';
 
@@ -66,43 +68,11 @@ const DEFAULT_REGISTRY_NAME = SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
 const CREDENTIAL_FETCH_RETRIES = 10;
 const CREDENTIAL_FETCH_RETRY_MS = 1000;
 const EXCHANGE_QUERY_LIMIT = 200;
-const W3C_ISSUANCE_POLL_MS = 1000;
-const W3C_ISSUANCE_SUCCESS_STATES = new Set(['grant_sent']);
-const W3C_ISSUANCE_DELIVERY_READY_STATES = new Set([
-    'issued',
-    'delivery_pending',
-]);
-const W3C_ISSUANCE_FAILURE_STATES = new Set(['failed']);
-const W3C_PRESENT_TX_POLL_MS = 1000;
-const W3C_PRESENT_TX_SUCCESS_STATES = new Set(['submitted', 'verified']);
-const W3C_PRESENT_TX_FAILURE_STATES = new Set(['failed']);
 
-export interface W3CIssuanceView {
-    issuanceId: string;
-    state: string;
-    issuerName?: string | null;
-    issuerAid?: string | null;
-    sourceCredentialSaid?: string | null;
-    signingRequestId?: string | null;
-    vcJwt?: string | null;
-    error?: string | null;
-    [key: string]: unknown;
-}
+export type W3CIssuanceView = W3CIssuanceContext;
 
-export interface W3CPresentTxView {
+export interface W3CPresentTxView extends W3CPresentationResult {
     presentTxId: string;
-    state: string;
-    holderName?: string | null;
-    holderAid?: string | null;
-    selectedCredentialId?: string | null;
-    aud?: string | null;
-    nonce?: string | null;
-    expires?: string | null;
-    signingRequestId?: string | null;
-    vpJwt?: string | null;
-    verifierResponse?: unknown;
-    error?: string | null;
-    [key: string]: unknown;
 }
 
 const keriaTimestamp = (): string =>
@@ -747,13 +717,8 @@ export function* admitCredentialGrantService({
 /**
  * Start QVI-side W3C VC-JWT issuance from a native VRD source credential.
  *
- * KERIA owns issuance orchestration. The browser edge runtime owns the two
- * issuer signatures that complete the VC proof and VC-JWT stages, then signs
- * and submits the issuer grant EXN that delivers the artifact to the holder.
- *
- * A long-lived `pending_signature` state means this foreground edge loop is not
- * servicing the KERIA signing requests, or the issuer policy below rejected a
- * request whose alias, AID, purpose, or issuance id no longer matches.
+ * The browser edge runtime builds and signs the VC-JWT, submits it to KERIA
+ * for validation, then signs the grant EXN that delivers the artifact.
  */
 export function* startW3CIssuanceService({
     client,
@@ -761,7 +726,7 @@ export function* startW3CIssuanceService({
     issuerAid,
     credentialSaid,
     timeoutMs,
-    pollMs = W3C_ISSUANCE_POLL_MS,
+    pollMs,
 }: {
     client: SignifyClient;
     issuerAlias: string;
@@ -773,143 +738,23 @@ export function* startW3CIssuanceService({
     const name = requireNonEmpty(issuerAlias, 'Issuer identifier');
     requireNonEmpty(issuerAid, 'Issuer AID');
     const sourceSaid = requireNonEmpty(credentialSaid, 'Credential SAID');
-    const issuance = yield* callPromise(() =>
-        postJson<W3CIssuanceView>(
+    return yield* callPromise(() =>
+        issueW3CCredential({
             client,
-            `/identifiers/${name}/w3c/credentials`,
-            { sourceCredentialSaid: sourceSaid }
-        )
-    );
-    const issuanceId = requireNonEmpty(
-        String(issuance.issuanceId ?? issuance.d ?? ''),
-        'W3C issuance id'
-    );
-    // The foreground automator keeps signing at the edge even for this manual
-    // fallback. It is scoped to this issuer and issuance id so a queued holder
-    // presentation or another issuer request cannot be signed accidentally.
-    const w3c = new W3C(client);
-    let current = issuance;
-    if (w3cIssuanceAlreadyDelivered(current)) {
-        current = (yield* callPromise(() =>
-            w3c.redeliverIssuance(name, issuanceId)
-        )) as W3CIssuanceView;
-    }
-
-    const automator = new W3CEdgeAutomator(client, {
-        store: new MemoryW3CAutomationStore(),
-        signingPolicy: issuerIssuanceSigningPolicy({
-            issuerAlias: name,
-            issuerAid,
-            issuanceId,
-        }),
-        importPolicy: () =>
-            'W3C issuance foreground automation handles issuer signatures only',
-    });
-    const timeoutAt = Date.now() + timeoutMs;
-
-    while (Date.now() < timeoutAt) {
-        const terminal = w3cIssuanceTerminalError(current);
-        if (terminal === null) {
-            return current;
-        }
-        if (terminal !== undefined) {
-            throw terminal;
-        }
-        if (w3cIssuanceReadyForDelivery(current)) {
-            current = (yield* callPromise(() =>
-                w3c.deliverIssuance(name, current as any)
-            )) as W3CIssuanceView;
-            continue;
-        }
-
-        yield* callPromise(() => automator.pollOnce(name));
-
-        current = yield* callPromise(() =>
-            getJson<W3CIssuanceView>(
-                client,
-                `/identifiers/${name}/w3c/credentials/${issuanceId}`
-            )
-        );
-        const refreshedTerminal = w3cIssuanceTerminalError(current);
-        if (refreshedTerminal === null) {
-            return current;
-        }
-        if (refreshedTerminal !== undefined) {
-            throw refreshedTerminal;
-        }
-
-        yield* sleep(pollMs);
-    }
-
-    throw new Error(
-        `Timed out waiting for W3C issuance delivery ${issuanceId}. Last state: ${current.state}.`
+            issuerName: name,
+            sourceCredentialSaid: sourceSaid,
+            timeoutMs,
+            pollMs,
+        })
     );
 }
 
-const w3cIssuanceTerminalError = (
-    issuance: W3CIssuanceView
-): Error | null | undefined => {
-    if (
-        W3C_ISSUANCE_SUCCESS_STATES.has(issuance.state) &&
-        stringValue(issuance.vcJwt) !== null
-    ) {
-        return null;
-    }
-    if (!W3C_ISSUANCE_FAILURE_STATES.has(issuance.state)) {
-        return undefined;
-    }
-
-    return new Error(
-        issuance.error ??
-            `W3C issuance ${issuance.issuanceId} ended as ${issuance.state}.`
-    );
-};
-
-const w3cIssuanceReadyForDelivery = (issuance: W3CIssuanceView): boolean =>
-    W3C_ISSUANCE_DELIVERY_READY_STATES.has(issuance.state) &&
-    stringValue(issuance.vcJwt) !== null;
-
-const w3cIssuanceAlreadyDelivered = (issuance: W3CIssuanceView): boolean =>
-    W3C_ISSUANCE_SUCCESS_STATES.has(issuance.state) &&
-    stringValue(issuance.vcJwt) !== null;
-
-const issuerIssuanceSigningPolicy =
-    ({
-        issuerAlias,
-        issuerAid,
-        issuanceId,
-    }: {
-        issuerAlias: string;
-        issuerAid: string;
-        issuanceId: string;
-    }) =>
-    (request: W3CSigningRequest): boolean | string => {
-        // Issuer issuance has two KERIA stages, but both use the same
-        // issuer_vc_jwt purpose and related issuance id. Anything else belongs
-        // to a different edge workflow and must fail closed here.
-        if (
-            request.purpose !== W3C_PURPOSE_ISSUER_VC_JWT ||
-            request.related !== issuanceId
-        ) {
-            return `W3C signing request ${request.d} is not for issuance ${issuanceId}`;
-        }
-        if (request.name !== issuerAlias || request.aid !== issuerAid) {
-            return `W3C issuance ${issuanceId} targets ${request.name}/${request.aid}, not ${issuerAlias}/${issuerAid}`;
-        }
-        return true;
-    };
-
 /**
- * Start a KERIA W3C presentation transaction from a runtime verifier request.
+ * Build and submit a holder-signed W3C VP-JWT from a runtime verifier request.
  *
- * The runtime descriptor comes from QR/request ingestion or manual operator
- * input. KERIA owns credential matching, VP-JWT signing requests, verifier
- * submission, and result state.
- *
- * KERIA deliberately rejects ambiguous matches. The common
- * "presentation requires exactly one eligible held credential" failure means
- * the holder has not imported/admitted the W3C VRD yet, or has duplicate
- * eligible held W3C credentials for the request.
+ * The browser edge runtime owns VP assembly and signing. KERIA validates the
+ * submitted VP-JWT against the selected held credential and verifier request,
+ * forwards it, and records the result.
  */
 export function* presentCredentialService({
     client,
@@ -917,8 +762,6 @@ export function* presentCredentialService({
     presenterAid,
     credentialSaid,
     verifierRequest,
-    timeoutMs,
-    pollMs = W3C_PRESENT_TX_POLL_MS,
 }: {
     client: SignifyClient;
     presenterAlias: string;
@@ -938,123 +781,63 @@ export function* presentCredentialService({
         ...verifierRequest,
         credentialSaid: said,
     };
-    const tx = yield* callPromise(() =>
-        postJson<W3CPresentTxView>(
-            client,
-            `/identifiers/${name}/w3c/present-txs`,
-            requestDescriptor
-        )
-    );
-    // Holder VP signing is approved by a short-lived local record. The
-    // background W3C edge automator rechecks the live KERIA transaction before
-    // signing so the audience, nonce, holder, and selected credential stay
-    // bound to the operator-approved verifier request.
-    recordPresentationApproval({
-        tx,
-        presenterAlias: name,
-        presenterAid,
-        credentialSaid: said,
-        verifierRequest: requestDescriptor,
-        timeoutMs,
-    });
-    const timeoutAt = Date.now() + timeoutMs;
-
-    let current = tx;
-    while (Date.now() < timeoutAt) {
-        const terminal = presentTxTerminalError(current);
-        if (terminal === null) {
-            return current;
-        }
-        if (terminal !== undefined) {
-            throw terminal;
-        }
-
-        current = yield* callPromise(() =>
-            getJson<W3CPresentTxView>(
-                client,
-                `/identifiers/${name}/w3c/present-txs/${current.presentTxId}`
-            )
+    const w3c = new W3CKeriaClient(client);
+    const credentials = yield* callPromise(() => w3c.credentials(name));
+    const held = selectHeldW3CCredential(credentials, said);
+    if (held === null) {
+        throw new Error(
+            `No held W3C credential was found for source credential ${said}.`
         );
-        const refreshedTerminal = presentTxTerminalError(current);
-        if (refreshedTerminal === null) {
-            return current;
-        }
-        if (refreshedTerminal !== undefined) {
-            throw refreshedTerminal;
-        }
-
-        yield* sleep(pollMs);
     }
-
-    throw new Error(
-        `Timed out waiting for W3C presentation transaction ${tx.presentTxId}. Last state: ${current.state}.`
+    const credentialId = requireNonEmpty(
+        String(held.credentialId ?? ''),
+        'W3C held credential id'
     );
+    const result = yield* callPromise(() =>
+        presentW3CCredential({
+            client,
+            holderName: name,
+            credentialId,
+            verifierRequest: requestDescriptor,
+        })
+    );
+    const view = presentationViewFromResult(result);
+    if (view.state === 'failed') {
+        throw new Error(
+            view.error ??
+                `W3C presentation ${view.presentationId} ended as failed.`
+        );
+    }
+    return view;
 }
 
-const presentTxTerminalError = (
-    tx: W3CPresentTxView
-): Error | null | undefined => {
-    if (W3C_PRESENT_TX_SUCCESS_STATES.has(tx.state)) {
-        return null;
-    }
-    if (!W3C_PRESENT_TX_FAILURE_STATES.has(tx.state)) {
-        return undefined;
-    }
+const selectHeldW3CCredential = (
+    credentials: readonly W3CHeldCredential[],
+    credentialSaid: string
+): W3CHeldCredential | null =>
+    credentials.find((credential) => {
+        const credentialId = stringValue(credential.credentialId);
+        const sourceCredentialSaid = stringValue(
+            credential.sourceCredentialSaid
+        );
+        return (
+            credentialId === credentialSaid ||
+            sourceCredentialSaid === credentialSaid
+        );
+    }) ?? null;
 
-    return new Error(
-        tx.error ??
-            `W3C presentation transaction ${tx.presentTxId} ended as ${tx.state}.`
+const presentationViewFromResult = (
+    result: W3CPresentationResult
+): W3CPresentTxView => {
+    const presentationId = requireNonEmpty(
+        String(result.presentationId ?? result.presentTxId ?? ''),
+        'W3C presentation id'
     );
-};
-
-const recordPresentationApproval = ({
-    tx,
-    presenterAlias,
-    presenterAid,
-    credentialSaid,
-    verifierRequest,
-    timeoutMs,
-}: {
-    tx: W3CPresentTxView;
-    presenterAlias: string;
-    presenterAid: string;
-    credentialSaid: string;
-    verifierRequest: Record<string, unknown>;
-    timeoutMs: number;
-}): void => {
-    const aud =
-        stringValue(tx.aud) ??
-        stringValue(verifierRequest.aud) ??
-        stringValue(verifierRequest.client_id);
-    const nonce = stringValue(tx.nonce) ?? stringValue(verifierRequest.nonce);
-    if (aud === null || nonce === null) {
-        return;
-    }
-    recordW3CHolderPresentationApproval({
-        presentTxId: tx.presentTxId,
-        holderAlias: presenterAlias,
-        holderAid: presenterAid,
-        credentialSaid,
-        aud,
-        nonce,
-        expiresAt:
-            stringValue(tx.expires) ??
-            new Date(Date.now() + timeoutMs).toISOString(),
-    });
-};
-
-const getJson = async <T>(client: SignifyClient, path: string): Promise<T> => {
-    const response = await client.fetch(path, 'GET', null);
-    return (await response.json()) as T;
-};
-
-const postJson = async <T>(
-    client: SignifyClient,
-    path: string,
-    body: Record<string, unknown>
-): Promise<T> => {
-    const response = await client.fetch(path, 'POST', body);
-    return (await response.json()) as T;
+    return {
+        ...result,
+        presentationId,
+        presentTxId: presentationId,
+    };
 };
 
 /**
