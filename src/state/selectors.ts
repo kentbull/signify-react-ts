@@ -16,6 +16,7 @@ import type {
     CredentialAdmitNotification,
     CredentialGrantNotification,
     CredentialIpexActivityRecord,
+    W3CVcGrantNotification,
 } from '../domain/credentials/credentialTypes';
 import {
     knownComponentsFromContacts,
@@ -160,6 +161,7 @@ const notificationExnSaid = (notification: NotificationRecord): string | null =>
     notification.challengeRequest?.exnSaid ??
     notification.credentialGrant?.grantSaid ??
     notification.credentialAdmit?.admitSaid ??
+    notification.w3cVcGrant?.grantSaid ??
     notification.delegationRequest?.delegateEventSaid ??
     notification.multisigRequest?.exnSaid ??
     notification.anchorSaid;
@@ -424,6 +426,11 @@ const byNewestCredentialAdmitTimestamp = (
     right: CredentialAdmitNotification
 ): number => right.createdAt.localeCompare(left.createdAt);
 
+const byNewestW3CVcGrantTimestamp = (
+    left: W3CVcGrantNotification,
+    right: W3CVcGrantNotification
+): number => right.createdAt.localeCompare(left.createdAt);
+
 const byNewestDelegationRequestTimestamp = (
     left: DelegationRequestNotification,
     right: DelegationRequestNotification
@@ -459,6 +466,36 @@ export const selectCredentialGrantNotificationById =
     (state: RootState): CredentialGrantNotification | null =>
         selectKeriaNotificationById(notificationId)(state)?.credentialGrant ??
         null;
+
+/** Select W3C VC-JWT grant notifications newest first. */
+export const selectW3CVcGrantNotifications = (state: RootState) =>
+    selectKeriaNotifications(state)
+        .flatMap((notification) =>
+            notification.w3cVcGrant === null ||
+            notification.w3cVcGrant === undefined
+                ? []
+                : [notification.w3cVcGrant]
+        )
+        .sort(byNewestW3CVcGrantTimestamp);
+
+/** Select unread holder-side W3C VC-JWT grant notifications. */
+export const selectUnreadW3CVcGrantNotifications = (state: RootState) =>
+    selectKeriaNotifications(state)
+        .flatMap((notification) =>
+            notification.read ||
+            notification.w3cVcGrant === null ||
+            notification.w3cVcGrant === undefined ||
+            notification.w3cVcGrant.status === 'notForThisWallet'
+                ? []
+                : [notification.w3cVcGrant]
+        )
+        .sort(byNewestW3CVcGrantTimestamp);
+
+/** Select one W3C VC-JWT grant notification by KERIA notification id. */
+export const selectW3CVcGrantNotificationById =
+    (notificationId: string) =>
+    (state: RootState): W3CVcGrantNotification | null =>
+        selectKeriaNotificationById(notificationId)(state)?.w3cVcGrant ?? null;
 
 /** Select issuer-side credential admit receipts newest first. */
 export const selectCredentialAdmitNotifications = (state: RootState) =>

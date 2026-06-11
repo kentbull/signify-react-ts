@@ -3,6 +3,7 @@ import {
     Box,
     Button,
     IconButton,
+    Link,
     Stack,
     Tooltip,
     Typography,
@@ -18,7 +19,13 @@ import {
     useParams,
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
-import { EmptyState, PageHeader, StatusPill } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type {
     ContactActionData,
@@ -28,13 +35,18 @@ import type {
 } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
+    selectAppNotificationById,
     selectChallengeRequestNotificationById,
     selectCredentialGrantNotificationById,
     selectDelegationRequestNotificationById,
     selectIdentifiers,
     selectKeriaNotificationById,
     selectMultisigRequestNotificationById,
+    selectOperationById,
+    selectW3CVcGrantNotificationById,
 } from '../../state/selectors';
+import { PayloadDetails } from '../../app/PayloadDetails';
+import { formatTimestamp } from '../../app/timeFormat';
 import {
     defaultMultisigRequestGroupAlias,
     defaultMultisigRequestLocalMember,
@@ -43,6 +55,9 @@ import {
     requiresMultisigJoinLabel,
 } from '../multisig/multisigRequestUi';
 import { NotificationProtocolPanels } from './NotificationProtocolPanels';
+
+const timestampText = (value: string | null): string =>
+    value === null ? 'Not available' : (formatTimestamp(value) ?? value);
 
 /**
  * Route view for one KERIA protocol notification or synthetic challenge item.
@@ -55,9 +70,16 @@ export const NotificationDetailView = () => {
     const credentialFetcher = useFetcher<CredentialActionData>();
     const delegationFetcher = useFetcher<ContactActionData>();
     const multisigFetcher = useFetcher<MultisigActionData>();
+    const markReadFetcher = useFetcher<ContactActionData>();
     const [multisigAliasDrafts, setMultisigAliasDrafts] = useState<
         Record<string, string>
     >({});
+    const appNotification = useAppSelector(
+        selectAppNotificationById(notificationId)
+    );
+    const appNotificationOperation = useAppSelector(
+        selectOperationById(appNotification?.operationId ?? '')
+    );
     const notification = useAppSelector(
         selectKeriaNotificationById(notificationId)
     );
@@ -66,6 +88,9 @@ export const NotificationDetailView = () => {
     );
     const credentialGrant = useAppSelector(
         selectCredentialGrantNotificationById(notificationId)
+    );
+    const w3cVcGrant = useAppSelector(
+        selectW3CVcGrantNotificationById(notificationId)
     );
     const delegationRequest = useAppSelector(
         selectDelegationRequestNotificationById(notificationId)
@@ -80,6 +105,12 @@ export const NotificationDetailView = () => {
             : identifiers.find(
                   (identifier) =>
                       identifier.prefix === credentialGrant.holderAid
+              );
+    const w3cGrantHolder =
+        w3cVcGrant === null
+            ? undefined
+            : identifiers.find(
+                  (identifier) => identifier.prefix === w3cVcGrant.holderAid
               );
     const canAdmitGrant =
         credentialGrant?.status === 'actionable' &&
@@ -132,6 +163,109 @@ export const NotificationDetailView = () => {
             navigate('/notifications');
         }
     }, [dismissFetcher.data, navigate]);
+
+    if (appNotification !== null) {
+        return (
+            <Box sx={{ display: 'grid', gap: 2.5, maxWidth: 980 }}>
+                <PageHeader
+                    eyebrow="App notification"
+                    title={appNotification.title}
+                    summary={appNotification.id}
+                    actions={
+                        <Button
+                            component={RouterLink}
+                            to="/notifications"
+                            startIcon={<ArrowBackIcon />}
+                            data-ui-sound={UI_SOUND_HOVER_VALUE}
+                        >
+                            Back to notifications
+                        </Button>
+                    }
+                />
+                <ConsolePanel
+                    title="Notification"
+                    eyebrow={appNotification.severity}
+                    actions={
+                        <StatusPill
+                            label={appNotification.status}
+                            tone={
+                                appNotification.severity === 'error'
+                                    ? 'error'
+                                    : appNotification.severity === 'success'
+                                      ? 'success'
+                                      : appNotification.severity === 'warning'
+                                        ? 'warning'
+                                        : 'neutral'
+                            }
+                        />
+                    }
+                >
+                    <Stack spacing={1.5}>
+                        <Stack spacing={0.5}>
+                            <TelemetryRow
+                                label="Message"
+                                value={appNotification.message}
+                            />
+                            <TelemetryRow
+                                label="Created"
+                                value={timestampText(
+                                    appNotification.createdAt
+                                )}
+                            />
+                            <TelemetryRow
+                                label="Read"
+                                value={appNotification.readAt ?? 'Unread'}
+                            />
+                            <TelemetryRow
+                                label="Operation"
+                                value={
+                                    appNotificationOperation?.requestId ??
+                                    appNotification.operationId ??
+                                    'Not available'
+                                }
+                                mono
+                            />
+                        </Stack>
+                        <PayloadDetails
+                            details={appNotification.payloadDetails}
+                        />
+                        <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            spacing={1}
+                            sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}
+                        >
+                            {appNotification.links
+                                .filter((link) => link.rel !== 'notification')
+                                .map((link) => (
+                                    <Button
+                                        key={`${appNotification.id}:${link.rel}`}
+                                        component={RouterLink}
+                                        to={link.path}
+                                        variant={
+                                            link.rel === 'operation'
+                                                ? 'contained'
+                                                : 'outlined'
+                                        }
+                                    >
+                                        {link.label}
+                                    </Button>
+                                ))}
+                            {appNotificationOperation !== null && (
+                                <Link
+                                    component={RouterLink}
+                                    to={`/operations/${encodeURIComponent(
+                                        appNotificationOperation.requestId
+                                    )}`}
+                                >
+                                    Open operation telemetry
+                                </Link>
+                            )}
+                        </Stack>
+                    </Stack>
+                </ConsolePanel>
+            </Box>
+        );
+    }
 
     if (loaderData.status === 'blocked') {
         return <ConnectionRequired />;
@@ -220,6 +354,17 @@ export const NotificationDetailView = () => {
         });
     };
 
+    const markNotificationRead = () => {
+        const formData = new FormData();
+        formData.set('intent', 'markNotificationRead');
+        formData.set('requestId', globalThis.crypto.randomUUID());
+        formData.set('notificationId', notification.id);
+        markReadFetcher.submit(formData, {
+            method: 'post',
+            action: `/notifications/${encodeURIComponent(notification.id)}`,
+        });
+    };
+
     return (
         <Box sx={{ display: 'grid', gap: 2.5 }}>
             <PageHeader
@@ -229,6 +374,8 @@ export const NotificationDetailView = () => {
                         ? 'Challenge request'
                         : credentialGrant !== null
                           ? 'Credential grant'
+                          : w3cVcGrant !== null
+                            ? 'W3C VC-JWT grant'
                           : delegationRequest !== null
                             ? 'Delegation request'
                             : multisigRequest !== null
@@ -317,11 +464,16 @@ export const NotificationDetailView = () => {
                 notification={notification}
                 challengeRequest={challengeRequest}
                 credentialGrant={credentialGrant}
+                w3cVcGrant={w3cVcGrant}
                 delegationRequest={delegationRequest}
                 multisigRequest={multisigRequest}
                 identifiers={identifiers}
                 grantRecipient={grantRecipient}
+                w3cGrantHolder={w3cGrantHolder}
                 canAdmitGrant={canAdmitGrant}
+                canMarkRead={
+                    !notification.read && markReadFetcher.state === 'idle'
+                }
                 delegationApprover={delegationApprover}
                 canApproveDelegation={canApproveDelegation}
                 multisigMember={multisigMember}
@@ -331,6 +483,7 @@ export const NotificationDetailView = () => {
                 canApproveMultisig={canApproveMultisig}
                 setMultisigAliasDrafts={setMultisigAliasDrafts}
                 admitCredentialGrant={admitCredentialGrant}
+                markNotificationRead={markNotificationRead}
                 approveDelegationRequest={approveDelegationRequest}
                 approveMultisigRequest={approveMultisigRequest}
             />

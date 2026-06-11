@@ -74,6 +74,10 @@ export type W3CIssuanceView = W3CIssuanceContext;
 
 export interface W3CPresentTxView extends W3CPresentationResult {
     presentTxId: string;
+    vcJwt: string | null;
+    verifierRequest: Record<string, unknown>;
+    submissionEndpoint: string | null;
+    sourceCredentialSaid: string;
 }
 
 const keriaTimestamp = (): string =>
@@ -820,7 +824,12 @@ export function* presentCredentialService({
             verifierRequest: requestDescriptor,
         })
     );
-    const view = presentationViewFromResult(result);
+    const view = presentationViewFromResult({
+        result,
+        held,
+        requestDescriptor,
+        sourceCredentialSaid: said,
+    });
     if (view.state === 'failed') {
         throw new Error(
             view.error ??
@@ -845,17 +854,36 @@ const selectHeldW3CCredential = (
         );
     }) ?? null;
 
-const presentationViewFromResult = (
-    result: W3CPresentationResult
-): W3CPresentTxView => {
+const presentationViewFromResult = ({
+    result,
+    held,
+    requestDescriptor,
+    sourceCredentialSaid,
+}: {
+    result: W3CPresentationResult;
+    held: W3CHeldCredential;
+    requestDescriptor: Record<string, unknown>;
+    sourceCredentialSaid: string;
+}): W3CPresentTxView => {
     const presentationId = requireNonEmpty(
         String(result.presentationId ?? result.presentTxId ?? ''),
         'W3C presentation id'
     );
+    const submissionEndpoint =
+        stringValue(result.submissionEndpoint) ??
+        stringValue(requestDescriptor.submissionEndpoint) ??
+        stringValue(requestDescriptor.response_uri);
     return {
         ...result,
         presentationId,
         presentTxId: presentationId,
+        selectedCredentialId:
+            result.selectedCredentialId ?? String(held.credentialId ?? ''),
+        vcJwt: stringValue(held.vcJwt) ?? null,
+        verifierRequest: requestDescriptor,
+        requestDescriptor: result.requestDescriptor ?? requestDescriptor,
+        submissionEndpoint,
+        sourceCredentialSaid,
     };
 };
 

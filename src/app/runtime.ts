@@ -747,6 +747,11 @@ export class AppRuntime {
         const id = notificationId(requestId);
         const links: AppNotificationLink[] = [
             {
+                rel: 'notification',
+                label: 'View notification',
+                path: `/notifications/${encodeURIComponent(id)}`,
+            },
+            {
                 rel: 'operation',
                 label: 'View operation',
                 path: operationRoute(requestId),

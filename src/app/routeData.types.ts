@@ -150,6 +150,7 @@ export type ContactActionData =
               | 'respondChallenge'
               | 'verifyChallenge'
               | 'dismissExchangeNotification'
+              | 'markNotificationRead'
               | 'approveDelegationRequest'
               | 'delete'
               | 'updateAlias';
@@ -174,6 +175,7 @@ export type ContactActionData =
               | 'respondChallenge'
               | 'verifyChallenge'
               | 'dismissExchangeNotification'
+              | 'markNotificationRead'
               | 'approveDelegationRequest'
               | 'delete'
               | 'updateAlias'
