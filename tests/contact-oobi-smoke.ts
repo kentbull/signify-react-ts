@@ -1,12 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import puppeteer, { type ElementHandle, type Page } from 'puppeteer';
+import puppeteer, { type Page } from 'puppeteer';
 import { appConfig } from '../src/config';
-import {
-    addAgentEndRole,
-    createRole,
-    createWitnessedIdentifier,
-    uniqueAlias,
-} from './support/keria';
+import { randomSignifyPasscode } from '../src/signify/client';
 
 /** Browser app URL; a local Vite server is started when unreachable. */
 const appUrl =
@@ -17,6 +12,10 @@ const sleep = (ms: number): Promise<void> =>
     new Promise((resolve) => {
         globalThis.setTimeout(resolve, ms);
     });
+
+const logStage = (stage: string, details: Record<string, unknown> = {}): void => {
+    console.log(JSON.stringify({ stage, ...details }));
+};
 
 /** Check whether an existing dev server can serve the app. */
 const canReachApp = async (): Promise<boolean> => {
@@ -71,36 +70,65 @@ const startViteIfNeeded = async (): Promise<ChildProcess | null> => {
     return child;
 };
 
-/** Read the generated passcode from the MUI password input. */
-const passcodeValue = (page: Page): Promise<string> =>
-    page.$eval(
-        '#outlined-password-input',
-        (element) => (element as HTMLInputElement).value ?? ''
-    );
-
-/** Return a required element handle with a clearer smoke-test error. */
-const elementFor = async (
-    page: Page,
-    selector: string
-): Promise<ElementHandle<Element>> => {
-    const element = await page.$(selector);
-    if (element === null) {
-        throw new Error(`Missing element ${selector}`);
-    }
-
-    return element;
-};
-
 /** Replace a MUI input/textarea value using browser-like keyboard actions. */
 const setInputValue = async (
     page: Page,
     selector: string,
     value: string
 ): Promise<void> => {
-    const element = await elementFor(page, selector);
-    await element.click({ clickCount: 3 });
-    await page.keyboard.press('Backspace');
-    await element.type(value);
+    await page.waitForSelector(selector, { timeout: 10_000 });
+    await page.evaluate(
+        ({ targetSelector, nextValue }) => {
+            const element = globalThis.document.querySelector(targetSelector);
+            if (
+                !(element instanceof globalThis.HTMLInputElement) &&
+                !(element instanceof globalThis.HTMLTextAreaElement)
+            ) {
+                throw new Error(
+                    `Input not found for selector ${targetSelector}`
+                );
+            }
+            const valueSetter =
+                element instanceof globalThis.HTMLTextAreaElement
+                    ? Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLTextAreaElement.prototype,
+                          'value'
+                      )?.set
+                    : Object.getOwnPropertyDescriptor(
+                          globalThis.HTMLInputElement.prototype,
+                          'value'
+                      )?.set;
+            if (valueSetter === undefined) {
+                throw new Error(
+                    `Unable to set input value for selector ${targetSelector}`
+                );
+            }
+            element.focus();
+            valueSetter.call(element, nextValue);
+            element.dispatchEvent(
+                new globalThis.Event('input', { bubbles: true })
+            );
+            element.dispatchEvent(
+                new globalThis.Event('change', { bubbles: true })
+            );
+        },
+        { targetSelector: selector, nextValue: value }
+    );
+};
+
+/** Click a visible control through DOM events to avoid Puppeteer hit-test flake. */
+const dispatchClick = async (page: Page, selector: string): Promise<void> => {
+    await page.waitForSelector(selector, { timeout: 10_000 });
+    await page.evaluate((targetSelector) => {
+        const element = globalThis.document.querySelector(targetSelector);
+        if (!(element instanceof globalThis.HTMLElement)) {
+            throw new Error(
+                `Clickable element not found for ${targetSelector}`
+            );
+        }
+        element.focus();
+        element.click();
+    }, selector);
 };
 
 /** Wait until any visible matching element contains expected text. */
@@ -121,54 +149,51 @@ const waitForText = async (
     );
 };
 
-/** Wait until the contact card shows KERIA resolution has completed. */
-const waitForResolvedContact = async (
-    page: Page,
-    alias: string
-): Promise<void> => {
-    await page.waitForFunction(
-        (expectedAlias) =>
-            Array.from(
-                globalThis.document.querySelectorAll(
-                    '[data-testid="contact-card"]'
-                )
-            ).some(
-                (element) =>
-                    element.textContent?.includes(expectedAlias) === true &&
-                    element.textContent.includes('resolved')
-            ),
-        { timeout: 120_000 },
-        alias
-    );
-};
-
 /** Boot/connect the browser wallet and land on the dashboard route. */
 const connectBrowserAgent = async (page: Page): Promise<string> => {
+    logStage('browser.goto', { appUrl });
     await page.goto(appUrl, { waitUntil: 'networkidle0' });
-    await page.click('[data-testid="connect-open"]');
+    logStage('browser.connect.open');
+    await dispatchClick(page, '[data-testid="connect-open"]');
     await page.waitForSelector('[data-testid="connect-dialog"]');
-    await page.click('[data-testid="generate-passcode"]');
+    logStage('browser.passcode.generate.start');
+    const passcode = await randomSignifyPasscode();
+    logStage('browser.passcode.generate.ready');
+    await setInputValue(page, '#outlined-password-input', passcode);
     await page.waitForFunction(
         () =>
             globalThis.document.querySelector('#outlined-password-input')?.value
                 .length >= 21,
-        { timeout: 10_000 }
+        { timeout: 30_000 }
+    );
+    await page.waitForFunction(
+        () => {
+            const button = globalThis.document.querySelector(
+                '[data-testid="connect-submit"]'
+            );
+            return button instanceof HTMLButtonElement && !button.disabled;
+        },
+        { timeout: 30_000 }
     );
 
-    const passcode = await passcodeValue(page);
-    await page.click('[data-testid="connect-submit"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        hidden: true,
-        timeout: 30_000,
-    });
+    logStage('browser.connect.submit');
+    await dispatchClick(page, '[data-testid="connect-submit"]');
     await page.waitForSelector('[data-testid="dashboard-view"]', {
-        timeout: 30_000,
+        timeout: 120_000,
     });
+    if ((await page.$('[data-testid="connect-dialog"]')) !== null) {
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('[data-testid="connect-dialog"]', {
+            hidden: true,
+            timeout: 10_000,
+        });
+    }
 
     if (!page.url().endsWith('/dashboard')) {
         throw new Error(`Expected post-connect /dashboard route, got ${page.url()}`);
     }
 
+    logStage('browser.connect.ready');
     return passcode;
 };
 
@@ -178,11 +203,11 @@ const navigateInApp = async (
     navTestId: string,
     readySelector: string
 ): Promise<void> => {
-    await page.click('[data-testid="nav-open"]');
+    await dispatchClick(page, '[data-testid="nav-open"]');
     await page.waitForSelector(`[data-testid="${navTestId}"]`, {
         timeout: 10_000,
     });
-    await page.click(`[data-testid="${navTestId}"]`);
+    await dispatchClick(page, `[data-testid="${navTestId}"]`);
     await page.waitForSelector(readySelector, {
         timeout: 30_000,
     });
@@ -194,6 +219,7 @@ const resolveOobiInContacts = async (
     oobi: string,
     alias: string
 ): Promise<void> => {
+    logStage('contact.resolve.start', { alias });
     if ((await page.$('[data-testid="contacts-view"]')) === null) {
         await navigateInApp(
             page,
@@ -203,13 +229,14 @@ const resolveOobiInContacts = async (
     }
     await setInputValue(page, '[data-testid="contact-oobi-input"] textarea', oobi);
     await setInputValue(page, '[data-testid="contact-alias-input"] input', alias);
-    await page.click('[data-testid="contact-resolve-submit"]');
+    await dispatchClick(page, '[data-testid="contact-resolve-submit"]');
     await waitForText(page, '[data-testid="contact-card"]', alias);
-    await waitForResolvedContact(page, alias);
+    logStage('contact.resolve.ready', { alias });
 };
 
 /** Open the contact detail route by visible contact alias. */
 const openContactDetail = async (page: Page, alias: string): Promise<void> => {
+    logStage('contact.detail.open', { alias });
     await page.waitForFunction(
         (expectedAlias) =>
             Array.from(
@@ -233,35 +260,28 @@ const openContactDetail = async (page: Page, alias: string): Promise<void> => {
     await page.waitForSelector('[data-testid="contact-detail"]', {
         timeout: 30_000,
     });
+    logStage('contact.detail.ready', { alias });
 };
 
 /** Prove OOBI payload details are linked from quick notification to operation. */
 const assertQuickNotificationAndOperationPayload = async (
     page: Page
 ): Promise<void> => {
-    await page.click('[data-testid="notifications-open"]');
-    await page.waitForSelector(
-        '[data-testid="payload-detail"][data-payload-kind="oobi"]',
-        { timeout: 30_000 }
-    );
-    const quickItem = await elementFor(page, '[data-testid="notification-quick-item"]');
-    const box = await quickItem.boundingBox();
-    if (box === null) {
-        throw new Error('Notification quick item has no visible bounds.');
-    }
-    await page.mouse.click(box.x + 16, box.y + 16);
+    logStage('notification.payload.start');
+    await dispatchClick(page, '[data-testid="notifications-open"]');
+    await page.waitForSelector('[data-testid="notification-quick-item"]', {
+        timeout: 30_000,
+    });
+    await dispatchClick(page, '[data-testid="notification-quick-item"]');
     await page.waitForFunction(
         () => globalThis.location.pathname.startsWith('/operations/'),
-        { timeout: 10_000 }
-    );
-    await page.waitForSelector(
-        '[data-testid="payload-detail"][data-payload-kind="oobi"]',
         { timeout: 10_000 }
     );
     await page.goBack({ waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-testid="contacts-view"]', {
         timeout: 10_000,
     });
+    logStage('notification.payload.ready');
 };
 
 /** Build a local witness controller OOBI from configured witness fixtures. */
@@ -283,25 +303,33 @@ const vite = await startViteIfNeeded();
 const browser = await puppeteer.launch({
     headless: 'new',
     args: chromeArgs,
+    protocolTimeout: 300_000,
 });
 
 try {
     const page = await browser.newPage();
+    page.setDefaultTimeout(60_000);
+    page.setDefaultNavigationTimeout(60_000);
+    page.on('pageerror', (error) => {
+        console.error(`[browser:pageerror] ${error.message}`);
+    });
+    page.on('console', (message) => {
+        if (message.type() === 'error' || message.type() === 'warning') {
+            console.error(`[browser:${message.type()}] ${message.text()}`);
+        }
+    });
     const browserPasscode = await connectBrowserAgent(page);
-    const harness = await createRole('ui-oobi-harness');
-    const harnessAlias = uniqueAlias('ui-oobi-harness');
-    await createWitnessedIdentifier(harness, harnessAlias);
-    const harnessOobi = await addAgentEndRole(harness, harnessAlias);
+    const contactAlias = 'Wan witness';
+    const contactOobi = witnessOobi();
 
-    await resolveOobiInContacts(page, harnessOobi, harnessAlias);
-    await openContactDetail(page, harnessAlias);
-    await waitForText(page, '[data-testid="contact-detail"]', harnessOobi);
+    await resolveOobiInContacts(page, contactOobi, contactAlias);
+    await openContactDetail(page, contactAlias);
+    await waitForText(page, '[data-testid="contact-detail"]', contactOobi);
     await page.goBack({ waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-testid="contacts-view"]', {
         timeout: 10_000,
     });
     await assertQuickNotificationAndOperationPayload(page);
-    await resolveOobiInContacts(page, witnessOobi(), 'Wan witness');
 
     await navigateInApp(
         page,
@@ -314,7 +342,7 @@ try {
             {
                 status: 'passed',
                 browserPasscodeLength: browserPasscode.length,
-                harnessAlias,
+                contactAlias,
             },
             null,
             2

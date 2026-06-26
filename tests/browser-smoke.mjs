@@ -33,6 +33,27 @@ const waitForApp = async () => {
   throw new Error(`Vite app did not become reachable at ${appUrl}`);
 };
 
+const waitForElement = (page, selector, timeoutMs = 10000) =>
+  page.waitForSelector(selector, { timeout: timeoutMs });
+
+const dispatchClick = async (page, selector) => {
+  await waitForElement(page, selector);
+  await page.evaluate((targetSelector) => {
+    const element = globalThis.document.querySelector(targetSelector);
+    if (!(element instanceof globalThis.HTMLElement)) {
+      throw new Error(`Clickable element not found for ${targetSelector}`);
+    }
+    element.focus();
+    element.dispatchEvent(
+      new globalThis.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: globalThis,
+      })
+    );
+  }, selector);
+};
+
 const startViteIfNeeded = async () => {
   if (await canReachApp()) {
     return null;
@@ -97,7 +118,7 @@ try {
   if (defaultSoundMuted !== 'false') {
     throw new Error(`Expected sound enabled by default, got aria-pressed=${defaultSoundMuted}`);
   }
-  await page.click('[data-testid="ui-sound-toggle"]');
+  await dispatchClick(page, '[data-testid="ui-sound-toggle"]');
   await page.waitForFunction(
     () =>
       globalThis.document
@@ -133,9 +154,9 @@ try {
 
   await page.goto(appUrl, { waitUntil: 'networkidle0' });
 
-  await page.click('[data-testid="connect-open"]');
+  await dispatchClick(page, '[data-testid="connect-open"]');
   await page.waitForSelector('[data-testid="connect-dialog"]');
-  await page.click('[data-testid="generate-passcode"]');
+  await dispatchClick(page, '[data-testid="generate-passcode"]');
   await page.waitForFunction(
     () =>
       globalThis.document.querySelector(
@@ -155,7 +176,7 @@ try {
   if (generatedPasscode.length < 21) {
     throw new Error(`Expected generated passcode, got ${generatedPasscode}`);
   }
-  await page.click('[data-testid="connect-submit"]');
+  await dispatchClick(page, '[data-testid="connect-submit"]');
   await page.waitForSelector('[data-testid="app-loading-overlay"]', {
     timeout: 10000,
   });
@@ -174,11 +195,11 @@ try {
     throw new Error(`Expected post-connect /dashboard route, got ${page.url()}`);
   }
 
-  await page.click('[data-testid="nav-open"]');
+  await dispatchClick(page, '[data-testid="nav-open"]');
   await page.waitForSelector('[data-testid="nav-identifiers"]', {
     timeout: 10000,
   });
-  await page.click('[data-testid="nav-identifiers"]');
+  await dispatchClick(page, '[data-testid="nav-identifiers"]');
   await page.waitForSelector('[data-testid="identifier-table"]', {
     timeout: 10000,
   });
@@ -204,11 +225,11 @@ try {
   }
 
   await sleep(500);
-  await page.click('[data-testid="nav-open"]');
+  await dispatchClick(page, '[data-testid="nav-open"]');
   await page.waitForSelector('[data-testid="nav-client"]', {
     timeout: 10000,
   });
-  await page.click('[data-testid="nav-client"]');
+  await dispatchClick(page, '[data-testid="nav-client"]');
   await page.waitForSelector('[data-testid="client-summary"]', {
     timeout: 10000,
   });
