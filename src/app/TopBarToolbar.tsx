@@ -14,6 +14,8 @@ import {
     Typography,
 } from '@mui/material';
 import CircleIcon from '@mui/icons-material/Circle';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
@@ -23,6 +25,7 @@ import { UI_SOUND_HOVER_VALUE } from './uiSound';
 import { abbreviateMiddle } from '../domain/contacts/contactHelpers';
 import type { RegistryRecord } from '../domain/credentials/credentialTypes';
 import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
+import type { ThemeMode } from '../state/uiPreferences.slice';
 
 /**
  * Shell toolbar state derived by `TopBar`.
@@ -35,6 +38,8 @@ interface TopBarToolbarProps {
     isConnected: boolean;
     /** Current persisted hover-sound preference. */
     hoverSoundMuted: boolean;
+    /** Current persisted visual theme preference. */
+    themeMode: ThemeMode;
     /** Wallet AID selected for credential-focused routes. */
     selectedIdentifier: IdentifierSummary | null;
     /** Credential registry selected for the current wallet AID. */
@@ -47,6 +52,7 @@ interface TopBarToolbarProps {
     onSelectedAidChange: (value: string) => void;
     onSelectedRegistryChange: (value: string) => void;
     onToggleHoverSoundMuted: () => void;
+    onToggleThemeMode: () => void;
     onOpenOperations: (event: MouseEvent<HTMLElement>) => void;
     onOpenNotifications: (event: MouseEvent<HTMLElement>) => void;
     onConnectClick: () => void;
@@ -58,6 +64,7 @@ interface TopBarToolbarProps {
 export const TopBarToolbar = ({
     isConnected,
     hoverSoundMuted,
+    themeMode,
     selectedIdentifier,
     selectedRegistry,
     identifiers,
@@ -68,6 +75,7 @@ export const TopBarToolbar = ({
     onSelectedAidChange,
     onSelectedRegistryChange,
     onToggleHoverSoundMuted,
+    onToggleThemeMode,
     onOpenOperations,
     onOpenNotifications,
     onConnectClick,
@@ -104,8 +112,10 @@ export const TopBarToolbar = ({
                 variant="h6"
                 noWrap
                 sx={{
-                    flex: '0 0 auto',
+                    flex: { xs: '1 1 auto', sm: '0 0 auto' },
+                    minWidth: 0,
                     color: 'text.primary',
+                    fontSize: { xs: '1rem', sm: '1.25rem' },
                     fontWeight: 700,
                 }}
             >
@@ -130,8 +140,7 @@ export const TopBarToolbar = ({
                         renderValue={(value) => {
                             const identifier =
                                 identifiers.find(
-                                    (candidate) =>
-                                        candidate.prefix === value
+                                    (candidate) => candidate.prefix === value
                                 ) ?? selectedIdentifier;
                             return `${identifier.name} / ${abbreviateMiddle(
                                 identifier.prefix,
@@ -142,7 +151,7 @@ export const TopBarToolbar = ({
                         sx={{
                             height: 32,
                             fontSize: '0.78rem',
-                            bgcolor: 'rgba(13, 23, 34, 0.72)',
+                            bgcolor: 'background.paper',
                             '.MuiSelect-select': {
                                 py: 0.5,
                                 pr: 3,
@@ -159,10 +168,7 @@ export const TopBarToolbar = ({
                                 value={identifier.prefix}
                             >
                                 {identifier.name} /{' '}
-                                {abbreviateMiddle(
-                                    identifier.prefix,
-                                    18
-                                )}
+                                {abbreviateMiddle(identifier.prefix, 18)}
                             </MenuItem>
                         ))}
                     </Select>
@@ -182,15 +188,12 @@ export const TopBarToolbar = ({
                         aria-label="Selected credential registry"
                         value={selectedRegistry.id}
                         onChange={(event) =>
-                            onSelectedRegistryChange(
-                                event.target.value
-                            )
+                            onSelectedRegistryChange(event.target.value)
                         }
                         renderValue={(value) => {
                             const registry =
                                 readyRegistries.find(
-                                    (candidate) =>
-                                        candidate.id === value
+                                    (candidate) => candidate.id === value
                                 ) ?? selectedRegistry;
                             return `Registry: ${registry.registryName}`;
                         }}
@@ -198,7 +201,7 @@ export const TopBarToolbar = ({
                         sx={{
                             height: 32,
                             fontSize: '0.78rem',
-                            bgcolor: 'rgba(13, 23, 34, 0.72)',
+                            bgcolor: 'background.paper',
                             '.MuiSelect-select': {
                                 py: 0.5,
                                 pr: 3,
@@ -210,10 +213,7 @@ export const TopBarToolbar = ({
                             <em>Clear registry</em>
                         </MenuItem>
                         {readyRegistries.map((registry) => (
-                            <MenuItem
-                                key={registry.id}
-                                value={registry.id}
-                            >
+                            <MenuItem key={registry.id} value={registry.id}>
                                 {registry.registryName} /{' '}
                                 {abbreviateMiddle(registry.regk, 18)}
                             </MenuItem>
@@ -228,6 +228,28 @@ export const TopBarToolbar = ({
                 tone={isConnected ? 'success' : 'error'}
             />
         </Box>
+        <Tooltip
+            title={
+                themeMode === 'dark'
+                    ? 'Switch to light theme'
+                    : 'Switch to dark theme'
+            }
+        >
+            <IconButton
+                color="inherit"
+                aria-label={
+                    themeMode === 'dark'
+                        ? 'Switch to light theme'
+                        : 'Switch to dark theme'
+                }
+                aria-pressed={themeMode === 'light'}
+                data-testid="theme-mode-toggle"
+                data-ui-sound={UI_SOUND_HOVER_VALUE}
+                onClick={onToggleThemeMode}
+            >
+                {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+        </Tooltip>
         <Tooltip
             title={
                 hoverSoundMuted

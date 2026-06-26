@@ -44,6 +44,10 @@ export const selectConnectionStatus = (state: RootState) =>
 export const selectHoverSoundMuted = (state: RootState): boolean =>
     state.uiPreferences.hoverSoundMuted;
 
+/** Select the persisted visual theme preference. */
+export const selectThemeMode = (state: RootState) =>
+    state.uiPreferences.themeMode;
+
 /** Select operation records in display order. */
 export const selectOperationRecords = (state: RootState) =>
     state.operations.order

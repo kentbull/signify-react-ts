@@ -1,4 +1,12 @@
-import { Box, Divider, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import {
+    Box,
+    Divider,
+    IconButton,
+    Stack,
+    Tooltip,
+    Typography,
+} from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { StatusPill, TelemetryRow } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
@@ -29,9 +37,13 @@ export const ActionNotice = ({ data }: { data: ContactActionData }) => (
             border: 1,
             borderColor: data.ok ? 'divider' : 'error.main',
             borderRadius: 1,
-            bgcolor: data.ok
-                ? 'rgba(39, 215, 255, 0.06)'
-                : 'rgba(255, 61, 79, 0.08)',
+            bgcolor: (theme) =>
+                alpha(
+                    data.ok
+                        ? theme.palette.primary.main
+                        : theme.palette.error.main,
+                    data.ok ? 0.06 : 0.08
+                ),
             px: 2,
             py: 1.25,
         }}
@@ -102,7 +114,11 @@ export const CopyBlock = ({
 /**
  * Render grouped contact OOBIs while preserving their KERIA role labels.
  */
-export const FullOobiBlock = ({ groups }: { groups: readonly ContactOobiGroup[] }) => (
+export const FullOobiBlock = ({
+    groups,
+}: {
+    groups: readonly ContactOobiGroup[];
+}) => (
     <Box sx={{ display: 'grid', gap: 1 }}>
         <Typography
             variant="caption"
@@ -157,7 +173,11 @@ export const FullOobiBlock = ({ groups }: { groups: readonly ContactOobiGroup[] 
 /**
  * Summarize one persisted challenge record for the contact detail route.
  */
-export const ChallengeBlock = ({ challenge }: { challenge: ChallengeRecord }) => (
+export const ChallengeBlock = ({
+    challenge,
+}: {
+    challenge: ChallengeRecord;
+}) => (
     <Box
         sx={{
             border: 1,

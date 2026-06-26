@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Box } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Outlet, useFetchers, useNavigation } from 'react-router-dom';
 import type { AppRuntime } from './runtime';
 import { useAppRuntime, useAppSession } from './runtimeHooks';
@@ -130,8 +131,14 @@ const RootLayoutContent = () => {
                         xs: 'calc(88px + env(safe-area-inset-bottom))',
                         sm: 3,
                     },
-                    background:
-                        'linear-gradient(180deg, rgba(39, 215, 255, 0.04) 0%, rgba(5, 9, 13, 0) 220px)',
+                    background: (theme) =>
+                        `linear-gradient(180deg, ${alpha(
+                            theme.palette.primary.main,
+                            0.04
+                        )} 0%, ${alpha(
+                            theme.palette.background.default,
+                            0
+                        )} 220px)`,
                 }}
             >
                 <Outlet />
