@@ -1,5 +1,6 @@
 import { formatTimestamp } from '../../app/timeFormat';
 import { ISSUEABLE_CREDENTIAL_TYPES } from '../../config/credentialCatalog';
+import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
 import type {
     CredentialSummaryRecord,
     RegistryRecord,
@@ -28,22 +29,33 @@ const schemaTypeLabel = (schemaSaid: string | null | undefined): string => {
     return (
         ISSUEABLE_CREDENTIAL_TYPES.find(
             (type) => type.schemaSaid === schemaSaid
-        )?.label ?? 'Credential schema'
+        )?.label ?? abbreviateMiddle(schemaSaid, 18)
     );
 };
+
+/** Resolve schema metadata into the human-readable credential type label. */
+export const credentialSchemaDisplayLabel = (
+    schemaSaid: string | null,
+    schema: SchemaRecord | null = null
+): string =>
+    schema?.title ??
+    schema?.credentialType ??
+    schemaTypeLabel(schemaSaid);
 
 /**
  * Prefer the resolved schema title, then the catalog label, then a generic fallback.
  */
 export const schemaTitle = (schema: SchemaRecord): string =>
-    schema.title ?? schemaTypeLabel(schema.said);
+    credentialSchemaDisplayLabel(schema.said, schema);
 
 /**
  * Resolve a credential's schema SAID into the dashboard type label.
  */
 export const credentialTypeLabel = (
-    credential: CredentialSummaryRecord
-): string => schemaTypeLabel(credential.schemaSaid);
+    credential: CredentialSummaryRecord,
+    schema: SchemaRecord | null = null
+): string =>
+    credentialSchemaDisplayLabel(credential.schemaSaid, schema);
 
 /**
  * Collapse credential persistence facts into the ledger status shown in dashboard lists.

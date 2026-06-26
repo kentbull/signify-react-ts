@@ -93,6 +93,13 @@ const admittedCredential = {
             expires: '2026-12-31T23:59:59Z',
         },
     },
+    schema: {
+        $id: 'Eschema',
+        title: 'Verifiable Reference Data (VRD) Credential',
+        description: 'A VRD credential',
+        credentialType: 'VRDCredential',
+        version: '1.0.0',
+    },
     status: { s: '0' },
 } as unknown as CredentialResult;
 
@@ -358,7 +365,41 @@ describe('credential service helpers', () => {
                                         eligible: true,
                                         expires: '2026-12-31T23:59:59Z',
                                     },
+                                    e: {
+                                        source: {
+                                            n: 'EsourceCredential',
+                                        },
+                                    },
                                 },
+                                schema: {
+                                    $id: 'Eschema',
+                                    title: 'Verifiable Reference Data (VRD) Credential',
+                                    description: 'A VRD credential',
+                                    credentialType: 'VRDCredential',
+                                    version: '1.0.0',
+                                },
+                                chains: [
+                                    {
+                                        sad: {
+                                            d: 'EsourceCredential',
+                                            s: 'EsourceSchema',
+                                            i: 'EsourceIssuer',
+                                            a: {
+                                                i: 'EsourceSubject',
+                                                LEI: '5493001KJTIIGC8Y1R12',
+                                            },
+                                        },
+                                        schema: {
+                                            $id: 'EsourceSchema',
+                                            title: 'Legal Entity vLEI Credential',
+                                            description: 'LE credential',
+                                            credentialType:
+                                                'LegalEntityvLEICredential',
+                                            version: '1.0.0',
+                                        },
+                                        status: { et: 'iss' },
+                                    },
+                                ],
                             },
                         ];
                     }
@@ -396,7 +437,7 @@ describe('credential service helpers', () => {
             expect(credentials.list).toHaveBeenCalledWith({
                 filter: { '-a-i': 'Eholder' },
             });
-            expect(inventory).toEqual([
+            expect(inventory.credentials).toEqual([
                 expect.objectContaining({
                     said: 'EissuedCredential',
                     issuerAid: 'Eissuer',
@@ -412,6 +453,48 @@ describe('credential service helpers', () => {
                     status: 'admitted',
                 }),
             ]);
+            expect(inventory.schemas).toEqual([
+                expect.objectContaining({
+                    said: 'Eschema',
+                    title: 'Verifiable Reference Data (VRD) Credential',
+                    credentialType: 'VRDCredential',
+                }),
+                expect.objectContaining({
+                    said: 'EsourceSchema',
+                    title: 'Legal Entity vLEI Credential',
+                    credentialType: 'LegalEntityvLEICredential',
+                }),
+            ]);
+            expect(inventory.acdcs).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        said: 'EissuedCredential',
+                        edges: [
+                            expect.objectContaining({
+                                label: 'source',
+                                said: 'EsourceCredential',
+                            }),
+                        ],
+                    }),
+                    expect.objectContaining({
+                        said: 'EsourceCredential',
+                        issuerAid: 'EsourceIssuer',
+                    }),
+                ])
+            );
+            expect(inventory.chainGraphs).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        rootSaid: 'EissuedCredential',
+                        nodes: expect.arrayContaining([
+                            expect.objectContaining({
+                                said: 'EsourceCredential',
+                                unresolved: false,
+                            }),
+                        ]),
+                    }),
+                ])
+            );
         } finally {
             await runtime.destroy();
         }
@@ -546,6 +629,7 @@ describe('credential service helpers', () => {
             get: vi.fn(async (said: string) => ({
                 title: `Schema ${said}`,
                 description: 'Known schema',
+                credentialType: 'KnownCredential',
                 version: '1.0.0',
                 rules: {
                     usageDisclaimer: {
@@ -577,6 +661,7 @@ describe('credential service helpers', () => {
                 said: credentialType.schemaSaid,
                 status: 'resolved',
                 title: `Schema ${credentialType.schemaSaid}`,
+                credentialType: 'KnownCredential',
                 rules: {
                     usageDisclaimer: {
                         l: 'Usage disclaimer',

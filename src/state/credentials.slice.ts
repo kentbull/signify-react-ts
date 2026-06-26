@@ -5,6 +5,8 @@ import {
     sessionDisconnected,
 } from './session.slice';
 import type {
+    CredentialAcdcRecord,
+    CredentialChainGraphRecord,
     CredentialIpexActivityRecord,
     CredentialSummaryRecord,
 } from '../domain/credentials/credentialTypes';
@@ -18,6 +20,8 @@ import type {
 export interface CredentialsState {
     bySaid: Record<string, CredentialSummaryRecord>;
     saids: string[];
+    acdcBySaid: Record<string, CredentialAcdcRecord>;
+    chainGraphByRootSaid: Record<string, CredentialChainGraphRecord>;
     ipexActivityByCredentialSaid: Record<
         string,
         CredentialIpexActivityRecord[]
@@ -28,6 +32,8 @@ export interface CredentialsState {
 const createInitialState = (): CredentialsState => ({
     bySaid: {},
     saids: [],
+    acdcBySaid: {},
+    chainGraphByRootSaid: {},
     ipexActivityByCredentialSaid: {},
     ipexActivityLoadedAt: null,
 });
@@ -78,6 +84,8 @@ export const credentialsSlice = createSlice({
                 payload,
             }: PayloadAction<{
                 credentials: CredentialSummaryRecord[];
+                acdcs?: CredentialAcdcRecord[];
+                chainGraphs?: CredentialChainGraphRecord[];
             }>
         ) {
             for (const credential of payload.credentials) {
@@ -108,6 +116,14 @@ export const credentialsSlice = createSlice({
                 if (!state.saids.includes(credential.said)) {
                     state.saids.push(credential.said);
                 }
+            }
+
+            for (const acdc of payload.acdcs ?? []) {
+                state.acdcBySaid[acdc.said] = acdc;
+            }
+
+            for (const graph of payload.chainGraphs ?? []) {
+                state.chainGraphByRootSaid[graph.rootSaid] = graph;
             }
         },
         credentialIpexActivityLoaded(

@@ -33,6 +33,7 @@ import {
     selectContacts,
     selectDidWebsDidByAid,
     selectIdentifiers,
+    selectSelectedWalletAid,
 } from '../../state/selectors';
 import { walletAidSelected } from '../../state/walletSelection.slice';
 import {
@@ -81,6 +82,7 @@ export const IdentifiersView = () => {
     >({});
     const actionRunning = fetcher.state !== 'idle';
     const liveIdentifiers = useAppSelector(selectIdentifiers);
+    const selectedWalletAid = useAppSelector(selectSelectedWalletAid);
     const contacts = useAppSelector(selectContacts);
     const activeOperations = useAppSelector(selectActiveOperations);
     const activeResourceKeys = new Set(
@@ -469,6 +471,7 @@ export const IdentifiersView = () => {
             )}
             <IdentifierTable
                 identifiers={identifiers}
+                selectedAid={selectedWalletAid}
                 onSelect={handleSelectIdentifier}
                 onRotate={handleRotate}
                 isRotateDisabled={(identifier) =>

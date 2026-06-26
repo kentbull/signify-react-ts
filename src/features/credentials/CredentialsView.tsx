@@ -17,6 +17,7 @@ import {
 } from 'react-router-dom';
 import { ConnectionRequired } from '../../app/ConnectionRequired';
 import { ConsolePanel, EmptyState, PageHeader, StatusPill } from '../../app/Console';
+import { useAppRuntime } from '../../app/runtimeHooks';
 import type { CredentialActionData, CredentialsLoaderData } from '../../app/routeData';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import { useAppDispatch, useAppSelector } from '../../state/hooks';
@@ -58,25 +59,49 @@ const submitWithId = (fetcher: FormSubmitter, formData: FormData): void => {
 export const CredentialsView = () => {
     const loaderData = useLoaderData() as CredentialsLoaderData;
     const fetcher = useFetcher<CredentialActionData>();
+    const runtime = useAppRuntime();
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const { aid: aidParam } = useParams<{ aid?: string }>();
     const identifiers = useAppSelector(selectIdentifiers);
     const walletSelectedAid = useAppSelector(selectSelectedWalletAid);
     const actionRunning = fetcher.state !== 'idle';
-    const selectedAid = aidParam ?? '';
+    const selectedAid = aidParam ?? walletSelectedAid ?? '';
     const selectedIdentifier =
         identifiers.find((identifier) => identifier.prefix === selectedAid) ??
         null;
 
     useEffect(() => {
+        if (aidParam === undefined && walletSelectedAid !== null) {
+            navigate(credentialPath(walletSelectedAid), { replace: true });
+        }
+    }, [aidParam, navigate, walletSelectedAid]);
+
+    useEffect(() => {
         if (
+            aidParam !== undefined &&
             selectedIdentifier !== null &&
             walletSelectedAid !== selectedIdentifier.prefix
         ) {
             dispatch(walletAidSelected({ aid: selectedIdentifier.prefix }));
         }
-    }, [dispatch, selectedIdentifier, walletSelectedAid]);
+    }, [aidParam, dispatch, selectedIdentifier, walletSelectedAid]);
+
+    useEffect(() => {
+        if (selectedIdentifier === null) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        void runtime.didwebs
+            .refreshIdentifierDid(selectedIdentifier.name, selectedIdentifier.prefix, {
+                signal: controller.signal,
+                track: false,
+            })
+            .catch(() => undefined);
+
+        return () => controller.abort();
+    }, [runtime, selectedIdentifier]);
 
     if (loaderData.status === 'blocked') {
         return <ConnectionRequired />;

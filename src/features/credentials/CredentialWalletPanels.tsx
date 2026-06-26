@@ -1,7 +1,6 @@
 import {
     Box,
     Button,
-    Collapse,
     Stack,
     Typography,
 } from '@mui/material';
@@ -14,6 +13,7 @@ import type { IssueableCredentialTypeView } from '../../domain/credentials/crede
 import type {
     CredentialGrantNotification,
     CredentialSummaryRecord,
+    SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
 import type { CredentialWalletStats } from './credentialViewModels';
 import {
@@ -21,7 +21,6 @@ import {
     schemaStatusTone,
     statusTone,
 } from './credentialDisplay';
-import { CredentialRecordRows } from './CredentialShared';
 
 /**
  * Holder-side credential type readiness panel.
@@ -182,11 +181,13 @@ export const InboundGrantsPanel = ({
     grants,
     actionRunning,
     credentialTypesBySchema,
+    schemasBySaid,
     onAdmit,
 }: {
     grants: readonly CredentialGrantNotification[];
     actionRunning: boolean;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     onAdmit: (notificationId: string, grantSaid: string) => void;
 }) => (
     <ConsolePanel title="Inbound grants">
@@ -226,7 +227,8 @@ export const InboundGrantsPanel = ({
                                             grant.attributes.fullName ??
                                                 schemaLabel(
                                                     grant.schemaSaid,
-                                                    credentialTypesBySchema
+                                                    credentialTypesBySchema,
+                                                    schemasBySaid
                                                 )
                                         )}
                                     </Typography>
@@ -261,18 +263,19 @@ export const InboundGrantsPanel = ({
 );
 
 /**
- * Holder-side admitted credential list with local expansion state owned by the route.
+ * Holder-side admitted credential list. Rows navigate to the full dashboard
+ * credential detail route.
  */
 export const HeldCredentialsPanel = ({
     credentials,
-    expandedCredentialSaid,
     credentialTypesBySchema,
-    onToggleCredential,
+    schemasBySaid,
+    onOpenCredential,
 }: {
     credentials: readonly CredentialSummaryRecord[];
-    expandedCredentialSaid: string;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
-    onToggleCredential: (credentialSaid: string) => void;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
+    onOpenCredential: (credentialSaid: string) => void;
 }) => (
     <ConsolePanel title="Held credentials">
         {credentials.length === 0 ? (
@@ -282,76 +285,59 @@ export const HeldCredentialsPanel = ({
             />
         ) : (
             <Stack spacing={1.5}>
-                {credentials.map((credential) => {
-                    const expanded = expandedCredentialSaid === credential.said;
-                    return (
-                        <Box
-                            key={credential.said}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => onToggleCredential(credential.said)}
-                            onKeyDown={(event) => {
-                                if (
-                                    event.key === 'Enter' ||
-                                    event.key === ' '
-                                ) {
-                                    event.preventDefault();
-                                    onToggleCredential(credential.said);
-                                }
-                            }}
-                            sx={[
-                                {
-                                    border: 1,
-                                    borderColor: expanded
-                                        ? 'primary.main'
-                                        : 'divider',
-                                    borderRadius: 1,
-                                    p: 1.5,
-                                    bgcolor: 'rgba(13, 23, 34, 0.72)',
-                                },
-                                clickablePanelSx,
-                            ]}
-                        >
-                            <Stack spacing={1}>
-                                <Stack
-                                    direction={{ xs: 'column', sm: 'row' }}
-                                    spacing={1}
-                                    sx={{
-                                        justifyContent: 'space-between',
-                                        alignItems: {
-                                            xs: 'stretch',
-                                            sm: 'center',
-                                        },
-                                    }}
-                                >
-                                    <Typography sx={{ fontWeight: 800 }}>
-                                        {schemaLabel(
-                                            credential.schemaSaid,
-                                            credentialTypesBySchema
-                                        )}
-                                    </Typography>
-                                    <StatusPill
-                                        label={credential.status}
-                                        tone={statusTone(credential.status)}
-                                    />
-                                </Stack>
-                                <Typography variant="body2" sx={monoValueSx}>
-                                    {abbreviateMiddle(credential.said, 28)}
+                {credentials.map((credential) => (
+                    <Box
+                        key={credential.said}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onOpenCredential(credential.said)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                onOpenCredential(credential.said);
+                            }
+                        }}
+                        sx={[
+                            {
+                                border: 1,
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                p: 1.5,
+                                bgcolor: 'rgba(13, 23, 34, 0.72)',
+                            },
+                            clickablePanelSx,
+                        ]}
+                    >
+                        <Stack spacing={1}>
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={1}
+                                sx={{
+                                    justifyContent: 'space-between',
+                                    alignItems: {
+                                        xs: 'stretch',
+                                        sm: 'center',
+                                    },
+                                }}
+                            >
+                                <Typography sx={{ fontWeight: 800 }}>
+                                    {schemaLabel(
+                                        credential.schemaSaid,
+                                        credentialTypesBySchema,
+                                        schemasBySaid
+                                    )}
                                 </Typography>
-                                <Collapse in={expanded}>
-                                    <Box sx={{ pt: 1 }}>
-                                        <CredentialRecordRows
-                                            credential={credential}
-                                            credentialTypesBySchema={
-                                                credentialTypesBySchema
-                                            }
-                                        />
-                                    </Box>
-                                </Collapse>
+                                <StatusPill
+                                    label={credential.status}
+                                    tone={statusTone(credential.status)}
+                                />
                             </Stack>
-                        </Box>
-                    );
-                })}
+                            <Typography variant="body2" sx={monoValueSx}>
+                                {abbreviateMiddle(credential.said, 28)}
+                            </Typography>
+                        </Stack>
+                    </Box>
+                ))}
             </Stack>
         )}
     </ConsolePanel>
