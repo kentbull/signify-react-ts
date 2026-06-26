@@ -4,7 +4,7 @@ import { appConfig } from '../src/config';
 import {
     challengeWordsFingerprint,
     validateChallengeWords,
-} from '../src/features/contacts/challengeWords';
+} from '../src/domain/challenges/challengeWords';
 import {
     CHALLENGE_REQUEST_ROUTE,
     CHALLENGE_TOPIC,

@@ -4,75 +4,16 @@ import {
     sessionConnecting,
     sessionDisconnected,
 } from './session.slice';
-
-/**
- * Subject attributes for the demo SEDI voter credential.
- */
-export interface SediVoterCredentialAttributes {
-    i: string;
-    fullName: string;
-    voterId: string;
-    precinctId: string;
-    county: string;
-    jurisdiction: string;
-    electionId: string;
-    eligible: boolean;
-    expires: string;
-}
-
-/** Local side of a credential known to this connected wallet. */
-export type CredentialDirection = 'issued' | 'held';
-
-/** Local status of a credential as it moves through issuer/holder flows. */
-export type CredentialStatus =
-    | 'draft'
-    | 'issued'
-    | 'grantSent'
-    | 'pendingAdmit'
-    | 'admitted'
-    | 'revoked'
-    | 'error';
-
-/**
- * Minimal credential projection stored for workflow/UI coordination.
- */
-export interface CredentialSummaryRecord {
-    said: string;
-    schemaSaid: string | null;
-    registryId: string | null;
-    issuerAid: string | null;
-    holderAid: string | null;
-    direction: CredentialDirection;
-    status: CredentialStatus;
-    grantSaid: string | null;
-    admitSaid: string | null;
-    notificationId: string | null;
-    issuedAt: string | null;
-    grantedAt: string | null;
-    admittedAt: string | null;
-    revokedAt: string | null;
-    error: string | null;
-    attributes: SediVoterCredentialAttributes | null;
-    updatedAt: string;
-}
-
-/** IPEX exchange activity linked to one credential. */
-export interface CredentialIpexActivityRecord {
-    id: string;
-    credentialSaid: string;
-    exchangeSaid: string;
-    route: string;
-    kind: 'grant' | 'admit';
-    direction: 'sent' | 'received' | 'unknown';
-    senderAid: string | null;
-    recipientAid: string | null;
-    linkedGrantSaid: string | null;
-    createdAt: string | null;
-    updatedAt: string;
-}
+import type {
+    CredentialIpexActivityRecord,
+    CredentialSummaryRecord,
+} from '../domain/credentials/credentialTypes';
 
 /**
  * Credential slice state keyed by credential SAID.
+ *
+ * This slice owns only serializable wallet facts. Domain record definitions
+ * live under `src/domain/credentials` and should not be re-exported from here.
  */
 export interface CredentialsState {
     bySaid: Record<string, CredentialSummaryRecord>;
@@ -95,6 +36,9 @@ const initialState: CredentialsState = createInitialState();
 
 /**
  * Redux slice for credential inventory and lifecycle status.
+ *
+ * Reducers merge late-arriving inventory with workflow facts so IPEX grant and
+ * admit metadata are not lost during background refreshes.
  */
 export const credentialsSlice = createSlice({
     name: 'credentials',

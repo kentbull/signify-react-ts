@@ -1,9 +1,11 @@
-import type { CredentialSummaryRecord } from '../../state/credentials.slice';
+import type {
+    CredentialGrantNotification,
+    CredentialSummaryRecord,
+    RegistryRecord,
+} from '../../domain/credentials/credentialTypes';
 import type {
     IssueableCredentialTypeView,
-} from '../../state/issueableCredentialTypes';
-import type { CredentialGrantNotification } from '../../state/notifications.slice';
-import type { RegistryRecord } from '../../state/registry.slice';
+} from '../../domain/credentials/credentialCatalog';
 import { readyCredentialRegistriesForIssuer } from './credentialSelection';
 
 export interface CredentialIssuerStats {

@@ -1,12 +1,30 @@
-import { appConfig, type AppConfig } from '../config';
-import type { CredentialSummaryRecord } from './credentials.slice';
-import type { SchemaRecord, SchemaResolutionStatus } from './schema.slice';
+import type {
+    CredentialSummaryRecord,
+    SchemaRecord,
+    SchemaResolutionStatus,
+} from './credentialTypes';
+import {
+    buildSediVoterIdCredentialType,
+    type SediVoterIdSchemaConfig,
+} from './sediVoterId';
+import type {
+    SEDI_VOTER_ID_CREDENTIAL_TYPE_KEY,
+    SEDI_VOTER_ID_FORM_KIND,
+} from './sediVoterId';
+
+/**
+ * Pure catalog model for credential types the app can issue.
+ *
+ * This module must not import app config or Redux state. It defines the
+ * domain shape; `src/config/credentialCatalog.ts` decides which records exist.
+ */
 
 /** Credential forms the app knows how to map into Signify issue payloads. */
-export type IssueableCredentialFormKind = 'sediVoterId';
+export type IssueableCredentialFormKind = typeof SEDI_VOTER_ID_FORM_KIND;
 
 /** Curated credential types this app can issue. */
-export type IssueableCredentialTypeKey = 'sediVoterId';
+export type IssueableCredentialTypeKey =
+    typeof SEDI_VOTER_ID_CREDENTIAL_TYPE_KEY;
 
 /** Static catalog record for one app-supported credential type. */
 export interface IssueableCredentialTypeRecord {
@@ -29,28 +47,27 @@ export interface IssueableCredentialTypeView
     lastIssuedAt: string | null;
 }
 
+/** Minimal schema config required to build pure issueable credential records. */
+export interface IssueableCredentialSchemaConfig {
+    schemas: {
+        sediVoterId: SediVoterIdSchemaConfig;
+    };
+}
+
+/**
+ * Build configured credential catalog records without importing app config.
+ */
 export const buildIssueableCredentialTypes = (
-    config: Pick<AppConfig, 'schemas'>
+    config: IssueableCredentialSchemaConfig
 ): IssueableCredentialTypeRecord[] => {
-    const schema = config.schemas.sediVoterId;
-    if (schema.said === null || schema.oobiUrl === null) {
-        return [];
-    }
-
-    return [
-        {
-            key: 'sediVoterId',
-            label: 'SEDI Voter ID',
-            description: 'Voter eligibility credential for the SEDI demo.',
-            schemaSaid: schema.said,
-            schemaOobiUrl: schema.oobiUrl,
-            formKind: 'sediVoterId',
-        },
+    const credentialTypes = [
+        buildSediVoterIdCredentialType(config.schemas.sediVoterId),
     ];
-};
 
-export const ISSUEABLE_CREDENTIAL_TYPES =
-    buildIssueableCredentialTypes(appConfig);
+    return credentialTypes.filter(
+        (type): type is IssueableCredentialTypeRecord => type !== null
+    );
+};
 
 const latestCredentialTimestamp = (
     credential: CredentialSummaryRecord
@@ -60,6 +77,11 @@ const latestCredentialTimestamp = (
     credential.admittedAt ??
     credential.updatedAt;
 
+/**
+ * Join configured credential types with loaded schema and issued-credential
+ * facts for UI display. This keeps Redux selectors deriving catalog views
+ * instead of storing denormalized catalog state.
+ */
 export const buildIssueableCredentialTypeViews = ({
     types,
     schemas,

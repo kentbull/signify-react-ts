@@ -6,6 +6,10 @@ import {
 import { ClientView } from '../features/client/ClientView';
 import { ContactDetailView } from '../features/contacts/ContactDetailView';
 import { ContactsView } from '../features/contacts/ContactsView';
+import { CredentialAidOverviewRoute } from '../features/credentials/CredentialAidOverviewRoute';
+import { CredentialIssuerRoute } from '../features/credentials/CredentialIssuerRoute';
+import { CredentialIssuerTypeRoute } from '../features/credentials/CredentialIssuerTypeRoute';
+import { CredentialWalletRoute } from '../features/credentials/CredentialWalletRoute';
 import { CredentialsView } from '../features/credentials/CredentialsView';
 import { DashboardView } from '../features/dashboard/DashboardView';
 import { IdentifiersView } from '../features/identifiers/IdentifiersView';
@@ -202,21 +206,6 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = APP_FEATURE_ROUTES.map(
     })
 );
 
-const credentialRoute = (
-    id: string,
-    path: string,
-    runtime: AppRuntime,
-    handle?: AppRouteHandle
-): RouteObject => ({
-    id,
-    path,
-    handle,
-    loader: ({ request }) => loadCredentials(runtime, request),
-    action: ({ request }) => credentialsAction(runtime, request),
-    element: <CredentialsView />,
-    errorElement: <RouteErrorBoundary title="Credentials route failed" />,
-});
-
 const dashboardRoute = (
     id: string,
     path: string,
@@ -315,28 +304,43 @@ export const createAppRoutes = (runtime: AppRuntime): RouteObject[] => [
                     <RouteErrorBoundary title="Multisig route failed" />
                 ),
             },
-            credentialRoute(
-                'credentials',
-                'credentials',
-                runtime,
-                APP_FEATURE_ROUTES[4].handle
-            ),
-            credentialRoute('credentialAid', 'credentials/:aid', runtime),
-            credentialRoute(
-                'credentialIssuer',
-                'credentials/:aid/issuer',
-                runtime
-            ),
-            credentialRoute(
-                'credentialIssuerType',
-                'credentials/:aid/issuer/:typeKey',
-                runtime
-            ),
-            credentialRoute(
-                'credentialWallet',
-                'credentials/:aid/wallet',
-                runtime
-            ),
+            {
+                id: 'credentials',
+                path: 'credentials',
+                handle: APP_FEATURE_ROUTES[4].handle,
+                loader: ({ request }) => loadCredentials(runtime, request),
+                action: ({ request }) => credentialsAction(runtime, request),
+                element: <CredentialsView />,
+                errorElement: (
+                    <RouteErrorBoundary title="Credentials route failed" />
+                ),
+                children: [
+                    {
+                        index: true,
+                        element: <CredentialAidOverviewRoute />,
+                    },
+                    {
+                        id: 'credentialAid',
+                        path: ':aid',
+                        element: <CredentialAidOverviewRoute />,
+                    },
+                    {
+                        id: 'credentialIssuer',
+                        path: ':aid/issuer',
+                        element: <CredentialIssuerRoute />,
+                    },
+                    {
+                        id: 'credentialIssuerType',
+                        path: ':aid/issuer/:typeKey',
+                        element: <CredentialIssuerTypeRoute />,
+                    },
+                    {
+                        id: 'credentialWallet',
+                        path: ':aid/wallet',
+                        element: <CredentialWalletRoute />,
+                    },
+                ],
+            },
             {
                 id: 'client',
                 path: 'client',

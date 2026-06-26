@@ -4,10 +4,10 @@ import type {
     ContactEndpointRole,
     ContactRecord,
     ContactWellKnown,
-} from '../../state/contacts.slice';
-import type { ChallengeRecord } from '../../state/challenges.slice';
+} from './contactTypes';
+import type { ChallengeRecord } from '../challenges/challengeTypes';
 import type { IdentifierSummary } from '../identifiers/identifierTypes';
-import { challengeWordsFingerprint } from './challengeWords';
+import { challengeWordsFingerprint } from '../challenges/challengeWords';
 
 /**
  * KERIA endpoint roles the app preserves from contact `ends` records.

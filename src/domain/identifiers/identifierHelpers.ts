@@ -1,6 +1,5 @@
 import { Algos } from 'signify-ts';
-import type { AppConfig } from '../../config';
-import type { ContactRecord } from '../../state/contacts.slice';
+import type { ContactRecord } from '../contacts/contactTypes';
 import { abbreviateMiddle, isWitnessContact } from '../contacts/contactHelpers';
 import type {
     IdentifierCreateArgs,
@@ -8,6 +7,17 @@ import type {
     IdentifierDelegatorOption,
     IdentifierSummary,
 } from './identifierTypes';
+
+/**
+ * Minimal config needed to map local identifier create intent into Signify
+ * args without coupling domain helpers to the app runtime config module.
+ */
+export interface IdentifierCreateConfig {
+    witnesses: {
+        aids: string[];
+        toad: number;
+    };
+}
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
@@ -113,10 +123,7 @@ export const identifierDelegatorOptions = (
         seen.add(aid);
         options.push({
             aid,
-            label: `${contact.alias} / ${abbreviateMiddle(
-                aid,
-                20
-            )} (contact)`,
+            label: `${contact.alias} / ${abbreviateMiddle(aid, 20)} (contact)`,
             source: 'contact',
         });
     }
@@ -294,7 +301,7 @@ export const isIdentifierCreateDraft = (
  */
 export const identifierCreateDraftToArgs = (
     draft: IdentifierCreateDraft,
-    config: AppConfig
+    config: IdentifierCreateConfig
 ): IdentifierCreateArgs => {
     const args: IdentifierCreateArgs = {
         algo: draft.algo,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { IdentifierSummary } from '../../src/features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 import {
     defaultMultisigRequestGroupAlias,
     displayMultisigRequestGroupAlias,

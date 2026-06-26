@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
     IdentifierCreateDraft,
     IdentifierSummary,
-} from '../../src/features/identifiers/identifierTypes';
-import { defaultIdentifierCreateDraft } from '../../src/features/identifiers/identifierHelpers';
+} from '../../src/domain/identifiers/identifierTypes';
+import { defaultIdentifierCreateDraft } from '../../src/domain/identifiers/identifierHelpers';
 import {
     contactsAction,
     credentialsAction,
@@ -19,11 +19,12 @@ import {
     rootAction,
     type RouteDataRuntime,
 } from '../../src/app/routeData';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../../src/config/credentialCatalog';
 import type {
-    ConnectedSignifyClient,
     SignifyClientConfig,
     SignifyStateSummary,
 } from '../../src/signify/client';
+import { multisigGroupDetailsFromIdentifier } from '../../src/domain/multisig/multisigGroupDetails';
 
 const summary: SignifyStateSummary = {
     controllerPre: 'Econtroller',
@@ -51,158 +52,244 @@ const makeRequest = (
     });
 };
 
-const makeRuntime = (
-    overrides: Partial<RouteDataRuntime> = {}
-): RouteDataRuntime => ({
-    getClient: vi.fn(() => ({ url: 'http://keria.example' })),
-    getState: vi.fn(() => summary),
-    connect: vi.fn(async () => ({ state: summary }) as ConnectedSignifyClient),
-    generatePasscode: vi.fn(async () => '0123456789abcdefghijk'),
-    refreshState: vi.fn(async () => summary),
-    listIdentifiers: vi.fn(async () => [
-        { name: 'alice', prefix: 'Ealice' } as IdentifierSummary,
-    ]),
-    syncSessionInventory: vi.fn(async () => ({})),
-    syncKnownCredentialSchemas: vi.fn(async () => ({})),
-    syncCredentialInventory: vi.fn(async () => ({})),
-    syncCredentialRegistries: vi.fn(async () => ({})),
-    syncCredentialIpexActivity: vi.fn(async () => ({})),
-    createIdentifier: vi.fn(async () => []),
-    rotateIdentifier: vi.fn(async () => []),
-    startCreateIdentifier: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'create-request-1',
-        operationRoute: '/operations/create-request-1',
-    })),
-    startRotateIdentifier: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'rotate-request-1',
-        operationRoute: '/operations/rotate-request-1',
-    })),
-    startCreateMultisigGroup: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'create-multisig-request-1',
-        operationRoute: '/operations/create-multisig-request-1',
-    })),
-    startAcceptMultisigInception: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'accept-multisig-request-1',
-        operationRoute: '/operations/accept-multisig-request-1',
-    })),
-    startAuthorizeMultisigAgents: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'authorize-multisig-request-1',
-        operationRoute: '/operations/authorize-multisig-request-1',
-    })),
-    startAcceptMultisigEndRole: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'accept-role-multisig-request-1',
-        operationRoute: '/operations/accept-role-multisig-request-1',
-    })),
-    startInteractMultisigGroup: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'interact-multisig-request-1',
-        operationRoute: '/operations/interact-multisig-request-1',
-    })),
-    startAcceptMultisigInteraction: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'accept-interaction-multisig-request-1',
-        operationRoute: '/operations/accept-interaction-multisig-request-1',
-    })),
-    startRotateMultisigGroup: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'rotate-multisig-request-1',
-        operationRoute: '/operations/rotate-multisig-request-1',
-    })),
-    startAcceptMultisigRotation: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'accept-rotation-multisig-request-1',
-        operationRoute: '/operations/accept-rotation-multisig-request-1',
-    })),
-    startJoinMultisigRotation: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'join-rotation-multisig-request-1',
-        operationRoute: '/operations/join-rotation-multisig-request-1',
-    })),
-    startGenerateOobi: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'oobi-request-1',
-        operationRoute: '/operations/oobi-request-1',
-    })),
-    startResolveContact: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'resolve-request-1',
-        operationRoute: '/operations/resolve-request-1',
-    })),
-    startDeleteContact: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'delete-contact-request-1',
-        operationRoute: '/operations/delete-contact-request-1',
-    })),
-    startUpdateContactAlias: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'update-contact-request-1',
-        operationRoute: '/operations/update-contact-request-1',
-    })),
-    generateContactChallenge: vi.fn(async () => ({
-        challengeId: 'challenge-1',
-        counterpartyAid: 'Econtact',
-        counterpartyAlias: 'Wan',
-        localIdentifier: 'alice',
-        localAid: 'Ealice',
-        words: Array.from({ length: 12 }, (_, index) => `word${index}`),
-        wordsHash: 'hash-one',
-        strength: 128,
-        generatedAt: '2026-04-21T00:00:00.000Z',
-    })),
-    startRespondToChallenge: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'respond-challenge-request-1',
-        operationRoute: '/operations/respond-challenge-request-1',
-    })),
-    startSendChallengeRequest: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'send-challenge-request-1',
-        operationRoute: '/operations/send-challenge-request-1',
-    })),
-    startVerifyContactChallenge: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'verify-challenge-request-1',
-        operationRoute: '/operations/verify-challenge-request-1',
-    })),
-    dismissExchangeNotification: vi.fn(async () => undefined),
-    startApproveDelegation: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'approve-delegation-request-1',
-        operationRoute: '/operations/approve-delegation-request-1',
-    })),
-    startResolveCredentialSchema: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'resolve-schema-request-1',
-        operationRoute: '/operations/resolve-schema-request-1',
-    })),
-    startCreateCredentialRegistry: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'create-registry-request-1',
-        operationRoute: '/operations/create-registry-request-1',
-    })),
-    startIssueCredential: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'issue-credential-request-1',
-        operationRoute: '/operations/issue-credential-request-1',
-    })),
-    startGrantCredential: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'grant-credential-request-1',
-        operationRoute: '/operations/grant-credential-request-1',
-    })),
-    startAdmitCredentialGrant: vi.fn(() => ({
-        status: 'accepted',
-        requestId: 'admit-credential-request-1',
-        operationRoute: '/operations/admit-credential-request-1',
-    })),
-    ...overrides,
-});
+type RuntimeOverrides = Partial<
+    Omit<
+        RouteDataRuntime,
+        | 'identifiers'
+        | 'contacts'
+        | 'challenges'
+        | 'notifications'
+        | 'delegations'
+        | 'credentials'
+        | 'multisig'
+    >
+> & {
+    identifiers?: Partial<RouteDataRuntime['identifiers']>;
+    contacts?: Partial<RouteDataRuntime['contacts']>;
+    challenges?: Partial<RouteDataRuntime['challenges']>;
+    notifications?: Partial<RouteDataRuntime['notifications']>;
+    delegations?: Partial<RouteDataRuntime['delegations']>;
+    credentials?: Partial<RouteDataRuntime['credentials']>;
+    multisig?: Partial<RouteDataRuntime['multisig']>;
+};
+
+const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
+    const runtime: RouteDataRuntime = {
+        getClient: vi.fn(() => ({ url: 'http://keria.example' })),
+        getState: vi.fn(() => summary),
+        connect: vi.fn(async () => ({ state: summary })),
+        generatePasscode: vi.fn(async () => '0123456789abcdefghijk'),
+        refreshState: vi.fn(async () => summary),
+        identifiers: {
+            list: vi.fn(async () => [
+                { name: 'alice', prefix: 'Ealice' } as IdentifierSummary,
+            ]),
+            get: vi.fn(
+                async () =>
+                    ({ name: 'alice', prefix: 'Ealice' }) as IdentifierSummary
+            ),
+            getDelegationChain: vi.fn(async () => []),
+            create: vi.fn(async () => []),
+            rotate: vi.fn(async () => []),
+            startCreate: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'create-request-1',
+                operationRoute: '/operations/create-request-1',
+            })),
+            startRotate: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'rotate-request-1',
+                operationRoute: '/operations/rotate-request-1',
+            })),
+        },
+        contacts: {
+            syncInventory: vi.fn(async () => ({})),
+            getIdentifierOobi: vi.fn(async () => ({
+                id: 'alice:agent',
+                identifier: 'alice',
+                role: 'agent',
+                oobis: [],
+                generatedAt: '2026-04-21T00:00:00.000Z',
+            })),
+            listIdentifierOobis: vi.fn(async () => []),
+            startGenerateOobi: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'oobi-request-1',
+                operationRoute: '/operations/oobi-request-1',
+            })),
+            startResolve: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'resolve-request-1',
+                operationRoute: '/operations/resolve-request-1',
+            })),
+            startDelete: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'delete-contact-request-1',
+                operationRoute: '/operations/delete-contact-request-1',
+            })),
+            startUpdateAlias: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'update-contact-request-1',
+                operationRoute: '/operations/update-contact-request-1',
+            })),
+        },
+        challenges: {
+            generate: vi.fn(async () => ({
+                challengeId: 'challenge-1',
+                counterpartyAid: 'Econtact',
+                counterpartyAlias: 'Wan',
+                localIdentifier: 'alice',
+                localAid: 'Ealice',
+                words: Array.from({ length: 12 }, (_, index) => 'word' + index),
+                wordsHash: 'hash-one',
+                strength: 128,
+                generatedAt: '2026-04-21T00:00:00.000Z',
+            })),
+            startRespond: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'respond-challenge-request-1',
+                operationRoute: '/operations/respond-challenge-request-1',
+            })),
+            startSendRequest: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'send-challenge-request-1',
+                operationRoute: '/operations/send-challenge-request-1',
+            })),
+            startVerify: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'verify-challenge-request-1',
+                operationRoute: '/operations/verify-challenge-request-1',
+            })),
+        },
+        notifications: {
+            dismissExchange: vi.fn(async () => undefined),
+        },
+        delegations: {
+            startApprove: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'approve-delegation-request-1',
+                operationRoute: '/operations/approve-delegation-request-1',
+            })),
+        },
+        credentials: {
+            syncInventory: vi.fn(async () => ({})),
+            syncRegistries: vi.fn(async () => ({})),
+            syncIpexActivity: vi.fn(async () => ({})),
+            syncKnownSchemas: vi.fn(async () => ({})),
+            startResolveSchema: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'resolve-schema-request-1',
+                operationRoute: '/operations/resolve-schema-request-1',
+            })),
+            startCreateRegistry: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'create-registry-request-1',
+                operationRoute: '/operations/create-registry-request-1',
+            })),
+            startIssue: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'issue-credential-request-1',
+                operationRoute: '/operations/issue-credential-request-1',
+            })),
+            startGrant: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'grant-credential-request-1',
+                operationRoute: '/operations/grant-credential-request-1',
+            })),
+            startAdmit: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'admit-credential-request-1',
+                operationRoute: '/operations/admit-credential-request-1',
+            })),
+        },
+        multisig: {
+            getGroupDetails: vi.fn(async (identifier: IdentifierSummary) =>
+                multisigGroupDetailsFromIdentifier({
+                    identifier,
+                    membersResponse: null,
+                })
+            ),
+            startCreateGroup: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'create-multisig-request-1',
+                operationRoute: '/operations/create-multisig-request-1',
+            })),
+            startAcceptInception: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'accept-multisig-request-1',
+                operationRoute: '/operations/accept-multisig-request-1',
+            })),
+            startAuthorizeAgents: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'authorize-multisig-request-1',
+                operationRoute: '/operations/authorize-multisig-request-1',
+            })),
+            startAcceptEndRole: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'accept-role-multisig-request-1',
+                operationRoute: '/operations/accept-role-multisig-request-1',
+            })),
+            startInteractGroup: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'interact-multisig-request-1',
+                operationRoute: '/operations/interact-multisig-request-1',
+            })),
+            startAcceptInteraction: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'accept-interaction-multisig-request-1',
+                operationRoute: '/operations/accept-interaction-multisig-request-1',
+            })),
+            startRotateGroup: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'rotate-multisig-request-1',
+                operationRoute: '/operations/rotate-multisig-request-1',
+            })),
+            startAcceptRotation: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'accept-rotation-multisig-request-1',
+                operationRoute: '/operations/accept-rotation-multisig-request-1',
+            })),
+            startJoinRotation: vi.fn(() => ({
+                status: 'accepted',
+                requestId: 'join-rotation-multisig-request-1',
+                operationRoute: '/operations/join-rotation-multisig-request-1',
+            })),
+        },
+    };
+
+    return {
+        ...runtime,
+        ...overrides,
+        identifiers: {
+            ...runtime.identifiers,
+            ...overrides.identifiers,
+        },
+        contacts: {
+            ...runtime.contacts,
+            ...overrides.contacts,
+        },
+        challenges: {
+            ...runtime.challenges,
+            ...overrides.challenges,
+        },
+        notifications: {
+            ...runtime.notifications,
+            ...overrides.notifications,
+        },
+        delegations: {
+            ...runtime.delegations,
+            ...overrides.delegations,
+        },
+        credentials: {
+            ...runtime.credentials,
+            ...overrides.credentials,
+        },
+        multisig: {
+            ...runtime.multisig,
+            ...overrides.multisig,
+        },
+    };
+};
 
 describe('route loaders', () => {
     it('blocks connected routes while disconnected', async () => {
@@ -237,7 +324,9 @@ describe('route loaders', () => {
             { name: 'alice', prefix: 'Ealice' } as IdentifierSummary,
         ];
         const runtime = makeRuntime({
-            listIdentifiers: vi.fn(async () => identifiers),
+            identifiers: {
+                list: vi.fn(async () => identifiers),
+            },
         });
 
         await expect(loadIdentifiers(runtime)).resolves.toEqual({
@@ -248,9 +337,11 @@ describe('route loaders', () => {
 
     it('returns actionable identifier load errors without throwing', async () => {
         const runtime = makeRuntime({
-            listIdentifiers: vi.fn(async () => {
-                throw new Error('CORS rejected request');
-            }),
+            identifiers: {
+                list: vi.fn(async () => {
+                    throw new Error('CORS rejected request');
+                }),
+            },
         });
 
         await expect(loadIdentifiers(runtime)).resolves.toMatchObject({
@@ -276,12 +367,12 @@ describe('route loaders', () => {
         await expect(loadDashboard(runtime)).resolves.toEqual({
             status: 'ready',
         });
-        expect(runtime.listIdentifiers).toHaveBeenCalledOnce();
-        expect(runtime.syncSessionInventory).toHaveBeenCalledOnce();
-        expect(runtime.syncKnownCredentialSchemas).toHaveBeenCalledOnce();
-        expect(runtime.syncCredentialRegistries).toHaveBeenCalledOnce();
-        expect(runtime.syncCredentialInventory).toHaveBeenCalledOnce();
-        expect(runtime.syncCredentialIpexActivity).toHaveBeenCalledOnce();
+        expect(runtime.identifiers.list).toHaveBeenCalledOnce();
+        expect(runtime.contacts.syncInventory).toHaveBeenCalledOnce();
+        expect(runtime.credentials.syncKnownSchemas).toHaveBeenCalledOnce();
+        expect(runtime.credentials.syncRegistries).toHaveBeenCalledOnce();
+        expect(runtime.credentials.syncInventory).toHaveBeenCalledOnce();
+        expect(runtime.credentials.syncIpexActivity).toHaveBeenCalledOnce();
     });
 
     it('loads contact inventory through the runtime boundary', async () => {
@@ -290,8 +381,8 @@ describe('route loaders', () => {
         await expect(loadContacts(runtime)).resolves.toEqual({
             status: 'ready',
         });
-        expect(runtime.listIdentifiers).toHaveBeenCalledOnce();
-        expect(runtime.syncSessionInventory).toHaveBeenCalledOnce();
+        expect(runtime.identifiers.list).toHaveBeenCalledOnce();
+        expect(runtime.contacts.syncInventory).toHaveBeenCalledOnce();
     });
 
     it('loads multisig inventory through identifiers and session sync', async () => {
@@ -309,16 +400,26 @@ describe('route loaders', () => {
             } as IdentifierSummary,
         ];
         const runtime = makeRuntime({
-            listIdentifiers: vi.fn(async () => identifiers),
-            getClient: vi.fn(() => ({
-                url: 'http://keria.example',
-                identifiers: () => ({
-                    members: vi.fn(async () => ({
-                        signing: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
-                        rotation: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
-                    })),
-                }),
-            })),
+            identifiers: {
+                list: vi.fn(async () => identifiers),
+            },
+            multisig: {
+                getGroupDetails: vi.fn(async (identifier) =>
+                    multisigGroupDetailsFromIdentifier({
+                        identifier,
+                        membersResponse: {
+                            signing: [
+                                { prefix: 'Ealice' },
+                                { prefix: 'Ebob' },
+                            ],
+                            rotation: [
+                                { prefix: 'Ealice' },
+                                { prefix: 'Ebob' },
+                            ],
+                        },
+                    })
+                ),
+            },
         });
 
         await expect(loadMultisig(runtime)).resolves.toEqual({
@@ -337,37 +438,47 @@ describe('route loaders', () => {
                 },
             ],
         });
-        expect(runtime.listIdentifiers).toHaveBeenCalledOnce();
-        expect(runtime.syncSessionInventory).toHaveBeenCalledOnce();
+        expect(runtime.identifiers.list).toHaveBeenCalledOnce();
+        expect(runtime.multisig.getGroupDetails).toHaveBeenCalledWith(
+            identifiers[0],
+            { signal: undefined }
+        );
+        expect(runtime.contacts.syncInventory).toHaveBeenCalledOnce();
     });
 
     it('loads credential registries and inventory after identifiers', async () => {
         const calls: string[] = [];
         const runtime = makeRuntime({
-            listIdentifiers: vi.fn(async () => {
-                calls.push('identifiers');
-                return [];
-            }),
-            syncSessionInventory: vi.fn(async () => {
-                calls.push('session');
-                return {};
-            }),
-            syncKnownCredentialSchemas: vi.fn(async () => {
-                calls.push('schemas');
-                return {};
-            }),
-            syncCredentialRegistries: vi.fn(async () => {
-                calls.push('registries');
-                return {};
-            }),
-            syncCredentialInventory: vi.fn(async () => {
-                calls.push('credentials');
-                return {};
-            }),
-            syncCredentialIpexActivity: vi.fn(async () => {
-                calls.push('ipexActivity');
-                return {};
-            }),
+            identifiers: {
+                list: vi.fn(async () => {
+                    calls.push('identifiers');
+                    return [];
+                }),
+            },
+            contacts: {
+                syncInventory: vi.fn(async () => {
+                    calls.push('session');
+                    return {};
+                }),
+            },
+            credentials: {
+                syncKnownSchemas: vi.fn(async () => {
+                    calls.push('schemas');
+                    return {};
+                }),
+                syncRegistries: vi.fn(async () => {
+                    calls.push('registries');
+                    return {};
+                }),
+                syncInventory: vi.fn(async () => {
+                    calls.push('credentials');
+                    return {};
+                }),
+                syncIpexActivity: vi.fn(async () => {
+                    calls.push('ipexActivity');
+                    return {};
+                }),
+            },
         });
 
         await expect(loadCredentials(runtime)).resolves.toEqual({
@@ -481,7 +592,7 @@ describe('route actions', () => {
             requestId: 'create-request-1',
             operationRoute: '/operations/create-request-1',
         });
-        expect(runtime.startCreateIdentifier).toHaveBeenCalledWith(
+        expect(runtime.identifiers.startCreate).toHaveBeenCalledWith(
             draft,
             expect.objectContaining({
                 requestId: 'create-request-1',
@@ -528,7 +639,7 @@ describe('route actions', () => {
             requestId: 'rotate-request-1',
             operationRoute: '/operations/rotate-request-1',
         });
-        expect(runtime.startRotateIdentifier).toHaveBeenCalledWith(
+        expect(runtime.identifiers.startRotate).toHaveBeenCalledWith(
             'alice',
             expect.objectContaining({ requestId: 'rotate-request-1' })
         );
@@ -573,7 +684,7 @@ describe('route actions', () => {
             requestId: 'create-multisig-request-1',
             operationRoute: '/operations/create-multisig-request-1',
         });
-        expect(runtime.startCreateMultisigGroup).toHaveBeenCalledWith(
+        expect(runtime.multisig.startCreateGroup).toHaveBeenCalledWith(
             draft,
             expect.objectContaining({
                 requestId: 'create-multisig-request-1',
@@ -603,7 +714,7 @@ describe('route actions', () => {
             requestId: 'accept-multisig-request-1',
             operationRoute: '/operations/accept-multisig-request-1',
         });
-        expect(runtime.startAcceptMultisigInception).toHaveBeenCalledWith(
+        expect(runtime.multisig.startAcceptInception).toHaveBeenCalledWith(
             {
                 notificationId: 'note-1',
                 exnSaid: 'Eexn',
@@ -638,7 +749,7 @@ describe('route actions', () => {
             requestId: 'accept-multisig-request-1',
             operationRoute: '/operations/accept-multisig-request-1',
         });
-        expect(runtime.startAcceptMultisigInception).toHaveBeenCalledWith(
+        expect(runtime.multisig.startAcceptInception).toHaveBeenCalledWith(
             {
                 notificationId: 'note-1',
                 exnSaid: 'Eexn',
@@ -672,7 +783,7 @@ describe('route actions', () => {
             message: 'Enter a label for this new group identifier.',
             requestId: 'accept-multisig-request-1',
         });
-        expect(runtime.startAcceptMultisigInception).not.toHaveBeenCalled();
+        expect(runtime.multisig.startAcceptInception).not.toHaveBeenCalled();
     });
 
     it('starts multisig interactions with parsed JSON and plain-string payloads', async () => {
@@ -696,7 +807,7 @@ describe('route actions', () => {
             requestId: 'interact-multisig-request-1',
             operationRoute: '/operations/interact-multisig-request-1',
         });
-        expect(runtime.startInteractMultisigGroup).toHaveBeenCalledWith(
+        expect(runtime.multisig.startInteractGroup).toHaveBeenCalledWith(
             {
                 groupAlias: 'team',
                 localMemberName: 'alice',
@@ -726,7 +837,7 @@ describe('route actions', () => {
             requestId: 'interact-multisig-request-1',
             operationRoute: '/operations/interact-multisig-request-1',
         });
-        expect(stringRuntime.startInteractMultisigGroup).toHaveBeenCalledWith(
+        expect(stringRuntime.multisig.startInteractGroup).toHaveBeenCalledWith(
             {
                 groupAlias: 'team',
                 localMemberName: null,
@@ -760,7 +871,7 @@ describe('route actions', () => {
             requestId: 'accept-interaction-multisig-request-1',
             operationRoute: '/operations/accept-interaction-multisig-request-1',
         });
-        expect(runtime.startAcceptMultisigInteraction).toHaveBeenCalledWith(
+        expect(runtime.multisig.startAcceptInteraction).toHaveBeenCalledWith(
             {
                 notificationId: 'note-ixn',
                 exnSaid: 'Eixn-exn',
@@ -813,7 +924,7 @@ describe('route actions', () => {
             requestId: 'resolve-request-1',
             operationRoute: '/operations/resolve-request-1',
         });
-        expect(runtime.startResolveContact).toHaveBeenCalledWith(
+        expect(runtime.contacts.startResolve).toHaveBeenCalledWith(
             {
                 oobi: 'http://127.0.0.1:3902/oobi/Ealice/agent?name=alice',
                 alias: null,
@@ -842,7 +953,7 @@ describe('route actions', () => {
             requestId: 'oobi-request-1',
             operationRoute: '/operations/oobi-request-1',
         });
-        expect(runtime.startGenerateOobi).toHaveBeenCalledWith(
+        expect(runtime.contacts.startGenerateOobi).toHaveBeenCalledWith(
             { identifier: 'alice', role: 'agent' },
             expect.objectContaining({ requestId: 'oobi-request-1' })
         );
@@ -875,7 +986,7 @@ describe('route actions', () => {
                 words: expect.arrayContaining(['word0']),
             }),
         });
-        expect(runtime.generateContactChallenge).toHaveBeenCalledWith(
+        expect(runtime.challenges.generate).toHaveBeenCalledWith(
             {
                 counterpartyAid: 'Econtact',
                 counterpartyAlias: 'Wan',
@@ -884,7 +995,7 @@ describe('route actions', () => {
             },
             expect.objectContaining({ signal: expect.any(AbortSignal) })
         );
-        expect(runtime.startSendChallengeRequest).toHaveBeenCalledWith(
+        expect(runtime.challenges.startSendRequest).toHaveBeenCalledWith(
             expect.objectContaining({
                 challengeId: 'challenge-1',
                 counterpartyAid: 'Econtact',
@@ -896,7 +1007,7 @@ describe('route actions', () => {
                 requestId: 'verify-challenge-request-1:challenge-request',
             })
         );
-        expect(runtime.startVerifyContactChallenge).toHaveBeenCalledWith(
+        expect(runtime.challenges.startVerify).toHaveBeenCalledWith(
             expect.objectContaining({
                 challengeId: 'challenge-1',
                 counterpartyAid: 'Econtact',
@@ -930,7 +1041,7 @@ describe('route actions', () => {
             requestId: 'respond-challenge-request-1',
             operationRoute: '/operations/respond-challenge-request-1',
         });
-        expect(runtime.startRespondToChallenge).toHaveBeenCalledWith(
+        expect(runtime.challenges.startRespond).toHaveBeenCalledWith(
             {
                 challengeId: 'respond-challenge-request-1',
                 notificationId: undefined,
@@ -973,7 +1084,7 @@ describe('route actions', () => {
             requestId: 'approve-delegation-request-1',
             operationRoute: '/operations/approve-delegation-request-1',
         });
-        expect(runtime.startApproveDelegation).toHaveBeenCalledWith(
+        expect(runtime.delegations.startApprove).toHaveBeenCalledWith(
             {
                 notificationId: 'delegate-note-1',
                 delegatorName: 'delegator',
@@ -1019,7 +1130,7 @@ describe('route actions', () => {
             intent: 'respondChallenge',
             ok: true,
         });
-        expect(runtime.startRespondToChallenge).toHaveBeenCalledWith(
+        expect(runtime.challenges.startRespond).toHaveBeenCalledWith(
             {
                 challengeId: 'challenge-1',
                 notificationId: 'note-1',
@@ -1057,7 +1168,7 @@ describe('route actions', () => {
             requestId: 'dismiss-request-1',
             operationRoute: '/notifications',
         });
-        expect(runtime.dismissExchangeNotification).toHaveBeenCalledWith(
+        expect(runtime.notifications.dismissExchange).toHaveBeenCalledWith(
             {
                 notificationId: 'challenge-request:Eexn',
                 exnSaid: 'Eexn',
@@ -1090,10 +1201,37 @@ describe('route actions', () => {
             requestId: 'resolve-schema-request-1',
             operationRoute: '/operations/resolve-schema-request-1',
         });
-        expect(runtime.startResolveCredentialSchema).toHaveBeenCalledWith(
+        expect(runtime.credentials.startResolveSchema).toHaveBeenCalledWith(
             {
                 schemaSaid: 'Eschema',
                 schemaOobiUrl: 'http://schema.example/oobi/Eschema',
+            },
+            expect.objectContaining({ requestId: 'resolve-schema-request-1' })
+        );
+    });
+
+    it('defaults credential schema resolution from the issueable catalog', async () => {
+        const runtime = makeRuntime();
+        const credentialType = ISSUEABLE_CREDENTIAL_TYPES[0];
+        expect(credentialType).toBeDefined();
+
+        await expect(
+            credentialsAction(
+                runtime,
+                makeRequest('/credentials', {
+                    intent: 'resolveSchema',
+                    requestId: 'resolve-schema-request-1',
+                })
+            )
+        ).resolves.toMatchObject({
+            intent: 'resolveSchema',
+            ok: true,
+            requestId: 'resolve-schema-request-1',
+        });
+        expect(runtime.credentials.startResolveSchema).toHaveBeenCalledWith(
+            {
+                schemaSaid: credentialType?.schemaSaid,
+                schemaOobiUrl: credentialType?.schemaOobiUrl,
             },
             expect.objectContaining({ requestId: 'resolve-schema-request-1' })
         );
@@ -1130,7 +1268,7 @@ describe('route actions', () => {
             requestId: 'issue-credential-request-1',
             operationRoute: '/operations/issue-credential-request-1',
         });
-        expect(runtime.startIssueCredential).toHaveBeenCalledWith(
+        expect(runtime.credentials.startIssue).toHaveBeenCalledWith(
             expect.objectContaining({
                 issuerAlias: 'issuer',
                 holderAid: 'Eholder',
@@ -1165,7 +1303,7 @@ describe('route actions', () => {
             requestId: 'admit-credential-request-1',
             operationRoute: '/operations/admit-credential-request-1',
         });
-        expect(runtime.startAdmitCredentialGrant).toHaveBeenCalledWith(
+        expect(runtime.credentials.startAdmit).toHaveBeenCalledWith(
             {
                 holderAlias: 'holder',
                 holderAid: 'Eholder',
@@ -1196,6 +1334,6 @@ describe('route actions', () => {
             message: 'Challenge must contain 12 or 24 words.',
             requestId: 'respond-challenge-request-2',
         });
-        expect(runtime.startRespondToChallenge).not.toHaveBeenCalled();
+        expect(runtime.challenges.startRespond).not.toHaveBeenCalled();
     });
 });

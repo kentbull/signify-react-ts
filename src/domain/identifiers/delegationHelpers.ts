@@ -1,9 +1,5 @@
 import type { KeyState } from 'signify-ts';
 import type {
-    DelegationRequestNotification,
-    NotificationRecord,
-} from '../../state/notifications.slice';
-import type {
     IdentifierDelegationChainNode,
     IdentifierSummary,
 } from './identifierTypes';
@@ -27,6 +23,10 @@ export interface DelegationWorkflowDetails {
     sequence: string;
     anchor: DelegationAnchor;
     requestedAt: string;
+}
+
+interface DelegationAnchorContainer {
+    anchor: DelegationAnchor;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -78,7 +78,7 @@ export const delegationAnchorFromEvent = (event: unknown): DelegationAnchor => {
  * Rebuild the anchor from a typed delegation request notification.
  */
 export const delegationAnchorFromNotification = (
-    request: DelegationRequestNotification
+    request: DelegationAnchorContainer
 ): DelegationAnchor => ({
     i: request.anchor.i,
     s: request.anchor.s,
@@ -143,6 +143,7 @@ export const delegationChainNodeFromKeyState = ({
  * Return the route-owned delegation request from a generic notification.
  */
 export const delegationRequestFromNotificationRecord = (
-    notification: NotificationRecord | null
-): DelegationRequestNotification | null =>
-    notification?.delegationRequest ?? null;
+    notification: {
+        delegationRequest?: DelegationAnchorContainer | null;
+    } | null
+): DelegationAnchorContainer | null => notification?.delegationRequest ?? null;

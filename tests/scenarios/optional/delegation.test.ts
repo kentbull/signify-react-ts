@@ -9,8 +9,8 @@ import {
     serderFromOperation,
     uniqueAlias,
 } from '../../support/keria';
-import { delegationAnchorFromEvent } from '../../../src/features/identifiers/delegationHelpers';
-import type { DelegationAnchor } from '../../../src/features/identifiers/delegationHelpers';
+import { delegationAnchorFromEvent } from '../../../src/domain/identifiers/delegationHelpers';
+import type { DelegationAnchor } from '../../../src/domain/identifiers/delegationHelpers';
 import { DELEGATION_REQUEST_NOTIFICATION_ROUTE } from '../../../src/services/notifications.service';
 
 /*

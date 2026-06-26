@@ -11,7 +11,7 @@ import type {
     IdentifierDelegationChainNode,
     IdentifierCreateDraft,
     IdentifierSummary,
-} from '../features/identifiers/identifierTypes';
+} from '../domain/identifiers/identifierTypes';
 import {
     identifierCreated,
     identifierLoaded,

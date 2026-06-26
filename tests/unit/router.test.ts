@@ -191,50 +191,65 @@ describe('data-router route metadata', () => {
 
     it('adds non-navigation nested credential drilldown routes', () => {
         const rootRoute = createAppRoutes({} as AppRuntime)[0];
-        const credentialRoutes = rootRoute.children
-            ?.filter((route) => String(route.id ?? '').startsWith('credential'))
+        const credentialsRoute = rootRoute.children?.find(
+            (route) => route.id === 'credentials'
+        );
+        const credentialChildren = credentialsRoute?.children
             .map((route) => ({
                 id: route.id,
                 path: route.path,
+                index: route.index,
                 hasLoader: route.loader !== undefined,
                 hasAction: route.action !== undefined,
                 hasHandle: route.handle !== undefined,
             }));
 
-        expect(credentialRoutes).toEqual([
+        expect(credentialsRoute).toMatchObject({
+            id: 'credentials',
+            path: 'credentials',
+            loader: expect.any(Function),
+            action: expect.any(Function),
+            handle: expect.any(Object),
+        });
+        expect(credentialChildren).toEqual([
             {
-                id: 'credentials',
-                path: 'credentials',
-                hasLoader: true,
-                hasAction: true,
-                hasHandle: true,
+                id: undefined,
+                path: undefined,
+                index: true,
+                hasLoader: false,
+                hasAction: false,
+                hasHandle: false,
             },
             {
                 id: 'credentialAid',
-                path: 'credentials/:aid',
-                hasLoader: true,
-                hasAction: true,
+                path: ':aid',
+                index: undefined,
+                hasLoader: false,
+                hasAction: false,
                 hasHandle: false,
             },
             {
                 id: 'credentialIssuer',
-                path: 'credentials/:aid/issuer',
-                hasLoader: true,
-                hasAction: true,
+                path: ':aid/issuer',
+                index: undefined,
+                hasLoader: false,
+                hasAction: false,
                 hasHandle: false,
             },
             {
                 id: 'credentialIssuerType',
-                path: 'credentials/:aid/issuer/:typeKey',
-                hasLoader: true,
-                hasAction: true,
+                path: ':aid/issuer/:typeKey',
+                index: undefined,
+                hasLoader: false,
+                hasAction: false,
                 hasHandle: false,
             },
             {
                 id: 'credentialWallet',
-                path: 'credentials/:aid/wallet',
-                hasLoader: true,
-                hasAction: true,
+                path: ':aid/wallet',
+                index: undefined,
+                hasLoader: false,
+                hasAction: false,
                 hasHandle: false,
             },
         ]);

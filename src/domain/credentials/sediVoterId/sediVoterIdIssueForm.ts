@@ -1,19 +1,14 @@
-export interface SediVoterIssueFormDraft {
-    fullName: string;
-    voterId: string;
-    precinctId: string;
-    county: string;
-    jurisdiction: string;
-    electionId: string;
-    eligible: boolean;
-    expires: string;
-}
+import type {
+    SediVoterIssueFormDraft,
+    SediVoterIssueTextFieldKey,
+} from './sediVoterIdTypes';
 
-export type SediVoterIssueTextFieldKey = Exclude<
-    keyof SediVoterIssueFormDraft,
-    'eligible'
->;
-
+/**
+ * Text fields required by the SEDI Voter ID issuance form.
+ *
+ * Keeping this in the schema-specific domain package lets the UI render form
+ * controls without owning credential-schema semantics.
+ */
 export const SEDI_VOTER_ISSUE_TEXT_FIELDS: readonly {
     key: SediVoterIssueTextFieldKey;
     label: string;
@@ -37,10 +32,16 @@ const requiredFieldLabels: Record<SediVoterIssueTextFieldKey, string> = {
     expires: 'Expires',
 };
 
+/**
+ * Field-level validation messages for a SEDI Voter ID issue draft.
+ */
 export type SediVoterIssueFormErrors = Partial<
     Record<SediVoterIssueTextFieldKey, string>
 >;
 
+/**
+ * Validate user-entered SEDI Voter ID attributes before issuing an ACDC.
+ */
 export const validateSediVoterIssueDraft = (
     draft: SediVoterIssueFormDraft
 ): SediVoterIssueFormErrors => {
@@ -62,6 +63,9 @@ export const validateSediVoterIssueDraft = (
     return errors;
 };
 
+/**
+ * Return whether a SEDI Voter ID issue draft has blocking validation errors.
+ */
 export const hasSediVoterIssueDraftErrors = (
     errors: SediVoterIssueFormErrors
 ): boolean => Object.keys(errors).length > 0;

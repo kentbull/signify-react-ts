@@ -1,7 +1,7 @@
 import type { Operation as EffectionOperation } from 'effection';
 import type { SignifyClient } from 'signify-ts';
 import { callPromise } from '../effects/promise';
-import { delegationAnchorFromNotification } from '../features/identifiers/delegationHelpers';
+import { delegationAnchorFromNotification } from '../domain/identifiers/delegationHelpers';
 import type { DelegationRequestNotification } from '../state/notifications.slice';
 import type { OperationLogger } from '../signify/client';
 import { waitOperationService } from './signify.service';

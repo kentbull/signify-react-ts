@@ -11,7 +11,7 @@ import {
     thresholdSpecToSith,
     validateThresholdSpecForMembers,
     validateThresholdSpec,
-} from '../../src/features/multisig/multisigThresholds';
+} from '../../src/domain/multisig/multisigThresholds';
 
 describe('multisig threshold helpers', () => {
     it('builds equal all-members-required proportional weights', () => {

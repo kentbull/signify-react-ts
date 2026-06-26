@@ -1,96 +1,180 @@
-import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
-import tseslint from "typescript-eslint";
+import js from '@eslint/js';
+import eslintConfigPrettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
 
 const browserGlobals = {
-    console: "readonly",
-    document: "readonly",
-    fetch: "readonly",
-    FormData: "readonly",
-    Headers: "readonly",
-    Request: "readonly",
-    setTimeout: "readonly",
-    window: "readonly",
+    console: 'readonly',
+    document: 'readonly',
+    fetch: 'readonly',
+    FormData: 'readonly',
+    Headers: 'readonly',
+    Request: 'readonly',
+    setTimeout: 'readonly',
+    window: 'readonly',
 };
 
 const nodeGlobals = {
-    console: "readonly",
-    fetch: "readonly",
-    FormData: "readonly",
-    process: "readonly",
-    Request: "readonly",
-    setTimeout: "readonly",
-    URL: "readonly",
+    console: 'readonly',
+    fetch: 'readonly',
+    FormData: 'readonly',
+    process: 'readonly',
+    Request: 'readonly',
+    setTimeout: 'readonly',
+    URL: 'readonly',
 };
 
 export default [
     {
-        ignores: ["dist"],
+        ignores: ['dist'],
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        files: ["src/**/*.{ts,tsx}"],
+        files: ['src/**/*.{ts,tsx}'],
         languageOptions: {
             globals: browserGlobals,
         },
         plugins: {
-            "react-hooks": reactHooks,
-            "react-refresh": reactRefresh,
+            'react-hooks': reactHooks,
+            'react-refresh': reactRefresh,
         },
         rules: {
             ...reactHooks.configs.recommended.rules,
-            "react-refresh/only-export-components": [
-                "warn",
+            'react-refresh/only-export-components': [
+                'warn',
                 { allowConstantExport: true },
             ],
-            "prefer-const": "off",
-            "no-unused-vars": "off",
-            "no-unused-expressions": "off",
-            "no-var": "warn",
-            "no-self-assign": "warn",
-            "no-case-declarations": "warn",
-            "no-constant-condition": "warn",
-            "no-empty": "warn",
-            "react-hooks/exhaustive-deps": "error",
-            "react-hooks/set-state-in-effect": "error",
-            "@typescript-eslint/no-non-null-assertion": "error",
-            "@typescript-eslint/no-non-null-asserted-optional-chain": "error",
-            "@typescript-eslint/no-explicit-any": "error",
-            "@typescript-eslint/no-namespace": "warn",
-            "@typescript-eslint/no-empty-object-type": "warn",
-            "@typescript-eslint/no-unused-expressions": "error",
-            "@typescript-eslint/no-unused-vars": [
-                "error",
+            'prefer-const': 'off',
+            'no-unused-vars': 'off',
+            'no-unused-expressions': 'off',
+            'no-var': 'warn',
+            'no-self-assign': 'warn',
+            'no-case-declarations': 'warn',
+            'no-constant-condition': 'warn',
+            'no-empty': 'warn',
+            'react-hooks/exhaustive-deps': 'error',
+            'react-hooks/set-state-in-effect': 'error',
+            '@typescript-eslint/no-non-null-assertion': 'error',
+            '@typescript-eslint/no-non-null-asserted-optional-chain': 'error',
+            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-namespace': 'warn',
+            '@typescript-eslint/no-empty-object-type': 'warn',
+            '@typescript-eslint/no-unused-expressions': 'error',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
                 {
-                    argsIgnorePattern: "^_",
-                    varsIgnorePattern: "^_",
-                    caughtErrorsIgnorePattern: "^_",
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
                 },
             ],
         },
     },
     {
-        files: ["tests/**/*.{ts,js,mjs}", "scripts/**/*.{ts,js,mjs}", "*.config.ts"],
+        files: ['src/{services,workflows,state}/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: [
+                                '../features/**',
+                                '../../features/**',
+                                '../app/**',
+                                '../../app/**',
+                            ],
+                            message:
+                                'Lower layers must not import from features or app. Move shared concepts into src/domain or a narrower lower-layer module.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['src/app/runtime.ts', 'src/app/routeData*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: [
+                                '../features/contacts/challengeWords',
+                                '../features/contacts/contactHelpers',
+                                '../features/identifiers/identifierHelpers',
+                                '../features/identifiers/identifierTypes',
+                                '../features/identifiers/delegationHelpers',
+                                '../features/multisig/multisigTypes',
+                                '../features/multisig/multisigThresholds',
+                            ],
+                            message:
+                                'App runtime and route data must import pure helpers and types from src/domain, not feature compatibility shims.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['src/domain/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: [
+                                '../app/**',
+                                '../../app/**',
+                                '../../../app/**',
+                                '../features/**',
+                                '../../features/**',
+                                '../../../features/**',
+                                '../state/**',
+                                '../../state/**',
+                                '../../../state/**',
+                                '../services/**',
+                                '../../services/**',
+                                '../../../services/**',
+                                '../workflows/**',
+                                '../../workflows/**',
+                                '../../../workflows/**',
+                            ],
+                            message:
+                                'Domain modules must not import app, feature, state, service, or workflow layers.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: [
+            'tests/**/*.{ts,js,mjs}',
+            'scripts/**/*.{ts,js,mjs}',
+            '*.config.ts',
+        ],
         languageOptions: {
             globals: nodeGlobals,
         },
         rules: {
-            "prefer-const": "off",
-            "no-unused-vars": "off",
-            "no-empty": "warn",
-            "@typescript-eslint/no-explicit-any": "error",
-            "@typescript-eslint/no-non-null-assertion": "error",
-            "@typescript-eslint/no-non-null-asserted-optional-chain": "error",
-            "@typescript-eslint/no-unused-expressions": "error",
-            "@typescript-eslint/no-unused-vars": [
-                "error",
+            'prefer-const': 'off',
+            'no-unused-vars': 'off',
+            'no-empty': 'warn',
+            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-non-null-assertion': 'error',
+            '@typescript-eslint/no-non-null-asserted-optional-chain': 'error',
+            '@typescript-eslint/no-unused-expressions': 'error',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
                 {
-                    argsIgnorePattern: "^_",
-                    varsIgnorePattern: "^_",
-                    caughtErrorsIgnorePattern: "^_",
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
                 },
             ],
         },

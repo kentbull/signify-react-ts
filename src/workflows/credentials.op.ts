@@ -16,55 +16,45 @@ import {
     credentialInventoryLoaded,
     credentialIpexActivityLoaded,
     credentialRecorded,
-    type CredentialSummaryRecord,
-    type SediVoterCredentialAttributes,
 } from '../state/credentials.slice';
 import {
     registryInventoryLoaded,
     registryRecorded,
-    type RegistryRecord,
 } from '../state/registry.slice';
-import { schemaRecorded, type SchemaRecord } from '../state/schema.slice';
-import { ISSUEABLE_CREDENTIAL_TYPES } from '../state/issueableCredentialTypes';
+import { schemaRecorded } from '../state/schema.slice';
+import { ISSUEABLE_CREDENTIAL_TYPES } from '../config/credentialCatalog';
+import type {
+    CredentialSummaryRecord,
+    RegistryRecord,
+    SchemaRecord,
+} from '../domain/credentials/credentialTypes';
+import { SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME } from '../domain/credentials/sediVoterId';
+import type {
+    AdmitCredentialGrantInput,
+    CreateCredentialRegistryInput,
+    GrantCredentialInput,
+    IssueSediCredentialInput,
+    ResolveCredentialSchemaInput,
+} from '../domain/credentials/credentialCommands';
 import { localIdentifierAids, syncSessionInventoryOp } from './contacts.op';
 
-export interface ResolveCredentialSchemaInput {
-    schemaSaid: string;
-    schemaOobiUrl: string;
-}
+export type {
+    AdmitCredentialGrantInput,
+    CreateCredentialRegistryInput,
+    GrantCredentialInput,
+    IssueSediCredentialInput,
+    ResolveCredentialSchemaInput,
+} from '../domain/credentials/credentialCommands';
 
-export interface CreateCredentialRegistryInput {
-    issuerAlias: string;
-    issuerAid: string;
-    registryName?: string;
-}
-
-export interface IssueSediCredentialInput {
-    issuerAlias: string;
-    issuerAid: string;
-    holderAid: string;
-    registryId: string;
-    schemaSaid: string;
-    attributes: SediVoterCredentialAttributes;
-}
-
-export interface GrantCredentialInput {
-    issuerAlias: string;
-    issuerAid: string;
-    holderAid: string;
-    credentialSaid: string;
-}
-
-export interface AdmitCredentialGrantInput {
-    holderAlias: string;
-    holderAid: string;
-    notificationId: string;
-    grantSaid: string;
-}
-
+/**
+ * Synthetic registry id used while registry creation is still pending.
+ */
 const pendingRegistryId = (issuerAid: string, registryName: string): string =>
     `${issuerAid}:${registryName}`;
 
+/**
+ * Workflow for resolving a credential schema and recording progress in Redux.
+ */
 export function* resolveCredentialSchemaOp(
     input: ResolveCredentialSchemaInput
 ): EffectionOperation<SchemaRecord> {
@@ -111,11 +101,16 @@ export function* resolveCredentialSchemaOp(
     }
 }
 
+/**
+ * Workflow for creating or rediscovering an issuer registry with optimistic
+ * state so the UI can explain pending registry work.
+ */
 export function* createCredentialRegistryOp(
     input: CreateCredentialRegistryInput
 ): EffectionOperation<RegistryRecord> {
     const services = yield* AppServicesContext.expect();
-    const registryName = input.registryName?.trim() || 'sedi-voter-registry';
+    const registryName =
+        input.registryName?.trim() || SEDI_VOTER_ID_DEFAULT_REGISTRY_NAME;
     const now = new Date().toISOString();
     services.store.dispatch(
         registryRecorded({
@@ -159,6 +154,9 @@ export function* createCredentialRegistryOp(
     }
 }
 
+/**
+ * Workflow for the schema-specific SEDI Voter ID issue command.
+ */
 export function* issueSediCredentialOp(
     input: IssueSediCredentialInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -177,6 +175,9 @@ export function* issueSediCredentialOp(
     return credential;
 }
 
+/**
+ * Workflow for sending an IPEX grant and refreshing wallet inventory facts.
+ */
 export function* grantCredentialOp(
     input: GrantCredentialInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -194,6 +195,9 @@ export function* grantCredentialOp(
     return credential;
 }
 
+/**
+ * Workflow for holder-side IPEX admit and post-admit inventory refresh.
+ */
 export function* admitCredentialGrantOp(
     input: AdmitCredentialGrantInput
 ): EffectionOperation<CredentialSummaryRecord> {
@@ -212,6 +216,9 @@ export function* admitCredentialGrantOp(
     return credential;
 }
 
+/**
+ * Synchronize issued and held credential inventory for local identifiers.
+ */
 export function* syncCredentialInventoryOp(): EffectionOperation<
     CredentialSummaryRecord[]
 > {
@@ -225,6 +232,9 @@ export function* syncCredentialInventoryOp(): EffectionOperation<
     return credentials;
 }
 
+/**
+ * Synchronize IPEX grant/admit activity for credentials already in state.
+ */
 export function* syncCredentialIpexActivityOp(): EffectionOperation<unknown[]> {
     const services = yield* AppServicesContext.expect();
     const state = services.store.getState();
@@ -246,6 +256,9 @@ export function* syncCredentialIpexActivityOp(): EffectionOperation<unknown[]> {
     return activities;
 }
 
+/**
+ * Synchronize credential registries owned by local issuer identifiers.
+ */
 export function* syncCredentialRegistriesOp(): EffectionOperation<
     RegistryRecord[]
 > {
@@ -278,6 +291,9 @@ export function* syncCredentialRegistriesOp(): EffectionOperation<
     return inventory.registries;
 }
 
+/**
+ * Synchronize configured credential schemas already known to the agent.
+ */
 export function* syncKnownCredentialSchemasOp(): EffectionOperation<
     SchemaRecord[]
 > {

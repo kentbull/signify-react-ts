@@ -3,7 +3,6 @@ import { storedChallengeWordsRehydrated } from './challenges.slice';
 import { exchangeTombstonesRehydrated } from './exchangeTombstones.slice';
 import { operationsRehydrated } from './operations.slice';
 import type { AppNotificationRecord } from './appNotifications.slice';
-import type { StoredChallengeWordsRecord } from './challenges.slice';
 import type { ExchangeTombstoneRecord } from './exchangeTombstones.slice';
 import type { OperationRecord } from './operations.slice';
 import type { AppStore, RootState } from './store';
@@ -36,7 +35,6 @@ export interface PersistedAppState {
     operations: OperationRecord[];
     appNotifications: AppNotificationRecord[];
     exchangeTombstones: ExchangeTombstoneRecord[];
-    storedChallengeWords: StoredChallengeWordsRecord[];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -96,27 +94,6 @@ const isExchangeTombstoneRecord = (
         (value.notificationId === undefined ||
             value.notificationId === null ||
             typeof value.notificationId === 'string')
-    );
-};
-
-const isStoredChallengeWordsRecord = (
-    value: unknown
-): value is StoredChallengeWordsRecord => {
-    if (!isRecord(value)) {
-        return false;
-    }
-
-    return (
-        hasString(value, 'challengeId') &&
-        hasString(value, 'counterpartyAid') &&
-        hasString(value, 'localIdentifier') &&
-        Array.isArray(value.words) &&
-        value.words.every((word) => typeof word === 'string') &&
-        hasString(value, 'wordsHash') &&
-        typeof value.strength === 'number' &&
-        hasString(value, 'generatedAt') &&
-        hasString(value, 'updatedAt') &&
-        (value.status === 'pending' || value.status === 'failed')
     );
 };
 
@@ -203,16 +180,12 @@ export const loadPersistedAppState = (
         const exchangeTombstones = Array.isArray(parsed.exchangeTombstones)
             ? parsed.exchangeTombstones.filter(isExchangeTombstoneRecord)
             : [];
-        const storedChallengeWords = Array.isArray(parsed.storedChallengeWords)
-            ? parsed.storedChallengeWords.filter(isStoredChallengeWordsRecord)
-            : [];
 
         return {
             version: PERSISTENCE_VERSION,
             operations,
             appNotifications,
             exchangeTombstones,
-            storedChallengeWords,
         };
     } catch {
         return null;
@@ -238,12 +211,6 @@ export const persistedAppStateFromRoot = (
         .map((said) => state.exchangeTombstones.bySaid[said])
         .filter(
             (record): record is ExchangeTombstoneRecord => record !== undefined
-        ),
-    storedChallengeWords: state.challenges.storedWordIds
-        .map((id) => state.challenges.storedWordsById[id])
-        .filter(
-            (record): record is StoredChallengeWordsRecord =>
-                record !== undefined
         ),
 });
 
@@ -296,7 +263,7 @@ export const rehydratePersistedAppState = (
     );
     store.dispatch(
         storedChallengeWordsRehydrated({
-            records: persisted?.storedChallengeWords ?? [],
+            records: [],
         })
     );
 };

@@ -1,4 +1,4 @@
-import type { IdentifierSummary } from '../identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { MultisigRequestNotification } from '../../state/notifications.slice';
 
 export type MultisigRequestIntent =

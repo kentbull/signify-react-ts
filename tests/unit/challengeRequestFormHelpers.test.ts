@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultChallengeResponseIdentifierName } from '../../src/features/notifications/challengeRequestFormHelpers';
-import type { IdentifierSummary } from '../../src/features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 
 const identifier = (name: string, prefix: string): IdentifierSummary =>
     ({ name, prefix }) as IdentifierSummary;

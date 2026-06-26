@@ -15,12 +15,12 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import { useFetcher } from 'react-router-dom';
 import type { ContactActionData } from '../../app/routeData';
-import type { IdentifierSummary } from '../identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import type { ChallengeRequestNotification } from '../../state/notifications.slice';
 import {
     parseChallengeWords,
     validateChallengeWords,
-} from '../contacts/challengeWords';
+} from '../../domain/challenges/challengeWords';
 import { defaultChallengeResponseIdentifierName } from './challengeRequestFormHelpers';
 
 const createRequestId = (): string =>

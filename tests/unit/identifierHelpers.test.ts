@@ -4,7 +4,7 @@ import { buildAppConfig } from '../../src/config';
 import {
     delegationAnchorFromEvent,
     delegationAnchorFromNotification,
-} from '../../src/features/identifiers/delegationHelpers';
+} from '../../src/domain/identifiers/delegationHelpers';
 import {
     defaultIdentifierCreateDraft,
     formatIdentifierMetadata,
@@ -21,8 +21,8 @@ import {
     isIdentifierCreateDraft,
     replaceIdentifierSummary,
     truncateMiddle,
-} from '../../src/features/identifiers/identifierHelpers';
-import type { IdentifierCreateDraft } from '../../src/features/identifiers/identifierTypes';
+} from '../../src/domain/identifiers/identifierHelpers';
+import type { IdentifierCreateDraft } from '../../src/domain/identifiers/identifierTypes';
 import type { ContactRecord } from '../../src/state/contacts.slice';
 
 const keyState = (prefix: string): KeyState => ({

@@ -4,27 +4,13 @@ import {
     sessionConnecting,
     sessionDisconnected,
 } from './session.slice';
-
-/** Resolution lifecycle for a credential schema OOBI. */
-export type SchemaResolutionStatus = 'unknown' | 'resolving' | 'resolved' | 'error';
-
-/**
- * Local schema resolution record keyed by schema SAID.
- */
-export interface SchemaRecord {
-    said: string;
-    oobi: string | null;
-    status: SchemaResolutionStatus;
-    title: string | null;
-    description: string | null;
-    version: string | null;
-    rules?: Record<string, unknown> | null;
-    error: string | null;
-    updatedAt: string | null;
-}
+import type { SchemaRecord } from '../domain/credentials/credentialTypes';
 
 /**
  * Schema slice state keyed by schema SAID.
+ *
+ * Domain schema record types are imported from `src/domain/credentials`; this
+ * slice owns only storage and reducer behavior.
  */
 export interface SchemaState {
     bySaid: Record<string, SchemaRecord>;

@@ -12,18 +12,18 @@ import {
     delegationChainNodeFromKeyState,
     identifierDelegatorAid,
     type DelegationWorkflowDetails,
-} from '../features/identifiers/delegationHelpers';
+} from '../domain/identifiers/delegationHelpers';
 import {
     identifierCreateDraftToArgs,
     identifiersFromResponse,
     replaceIdentifierSummary,
-} from '../features/identifiers/identifierHelpers';
+} from '../domain/identifiers/identifierHelpers';
 import type {
     IdentifierCreateDraft,
     IdentifierDelegationChainNode,
     IdentifierSummary,
-} from '../features/identifiers/identifierTypes';
-import type { ContactRecord } from '../state/contacts.slice';
+} from '../domain/identifiers/identifierTypes';
+import type { ContactRecord } from '../domain/contacts/contactTypes';
 import type { OperationLogger } from '../signify/client';
 import { waitOperationService } from './signify.service';
 

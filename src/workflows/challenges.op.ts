@@ -5,7 +5,7 @@ import {
     challengeWordsFingerprint,
     defaultChallengeStrength,
     type ChallengeStrength,
-} from '../features/contacts/challengeWords';
+} from '../domain/challenges/challengeWords';
 import {
     generateChallengeService,
     respondToChallengeService,

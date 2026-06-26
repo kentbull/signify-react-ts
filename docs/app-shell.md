@@ -140,20 +140,20 @@ their handles.
 
 ## Current Routes
 
-| Path                     | Route behavior                         | Loader/action owner       | Gating                            |
-|--------------------------|----------------------------------------|---------------------------|-----------------------------------|
-| `/`                      | redirects to `/dashboard`              | root child index loader   | none                              |
-| `/dashboard`             | session/activity/component summary     | dashboard loader          | connected Signify client required |
-| `/contacts`              | OOBI generation/resolution and contacts | contacts loader/action    | connected Signify client required |
-| `/contacts/:contactId`   | contact detail, OOBIs, challenge flows | contacts loader/action    | connected Signify client required |
-| `/identifiers`           | identifier list/detail/create/rotate   | identifiers loader/action | connected Signify client required |
-| `/credentials`           | connected placeholder                  | credentials loader        | connected Signify client required |
-| `/client`                | client/controller/agent state          | client loader             | connected Signify state required  |
-| `/operations`            | persisted/background operation history | Redux selectors           | none                              |
-| `/operations/:requestId` | operation detail and result links      | Redux selectors           | none                              |
-| `/notifications`         | app notices and KERIA protocol inbox   | notifications loader/action | connected Signify client required |
-| `/notifications/:notificationId` | KERIA/synthetic notification detail | notifications loader/action | connected Signify client required |
-| `*`                      | redirects to `/dashboard`              | catch-all loader          | none                              |
+| Path                             | Route behavior                          | Loader/action owner         | Gating                            |
+| -------------------------------- | --------------------------------------- | --------------------------- | --------------------------------- |
+| `/`                              | redirects to `/dashboard`               | root child index loader     | none                              |
+| `/dashboard`                     | session/activity/component summary      | dashboard loader            | connected Signify client required |
+| `/contacts`                      | OOBI generation/resolution and contacts | contacts loader/action      | connected Signify client required |
+| `/contacts/:contactId`           | contact detail, OOBIs, challenge flows  | contacts loader/action      | connected Signify client required |
+| `/identifiers`                   | identifier list/detail/create/rotate    | identifiers loader/action   | connected Signify client required |
+| `/credentials`                   | connected placeholder                   | credentials loader          | connected Signify client required |
+| `/client`                        | client/controller/agent state           | client loader               | connected Signify state required  |
+| `/operations`                    | persisted/background operation history  | Redux selectors             | none                              |
+| `/operations/:requestId`         | operation detail and result links       | Redux selectors             | none                              |
+| `/notifications`                 | app notices and KERIA protocol inbox    | notifications loader/action | connected Signify client required |
+| `/notifications/:notificationId` | KERIA/synthetic notification detail     | notifications loader/action | connected Signify client required |
+| `*`                              | redirects to `/dashboard`               | catch-all loader            | none                              |
 
 Operations routes are intentionally ungated. Persisted history should remain
 viewable after disconnect, refresh, or reconnect. Notifications are connected
@@ -165,7 +165,20 @@ connects. Routes do not auto-open the connect dialog.
 
 ## Loaders And Actions
 
-`src/app/routeData.ts` contains the testable loader/action functions:
+Route data is split by route family. `src/app/routeData.ts` is the public
+barrel for existing imports, while focused modules own the implementation:
+
+- `routeData.types.ts`: loader/action result types and the narrow
+  `RouteDataRuntime` contract.
+- `routeData.loaders.ts`: connected route loaders.
+- `routeData.root.ts`: root shell actions such as connect and passcode
+  generation.
+- `routeData.identifiers.ts`, `routeData.contacts.ts`,
+  `routeData.credentials.ts`, and `routeData.multisig.ts`: route-family
+  actions and parsers.
+- `routeData.shared.ts`: tiny form/error guards shared by those modules.
+
+The exported loader/action functions are:
 
 - `loadIdentifiers(runtime)` returns blocked, ready identifiers, or an
   actionable load error without throwing.
@@ -174,6 +187,8 @@ connects. Routes do not auto-open the connect dialog.
 - `loadContacts(runtime)` syncs contact, challenge, and KERIA notification
   inventory.
 - `loadCredentials(runtime)` currently gates the placeholder route.
+- `loadMultisig(runtime)` loads multisig group route data through the runtime
+  boundary.
 - `loadNotifications(runtime)` syncs protocol notifications and synthetic
   exchange-backed challenge requests.
 - `rootAction(runtime, request)` handles connect form submissions and redirects
@@ -181,6 +196,10 @@ connects. Routes do not auto-open the connect dialog.
 - `identifiersAction(runtime, request)` handles create and rotate intents.
 - `contactsAction(runtime, request)` handles OOBI resolution, contact metadata,
   and challenge intents.
+- `credentialsAction(runtime, request)` handles registry, issue, grant, admit,
+  and refresh intents.
+- `multisigAction(runtime, request)` handles group inception, agent
+  authorization, interaction, and rotation intents.
 - `notificationsAction(runtime, request)` handles challenge responses and
   exchange-notification dismissal.
 

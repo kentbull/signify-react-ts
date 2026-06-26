@@ -18,9 +18,9 @@ import {
     knownComponentsFromContacts,
     normalizeOobiUrlForResolution,
     pendingContactIdForOobi,
-} from '../../src/features/contacts/contactHelpers';
+} from '../../src/domain/contacts/contactHelpers';
 import type { ContactRecord } from '../../src/state/contacts.slice';
-import type { IdentifierSummary } from '../../src/features/identifiers/identifierTypes';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 
 describe('contact helpers', () => {
     it('extracts aliases and strips local name hints before resolution', () => {

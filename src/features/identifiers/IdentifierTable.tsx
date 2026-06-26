@@ -18,14 +18,14 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
-import type { IdentifierSummary } from './identifierTypes';
+import type { IdentifierSummary } from '../../domain/identifiers/identifierTypes';
 import {
     formatIdentifierMetadata,
     identifierIdentifierIndex,
     identifierKeyIndex,
     identifierType,
     truncateMiddle,
-} from './identifierHelpers';
+} from '../../domain/identifiers/identifierHelpers';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 
 /**
