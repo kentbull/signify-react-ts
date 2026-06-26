@@ -31,6 +31,7 @@ import { useAppDispatch, useAppSelector } from '../../state/hooks';
 import {
     selectActiveOperations,
     selectContacts,
+    selectDidWebsDidByAid,
     selectIdentifiers,
 } from '../../state/selectors';
 import { walletAidSelected } from '../../state/walletSelection.slice';
@@ -107,6 +108,9 @@ export const IdentifiersView = () => {
             : (identifiers.find(
                   (identifier) => identifier.name === selectedIdentifierName
               ) ?? null);
+    const selectedDidWebsDid = useAppSelector(
+        selectDidWebsDidByAid(selectedIdentifier?.prefix)
+    );
 
     useEffect(() => {
         if (selectedIdentifierName === null) {
@@ -129,36 +133,72 @@ export const IdentifiersView = () => {
                 }
 
                 setDetailRefresh({ status: 'success', message: null });
-
-                const chain = await runtime.identifiers.getDelegationChain(
-                    refreshed.name,
-                    {
+                void runtime.didwebs
+                    .refreshIdentifierDid(refreshed.name, refreshed.prefix, {
                         signal: controller.signal,
                         track: false,
+                    })
+                    .catch(() => undefined);
+
+                try {
+                    const chain = await runtime.identifiers.getDelegationChain(
+                        refreshed.name,
+                        {
+                            signal: controller.signal,
+                            track: false,
+                        }
+                    );
+                    if (!controller.signal.aborted) {
+                        setDelegationChain({
+                            status: 'success',
+                            message: null,
+                            nodes: chain,
+                        });
                     }
-                );
-                if (!controller.signal.aborted) {
+                } catch (error: unknown) {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     setDelegationChain({
-                        status: 'success',
-                        message: null,
-                        nodes: chain,
+                        status: 'error',
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        nodes: [],
                     });
                 }
 
-                const roles = identifierAvailableOobiRoles(refreshed);
-                const records = await runtime.contacts.listIdentifierOobis(
-                    refreshed.name,
-                    roles,
-                    {
-                        signal: controller.signal,
-                        track: false,
+                try {
+                    const roles = identifierAvailableOobiRoles(refreshed);
+                    const records = await runtime.contacts.listIdentifierOobis(
+                        refreshed.name,
+                        roles,
+                        {
+                            signal: controller.signal,
+                            track: false,
+                        }
+                    );
+                    if (!controller.signal.aborted) {
+                        setDetailOobis({
+                            status: 'success',
+                            message: null,
+                            records,
+                        });
                     }
-                );
-                if (!controller.signal.aborted) {
+                } catch (error: unknown) {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     setDetailOobis({
-                        status: 'success',
-                        message: null,
-                        records,
+                        status: 'error',
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        records: [],
                     });
                 }
             } catch (error: unknown) {
@@ -240,6 +280,16 @@ export const IdentifiersView = () => {
         fetcher.submit(formData, { method: 'post' });
     };
 
+    const handleAuthorizeAgent = (aid: string) => {
+        const requestId = globalThis.crypto.randomUUID();
+        setPendingMessage(`Authorizing agent for ${aid}`);
+        const formData = new FormData();
+        formData.set('intent', 'authorizeAgent');
+        formData.set('aid', aid);
+        formData.set('requestId', requestId);
+        fetcher.submit(formData, { method: 'post' });
+    };
+
     const handleCreate = async (
         draft: IdentifierCreateDraft
     ): Promise<void> => {
@@ -255,6 +305,9 @@ export const IdentifiersView = () => {
 
     const isRotateDisabled = (identifierName: string): boolean =>
         activeResourceKeys.has(`identifier:aid:${identifierName}`);
+    const isAuthorizeAgentDisabled = (identifierName: string): boolean =>
+        activeResourceKeys.has(`identifier:aid:${identifierName}`) ||
+        activeResourceKeys.has(`identifier:agent-endrole:${identifierName}`);
     const openCreate = () => {
         setActiveCreateRequestId(null);
         setCreateOpen(true);
@@ -346,6 +399,7 @@ export const IdentifiersView = () => {
                         disabled={actionRunning}
                         sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
                         data-ui-sound={UI_SOUND_HOVER_VALUE}
+                        data-testid="identifier-create-open"
                     >
                         Create Identifier
                     </Button>
@@ -406,6 +460,7 @@ export const IdentifiersView = () => {
                             disabled={actionRunning}
                             sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
                             data-ui-sound={UI_SOUND_HOVER_VALUE}
+                            data-testid="identifier-create-open"
                         >
                             Create Identifier
                         </Button>
@@ -418,6 +473,10 @@ export const IdentifiersView = () => {
                 onRotate={handleRotate}
                 isRotateDisabled={(identifier) =>
                     isRotateDisabled(identifier.name)
+                }
+                onAuthorizeAgent={handleAuthorizeAgent}
+                isAuthorizeAgentDisabled={(identifier) =>
+                    isAuthorizeAgentDisabled(identifier.name)
                 }
                 onCopyAgentOobi={handleCopyAgentOobi}
                 agentOobiCopyStatus={agentOobiCopyStatus}
@@ -432,10 +491,16 @@ export const IdentifiersView = () => {
                 refreshMessage={detailRefresh.message}
                 oobiState={detailOobis}
                 delegationChain={delegationChain}
+                didWebsDid={selectedDidWebsDid}
                 actionRunning={
                     selectedIdentifierName === null
                         ? false
                         : isRotateDisabled(selectedIdentifierName)
+                }
+                authorizeAgentRunning={
+                    selectedIdentifierName === null
+                        ? false
+                        : isAuthorizeAgentDisabled(selectedIdentifierName)
                 }
                 onClose={() => {
                     setSelectedIdentifierName(null);
@@ -452,6 +517,7 @@ export const IdentifiersView = () => {
                     });
                 }}
                 onRotate={handleRotate}
+                onAuthorizeAgent={handleAuthorizeAgent}
             />
             {createDialogOpen && (
                 <IdentifierCreateDialog

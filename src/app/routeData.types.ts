@@ -10,6 +10,7 @@ import type {
     ContactRuntimeCommands,
     CredentialRuntimeCommands,
     DelegationRuntimeCommands,
+    DidWebsRuntimeCommands,
     IdentifierRuntimeCommands,
     MultisigRuntimeCommands,
     NotificationRuntimeCommands,
@@ -113,14 +114,14 @@ export type RootActionData =
  */
 export type IdentifierActionData =
     | {
-          intent: 'create' | 'rotate';
+          intent: 'create' | 'rotate' | 'authorizeAgent';
           ok: true;
           message: string;
           requestId: string;
           operationRoute: string;
       }
     | {
-          intent: 'create' | 'rotate' | 'unsupported';
+          intent: 'create' | 'rotate' | 'authorizeAgent' | 'unsupported';
           ok: false;
           message: string;
           requestId?: string;
@@ -292,4 +293,6 @@ export interface RouteDataRuntime {
     credentials: CredentialRuntimeCommands;
     /** Multisig route commands. */
     multisig: MultisigRuntimeCommands;
+    /** did:webs DID route commands. */
+    didwebs: DidWebsRuntimeCommands;
 }

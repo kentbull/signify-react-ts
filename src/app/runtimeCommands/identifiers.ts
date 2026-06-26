@@ -10,6 +10,8 @@ import type {
 import type { RootState } from '../../state/store';
 import type { IdentifierMutationResult } from '../../services/identifiers.service';
 import {
+    authorizeAgentEndRoleBackgroundOp,
+    authorizeAgentEndRoleOp,
     createIdentifierBackgroundOp,
     createIdentifierOp,
     getIdentifierDelegationChainOp,
@@ -46,11 +48,19 @@ export interface IdentifierRuntimeCommands {
         aid: string,
         options?: WorkflowRunOptions
     ): Promise<IdentifierSummary[]>;
+    authorizeAgent(
+        aid: string,
+        options?: WorkflowRunOptions
+    ): Promise<IdentifierSummary[]>;
     startCreate(
         draft: IdentifierCreateDraft,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
     startRotate(
+        aid: string,
+        options?: RequestIdOptions
+    ): BackgroundWorkflowStartResult;
+    startAuthorizeAgent(
         aid: string,
         options?: RequestIdOptions
     ): BackgroundWorkflowStartResult;
@@ -68,8 +78,10 @@ export const createIdentifierRuntimeCommands = (
     getDelegationChain: getIdentifierDelegationChain(context),
     create: createIdentifier(context),
     rotate: rotateIdentifier(context),
+    authorizeAgent: authorizeAgent(context),
     startCreate: startCreateIdentifier(context),
     startRotate: startRotateIdentifier(context),
+    startAuthorizeAgent: startAuthorizeAgent(context),
 });
 
 const listIdentifiers =
@@ -131,6 +143,18 @@ const rotateIdentifier =
             kind: options.kind ?? 'rotateIdentifier',
         });
 
+const authorizeAgent =
+    (context: RuntimeCommandContext) =>
+    (
+        aid: string,
+        options: WorkflowRunOptions = {}
+    ): Promise<IdentifierSummary[]> =>
+        context.runWorkflow(() => authorizeAgentEndRoleOp(aid), {
+            ...options,
+            label: options.label ?? 'Authorizing agent endpoint...',
+            kind: options.kind ?? 'authorizeAgentEndRole',
+        });
+
 const startCreateIdentifier =
     (context: RuntimeCommandContext) =>
     (
@@ -148,14 +172,25 @@ const startRotateIdentifier =
     (context: RuntimeCommandContext) =>
     (aid: string, options: RequestIdOptions = {}): BackgroundWorkflowStartResult => {
         const requestId = requestIdFrom(context, options);
-        const identifier = identifierForRotation(context.getState(), aid);
+        const identifier = identifierForAid(context.getState(), aid);
         return context.startBackgroundWorkflow(
             () => rotateIdentifierBackgroundOp(aid, requestId),
             rotateIdentifierOptions(aid, requestId, identifier)
         );
     };
 
-const identifierForRotation = (
+const startAuthorizeAgent =
+    (context: RuntimeCommandContext) =>
+    (aid: string, options: RequestIdOptions = {}): BackgroundWorkflowStartResult => {
+        const requestId = requestIdFrom(context, options);
+        const identifier = identifierForAid(context.getState(), aid);
+        return context.startBackgroundWorkflow(
+            () => authorizeAgentEndRoleBackgroundOp(aid),
+            authorizeAgentOptions(aid, requestId, identifier)
+        );
+    };
+
+const identifierForAid = (
     state: RootState,
     aid: string
 ): IdentifierSummary | null =>
@@ -254,6 +289,36 @@ const rotateIdentifierOptions = (
     };
 };
 
+const authorizeAgentOptions = (
+    aid: string,
+    requestId: string,
+    identifier: IdentifierSummary | null
+): BackgroundWorkflowRunOptions<IdentifierMutationResult> => {
+    const label = identifier?.name ?? aid;
+
+    return {
+        requestId,
+        label: `Authorizing agent for ${label}`,
+        title: `Authorize agent for ${label}`,
+        description:
+            'Authorizes the connected KERIA agent as this identifier endpoint.',
+        kind: 'authorizeAgentEndRole',
+        resourceKeys: authorizeAgentResourceKeys(aid),
+        resultRoute: identifiersRoute,
+        successNotification: {
+            title: 'Agent authorization complete',
+            message: `The agent endpoint role for ${label} is authorized.`,
+            severity: 'success',
+        },
+        failureNotification: {
+            title: 'Agent authorization failed',
+            message: `The agent endpoint role for ${label} failed.`,
+            severity: 'error',
+        },
+        payloadDetails: delegationPayloadDetails,
+    };
+};
+
 const createIdentifierResourceKeys = (
     name: string,
     delegatorAid: string | null
@@ -270,4 +335,9 @@ const rotateIdentifierResourceKeys = (
 ): string[] => [
     `identifier:aid:${aid}`,
     ...(delegatorAid === null ? [] : [`delegation:delegate:${aid}`]),
+];
+
+const authorizeAgentResourceKeys = (aid: string): string[] => [
+    `identifier:aid:${aid}`,
+    `identifier:agent-endrole:${aid}`,
 ];

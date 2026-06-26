@@ -2,3 +2,4 @@ allowBuilds:
   esbuild: true
   puppeteer: true
   signify-ts: true
+  signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3: true

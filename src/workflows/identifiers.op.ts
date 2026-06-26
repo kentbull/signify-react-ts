@@ -1,6 +1,7 @@
 import type { Operation as EffectionOperation } from 'effection';
 import { AppServicesContext } from '../effects/contexts';
 import {
+    authorizeAgentEndRoleService,
     createIdentifierService,
     getIdentifierDelegationChainService,
     getIdentifierService,
@@ -213,6 +214,71 @@ export function* rotateIdentifierBackgroundOp(
             updatedAt: new Date().toISOString(),
         })
     );
+
+    return result;
+}
+
+/**
+ * Authorize the connected KERIA agent as the `agent` endpoint role for one
+ * managed identifier and publish refreshed identifier facts.
+ */
+export function* authorizeAgentEndRoleOp(
+    aid: string
+): EffectionOperation<IdentifierSummary[]> {
+    const services = yield* AppServicesContext.expect();
+    const result = yield* authorizeAgentEndRoleService({
+        client: services.runtime.requireConnectedClient(),
+        aid,
+        logger: services.logger,
+    });
+    const updatedAt = new Date().toISOString();
+
+    services.store.dispatch(
+        identifierListLoaded({
+            identifiers: result.identifiers,
+            loadedAt: updatedAt,
+        })
+    );
+    if (result.refreshed !== null) {
+        services.store.dispatch(
+            identifierLoaded({
+                identifier: result.refreshed,
+                loadedAt: updatedAt,
+            })
+        );
+    }
+
+    return result.identifiers;
+}
+
+/**
+ * Background variant used by the identifier route action.
+ */
+export function* authorizeAgentEndRoleBackgroundOp(
+    aid: string
+): EffectionOperation<IdentifierMutationResult> {
+    const services = yield* AppServicesContext.expect();
+    const result = yield* authorizeAgentEndRoleService({
+        client: services.runtime.requireConnectedClient(),
+        aid,
+        logger: services.logger,
+    });
+    const updatedAt = new Date().toISOString();
+
+    services.store.dispatch(
+        identifierListLoaded({
+            identifiers: result.identifiers,
+            loadedAt: updatedAt,
+        })
+    );
+    if (result.refreshed !== null) {
+        services.store.dispatch(
+            identifierLoaded({
+                identifier: result.refreshed,
+                loadedAt: updatedAt,
+            })
+        );
+    }
 
     return result;
 }
