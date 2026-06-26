@@ -491,6 +491,7 @@ const OobiCopyButton = ({
                           : 'default'
                 }
                 onClick={(event) => onCopy(event, identifier)}
+                data-testid={`identifier-copy-agent-oobi-${identifier.name}`}
             >
                 <ContentCopyIcon
                     fontSize={size === 'small' ? 'small' : 'medium'}

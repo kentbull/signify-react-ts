@@ -1,12 +1,15 @@
-import { spawn } from 'node:child_process';
-import puppeteer from 'puppeteer';
+import puppeteer, { type Page } from 'puppeteer';
+import { SignifyClient, Tier, randomPasscode, ready } from 'signify-ts';
 import {
-    Algos,
-    SignifyClient,
-    Tier,
-    randomPasscode,
-    ready,
-} from 'signify-ts';
+    chromeArgs,
+    connectBrowserAgent,
+    dispatchClick,
+    routeUrl as appRouteUrl,
+    startViteIfNeeded,
+    waitForDomState,
+    waitForElement,
+    waitForElementHidden,
+} from './support/browserHarness';
 
 /**
  * Responsive browser smoke for the app shell and connected identifier table.
@@ -18,74 +21,40 @@ import {
 const appUrl = process.env.RESPONSIVE_SMOKE_URL ?? 'http://127.0.0.1:5175';
 const keriaAdminUrl =
     process.env.VITE_KERIA_ADMIN_URL ?? 'http://127.0.0.1:3901';
-const keriaBootUrl =
-    process.env.VITE_KERIA_BOOT_URL ?? 'http://127.0.0.1:3903';
+const keriaBootUrl = process.env.VITE_KERIA_BOOT_URL ?? 'http://127.0.0.1:3903';
+const witnessAids = (
+    process.env.VITE_WITNESS_AIDS ??
+    [
+        'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha',
+        'BLskRTInXnMxWaGqcpSyMgo0nYbalW99cGZESrz3zapM',
+        'BIKKuvBwpmDVA4Ds-EpL5bt9OqPzWPja2LigFYZN2YfX',
+    ].join(',')
+)
+    .split(',')
+    .map((aid) => aid.trim())
+    .filter((aid) => aid.length > 0);
+const witnessToad = Number(process.env.VITE_WITNESS_TOAD ?? 2);
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const routeUrl = (path: string): string => appRouteUrl(appUrl, path);
 
-const canReachApp = async () => {
-    try {
-        const response = await fetch(appUrl);
-        return response.ok;
-    } catch {
-        return false;
-    }
-};
-
-const waitForApp = async () => {
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-        if (await canReachApp()) {
-            return;
-        }
-        await sleep(500);
-    }
-
-    throw new Error(`Vite app did not become reachable at ${appUrl}`);
-};
-
-const startViteIfNeeded = async () => {
-    if (await canReachApp()) {
-        return null;
-    }
-
-    const url = new URL(appUrl);
-    const child = spawn(
-        'pnpm',
-        [
-            'exec',
-            'vite',
-            '--host',
-            url.hostname,
-            '--port',
-            url.port,
-            '--strictPort',
-        ],
-        {
-            stdio: 'ignore',
-            env: {
-                ...process.env,
-                BROWSER: 'none',
-            },
-        }
-    );
-
-    await waitForApp();
-    return child;
-};
-
-const routeUrl = (path) => new URL(path, appUrl).toString();
-
-const navigateSpa = async (page, path) => {
+const navigateSpa = async (page: Page, path: string): Promise<void> => {
     await page.evaluate((nextPath) => {
         globalThis.history.pushState({}, '', nextPath);
         globalThis.dispatchEvent(new globalThis.Event('popstate'));
     }, path);
 };
 
-const responsiveAlias = () =>
-    `responsive-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
+const responsiveAlias = (): string =>
+    `responsive-${new Date()
+        .toISOString()
+        .replace(/[-:.TZ]/g, '')
+        .slice(0, 14)}`;
 
-const waitForOperation = async (client, operation, label) => {
+const waitForOperation = async (
+    client: SignifyClient,
+    operation: unknown,
+    label: string
+): Promise<void> => {
     const controller = new globalThis.AbortController();
     const timeout = globalThis.setTimeout(() => {
         controller.abort(new Error(`${label} timed out`));
@@ -107,7 +76,7 @@ const waitForOperation = async (client, operation, label) => {
     }
 };
 
-const connectClient = async (passcode) => {
+const connectClient = async (passcode: string): Promise<SignifyClient> => {
     await ready();
     const client = new SignifyClient(
         keriaAdminUrl,
@@ -139,13 +108,20 @@ const connectClient = async (passcode) => {
     return client;
 };
 
-const createIdentifierFixture = async () => {
+interface IdentifierFixture {
+    passcode: string;
+    alias: string;
+    prefix: string;
+}
+
+const createIdentifierFixture = async (): Promise<IdentifierFixture> => {
     await ready();
     const passcode = randomPasscode();
     const client = await connectClient(passcode);
     const alias = responsiveAlias();
     const result = await client.identifiers().create(alias, {
-        algo: Algos.randy,
+        toad: witnessToad,
+        wits: witnessAids,
     });
     const operation = await result.op();
     await waitForOperation(client, operation, `creating ${alias}`);
@@ -154,7 +130,10 @@ const createIdentifierFixture = async () => {
     return { passcode, alias, prefix: identifier.prefix };
 };
 
-const assertNoHorizontalOverflow = async (page, label) => {
+const assertNoHorizontalOverflow = async (
+    page: Page,
+    label: string
+): Promise<void> => {
     const metrics = await page.evaluate(() => ({
         innerWidth: globalThis.innerWidth,
         htmlScrollWidth: globalThis.document.documentElement.scrollWidth,
@@ -294,11 +273,7 @@ const visibleIdentifierHeaders = async (page) =>
             .map((header) => header.textContent?.trim() ?? '')
     );
 
-const assertIdentifierHeaders = async (
-    page,
-    { expected, omitted },
-    label
-) => {
+const assertIdentifierHeaders = async (page, { expected, omitted }, label) => {
     const headers = await visibleIdentifierHeaders(page);
     const missing = expected.filter((header) => !headers.includes(header));
     const unexpectedlyVisible = omitted.filter((header) =>
@@ -312,54 +287,28 @@ const assertIdentifierHeaders = async (
     }
 };
 
-const setInputValue = async (page, selector, value) => {
-    await page.$eval(
-        selector,
-        (element, nextValue) => {
-            const descriptor = Object.getOwnPropertyDescriptor(
-                globalThis.HTMLInputElement.prototype,
-                'value'
-            );
-            descriptor?.set?.call(element, nextValue);
-            element.dispatchEvent(
-                new globalThis.Event('input', { bubbles: true })
-            );
-        },
-        value
+const connectBrowser = async (
+    page: Page,
+    passcode: string
+): Promise<void> => {
+    await connectBrowserAgent(page, {
+        appUrl,
+        passcode,
+        waitUntil: 'domcontentloaded',
+    });
+    await waitForElementHidden(
+        page,
+        '[data-testid="app-loading-overlay"]',
+        10_000
     );
 };
 
-const connectBrowser = async (page, passcode) => {
-    await page.goto(appUrl, { waitUntil: 'domcontentloaded' });
-    await page.click('[data-testid="connect-open"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        timeout: 10000,
-    });
-    await setInputValue(page, '#outlined-password-input', passcode);
-    await page.click('[data-testid="connect-submit"]');
-    await page.waitForSelector('[data-testid="connect-dialog"]', {
-        hidden: true,
-        timeout: 30000,
-    });
-    await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-        hidden: true,
-        timeout: 10000,
-    });
-    await page.waitForSelector('[data-testid="dashboard-view"]', {
-        timeout: 30000,
-    });
-};
-
 const navigateToIdentifiers = async (page) => {
-    await page.click('[data-testid="nav-open"]');
-    await page.waitForSelector('[data-testid="nav-identifiers"]', {
-        timeout: 10000,
-    });
-    await page.click('[data-testid="nav-identifiers"]');
+    await dispatchClick(page, '[data-testid="nav-open"]');
+    await waitForElement(page, '[data-testid="nav-identifiers"]', 10000);
+    await dispatchClick(page, '[data-testid="nav-identifiers"]');
     try {
-        await page.waitForSelector('[data-testid="identifier-table"]', {
-            timeout: 10000,
-        });
+        await waitForElement(page, '[data-testid="identifier-table"]', 10000);
     } catch (error) {
         const debug = await page.evaluate(() => ({
             url: globalThis.location.href,
@@ -373,15 +322,17 @@ const navigateToIdentifiers = async (page) => {
 };
 
 const assertOverlayFitsViewport = async (page, label) => {
-    await page.click('[data-testid="generate-passcode"]');
-    await page.waitForFunction(
+    await dispatchClick(page, '[data-testid="generate-passcode"]');
+    await waitForDomState(
+        page,
+        'passcode generation or loading overlay',
         () =>
             globalThis.document.querySelector(
                 '[data-testid="app-loading-overlay"]'
             ) !== null ||
             globalThis.document.querySelector('#outlined-password-input')?.value
                 .length >= 21,
-        { timeout: 10000 }
+        30000
     );
 
     const overlay = await page.$('[data-testid="app-loading-overlay"]');
@@ -391,17 +342,13 @@ const assertOverlayFitsViewport = async (page, label) => {
             ['[data-testid="app-loading-overlay"] [role="status"]'],
             `${label} loading overlay`
         );
-        await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-            hidden: true,
-            timeout: 10000,
-        });
+        await waitForElementHidden(
+            page,
+            '[data-testid="app-loading-overlay"]',
+            10000
+        );
     }
 };
-
-const chromeArgs =
-    process.env.CI === 'true'
-        ? ['--no-sandbox', '--disable-setuid-sandbox']
-        : [];
 
 const viewports = [
     { label: 'iPhone SE', width: 320, height: 568 },
@@ -429,7 +376,7 @@ const identifierViewports = [
     },
 ];
 
-const vite = await startViteIfNeeded();
+const vite = await startViteIfNeeded(appUrl);
 const browser = await puppeteer.launch({
     headless: 'new',
     args: chromeArgs,
@@ -448,17 +395,17 @@ try {
         await page.goto(routeUrl('/identifiers'), {
             waitUntil: 'networkidle0',
         });
-        await page.waitForSelector('[data-testid="connection-required"]', {
-            timeout: 10000,
-        });
+        await waitForElement(
+            page,
+            '[data-testid="connection-required"]',
+            10000
+        );
 
         await assertNoHorizontalOverflow(page, viewport.label);
         await assertContentStartsBelowAppBar(page, viewport.label);
 
-        await page.click('[data-testid="connect-open"]');
-        await page.waitForSelector('[data-testid="connect-dialog"]', {
-            timeout: 10000,
-        });
+        await dispatchClick(page, '[data-testid="connect-open"]');
+        await waitForElement(page, '[data-testid="connect-dialog"]', 10000);
         await assertNoHorizontalOverflow(page, `${viewport.label} dialog`);
         await assertElementsFitViewport(
             page,
@@ -471,7 +418,7 @@ try {
             `${viewport.label} dialog`
         );
         await assertOverlayFitsViewport(page, viewport.label);
-        await page.click('[data-testid="connect-close"]');
+        await dispatchClick(page, '[data-testid="connect-close"]');
     }
 
     const fixture = await createIdentifierFixture();
@@ -495,18 +442,22 @@ try {
             await navigateToIdentifiers(page);
             identifiersRouteLoaded = true;
         } else {
-            await page.waitForSelector('[data-testid="identifier-table"]', {
-                timeout: 10000,
-            });
+            await waitForElement(
+                page,
+                '[data-testid="identifier-table"]',
+                10000
+            );
         }
-        await page.waitForFunction(
+        await waitForDomState(
+            page,
+            `rotate control for ${fixture.alias}`,
             (alias) =>
                 [...globalThis.document.querySelectorAll('button')].some(
                     (button) =>
                         button.getAttribute('aria-label') ===
                         `Rotate identifier ${alias}`
                 ),
-            { timeout: 10000 },
+            10000,
             fixture.alias
         );
 
@@ -546,17 +497,16 @@ try {
         },
         {
             path: '/dashboard/credentials/not-found',
-            selector: '[data-testid="dashboard-credential-detail"]',
+            selector: '[data-testid="dashboard-held-credentials-detail"]',
         },
     ]) {
         await navigateSpa(page, path);
-        await page.waitForSelector(selector, {
-            timeout: 30000,
-        });
-        await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-            hidden: true,
-            timeout: 30000,
-        });
+        await waitForElement(page, selector, 30000);
+        await waitForElementHidden(
+            page,
+            '[data-testid="app-loading-overlay"]',
+            30000
+        );
         await assertNoHorizontalOverflow(page, `dashboard ${path}`);
     }
     for (const path of [
@@ -567,31 +517,26 @@ try {
         `/credentials/${fixture.prefix}/wallet`,
     ]) {
         await navigateSpa(page, path);
-        await page.waitForSelector('[data-testid="credentials-view"]', {
-            timeout: 30000,
-        });
-        await page.waitForSelector('[data-testid="app-loading-overlay"]', {
-            hidden: true,
-            timeout: 30000,
-        });
+        await waitForElement(page, '[data-testid="credentials-view"]', 30000);
+        await waitForElementHidden(
+            page,
+            '[data-testid="app-loading-overlay"]',
+            30000
+        );
         await assertNoHorizontalOverflow(page, `credentials ${path}`);
     }
     await navigateSpa(page, '/credentials');
-    await page.waitForSelector('[data-testid="credentials-view"]', {
-        timeout: 30000,
-    });
-    const credentialOverviewHidden = await page.evaluate(
-        () =>
-            globalThis.document.querySelector(
-                '[data-testid="credential-issuer-card"]'
-            ) === null &&
-            globalThis.document.querySelector(
-                '[data-testid="credential-wallet-card"]'
-            ) === null
+    await waitForElement(page, '[data-testid="credentials-view"]', 30000);
+    await waitForElementHidden(
+        page,
+        '[data-testid="app-loading-overlay"]',
+        30000
     );
-    if (!credentialOverviewHidden) {
-        throw new Error('Credentials root rendered AID-specific panels.');
-    }
+    await assertNoHorizontalOverflow(page, 'credentials index');
+    await navigateSpa(page, `/credentials/${fixture.prefix}`);
+    await waitForElement(page, '[data-testid="credential-issuer-card"]', 30000);
+    await waitForElement(page, '[data-testid="credential-wallet-card"]', 30000);
+    await assertNoHorizontalOverflow(page, 'credentials selected AID overview');
 
     console.log(
         JSON.stringify(

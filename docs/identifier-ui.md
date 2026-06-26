@@ -130,7 +130,7 @@ Relevant coverage:
 
 - `tests/unit/identifierHelpers.test.ts` covers salty and randy metadata
   extraction, unavailable values, JSON formatting, and middle truncation.
-- `tests/browser-smoke.mjs` checks that the table includes AID, KIDX, PIDX, and
+- `tests/browser-smoke.ts` checks that the table includes AID, KIDX, PIDX, and
   Actions headers after connect.
 - Scenario tests protect real Signify/KERIA rotation behavior.
 

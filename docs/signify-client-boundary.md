@@ -20,7 +20,7 @@ focused on rendering state.
   `AppRuntime` instance; new routed app code should use the app runtime instead.
 - `tests/smoke/clientBoundarySmoke.ts` owns the reusable local KERIA smoke
   scenario.
-- `scripts/keria-smoke.ts` and `tests/browser-smoke.mjs` are thin executable
+- `scripts/keria-smoke.ts` and `tests/browser-smoke.ts` are thin executable
   wrappers around the app behavior.
 
 Do not move KERIA lifecycle calls back into component event handlers. New

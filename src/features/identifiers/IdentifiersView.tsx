@@ -346,6 +346,7 @@ export const IdentifiersView = () => {
                         disabled={actionRunning}
                         sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
                         data-ui-sound={UI_SOUND_HOVER_VALUE}
+                        data-testid="identifier-create-open"
                     >
                         Create Identifier
                     </Button>
@@ -406,6 +407,7 @@ export const IdentifiersView = () => {
                             disabled={actionRunning}
                             sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
                             data-ui-sound={UI_SOUND_HOVER_VALUE}
+                            data-testid="identifier-create-open"
                         >
                             Create Identifier
                         </Button>
@@ -472,6 +474,7 @@ export const IdentifiersView = () => {
                     openCreate();
                 }}
                 disabled={actionRunning}
+                data-testid="identifier-create-open"
                 sx={{
                     display: {
                         xs:
