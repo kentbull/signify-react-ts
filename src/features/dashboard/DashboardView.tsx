@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+    Navigate,
     useLoaderData,
     useLocation,
     useNavigate,
@@ -11,10 +12,7 @@ import type { DashboardLoaderData } from '../../app/routeData';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectContacts,
-    selectCredentialIpexActivity,
-    selectCredentialRegistries,
     selectDashboardCounts,
-    selectCredentialGrantNotifications,
     selectHeldCredentials,
     selectIdentifiers,
     selectIssuedCredentials,
@@ -27,17 +25,16 @@ import {
 } from '../../state/selectors';
 import { DashboardOverview } from './DashboardOverview';
 import {
-    CredentialRecordDetail,
     CredentialsDetail,
     ResolvedSchemasDetail,
 } from './DashboardDetailViews';
 import {
-    buildCredentialActivity,
     buildDashboardAidAliases,
-    buildDashboardRegistryMap,
-    credentialDetailPath,
+    canonicalCredentialWorkflowPath,
     dashboardModeForPath,
+    legacyDashboardCredentialRedirectPath,
 } from './dashboardViewModels';
+import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
 
 /**
  * Route view that summarizes session health, activity, and credential inventory.
@@ -61,64 +58,21 @@ export const DashboardView = () => {
     const resolvedSchemas = useAppSelector(selectResolvedCredentialSchemas);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const heldCredentials = useAppSelector(selectHeldCredentials);
-    const grantNotifications = useAppSelector(
-        selectCredentialGrantNotifications
-    );
-    const selectedCredentialExchangeActivities = useAppSelector(
-        selectCredentialIpexActivity(credentialSaid)
-    );
-    const registries = useAppSelector(selectCredentialRegistries);
     const contacts = useAppSelector(selectContacts);
     const identifiers = useAppSelector(selectIdentifiers);
     const connection = runtimeSnapshot.connection;
     const connectionUrl =
         connection.status === 'connected' ? connection.client.url : null;
-    const registriesById = useMemo(
-        () => buildDashboardRegistryMap(registries),
-        [registries]
-    );
     const aidAliases = useMemo(
         () => buildDashboardAidAliases({ contacts, identifiers }),
         [contacts, identifiers]
     );
-    const credentials = useMemo(
-        () => [...issuedCredentials, ...heldCredentials],
-        [issuedCredentials, heldCredentials]
+    const schemasBySaid = useMemo(
+        () => new Map(resolvedSchemas.map((schema) => [schema.said, schema])),
+        [resolvedSchemas]
     );
-    const selectedCredential = useMemo(
-        () =>
-            credentials.find(
-                (credential) => credential.said === credentialSaid
-            ) ?? null,
-        [credentialSaid, credentials]
-    );
-    const selectedCredentialSchema = useMemo(
-        () =>
-            selectedCredential?.schemaSaid === null ||
-            selectedCredential?.schemaSaid === undefined
-                ? null
-                : (resolvedSchemas.find(
-                      (schema) => schema.said === selectedCredential.schemaSaid
-                  ) ?? null),
-        [resolvedSchemas, selectedCredential]
-    );
-    const selectedCredentialActivity = useMemo(
-        () =>
-            selectedCredential === null
-                ? []
-                : buildCredentialActivity({
-                      credential: selectedCredential,
-                      grantNotifications,
-                      exchangeActivities: selectedCredentialExchangeActivities,
-                  }),
-        [
-            grantNotifications,
-            selectedCredential,
-            selectedCredentialExchangeActivities,
-        ]
-    );
-    const openCredential = (said: string) => {
-        navigate(credentialDetailPath(said));
+    const openCredential = (credential: CredentialSummaryRecord) => {
+        navigate(canonicalCredentialWorkflowPath(credential) ?? '/credentials');
     };
 
     if (loaderData.status === 'blocked') {
@@ -141,6 +95,7 @@ export const DashboardView = () => {
             <CredentialsDetail
                 loaderData={loaderData}
                 credentials={issuedCredentials}
+                schemasBySaid={schemasBySaid}
                 aidAliases={aidAliases}
                 kind="issued"
                 onOpenCredential={openCredential}
@@ -153,6 +108,7 @@ export const DashboardView = () => {
             <CredentialsDetail
                 loaderData={loaderData}
                 credentials={heldCredentials}
+                schemasBySaid={schemasBySaid}
                 aidAliases={aidAliases}
                 kind="held"
                 onOpenCredential={openCredential}
@@ -162,13 +118,13 @@ export const DashboardView = () => {
 
     if (mode === 'credentialDetail') {
         return (
-            <CredentialRecordDetail
-                loaderData={loaderData}
-                credential={selectedCredential}
-                schema={selectedCredentialSchema}
-                registriesById={registriesById}
-                aidAliases={aidAliases}
-                activity={selectedCredentialActivity}
+            <Navigate
+                to={legacyDashboardCredentialRedirectPath({
+                    credentialSaid,
+                    heldCredentials,
+                    issuedCredentials,
+                })}
+                replace
             />
         );
     }

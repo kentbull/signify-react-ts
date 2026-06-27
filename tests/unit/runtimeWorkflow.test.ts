@@ -19,6 +19,8 @@ import {
 } from '../../src/state/persistence';
 import { selectActiveOperations } from '../../src/state/selectors';
 import { createAppStore } from '../../src/state/store';
+import { walletAidSelected } from '../../src/state/walletSelection.slice';
+import { MemoryWalletSelectionPersistenceStore } from '../../src/state/walletSelectionPersistence';
 
 /**
  * Minimal storage fake used to exercise controller-scoped persistence.
@@ -220,7 +222,15 @@ describe('AppRuntime workflow bridge', () => {
     it('clears persisted local buckets and current persisted projections', async () => {
         const store = createAppStore();
         const storage = new MemoryStorage();
-        const runtime = createAppRuntime({ store, storage });
+        const walletSelectionStorage =
+            new MemoryWalletSelectionPersistenceStore();
+        await walletSelectionStorage.save('Econtroller1', 'Ealice');
+        store.dispatch(walletAidSelected({ aid: 'Ealice' }));
+        const runtime = createAppRuntime({
+            store,
+            storage,
+            walletSelectionStorage,
+        });
 
         storage.setItem(
             persistedAppStateKey('Econtroller1'),
@@ -280,6 +290,9 @@ describe('AppRuntime workflow bridge', () => {
         );
 
         expect(runtime.clearAllLocalState()).toBe(2);
+        await vi.waitFor(async () => {
+            expect(await walletSelectionStorage.load('Econtroller1')).toBeNull();
+        });
 
         expect(
             storage.getItem(persistedAppStateKey('Econtroller1'))
@@ -291,6 +304,63 @@ describe('AppRuntime workflow bridge', () => {
         expect(store.getState().appNotifications.ids).toEqual([]);
         expect(store.getState().exchangeTombstones.saids).toEqual([]);
         expect(store.getState().challenges.storedWordIds).toEqual([]);
+        expect(store.getState().walletSelection.selectedAid).toBeNull();
+
+        await runtime.destroy();
+    });
+
+    it('rehydrates selected wallet AID after the controller bucket is known', async () => {
+        const store = createAppStore();
+        const walletSelectionStorage =
+            new MemoryWalletSelectionPersistenceStore();
+        await walletSelectionStorage.save('Econtroller', 'Ealice');
+        const runtime = createAppRuntime({
+            store,
+            storage: null,
+            walletSelectionStorage,
+        });
+
+        (
+            runtime as unknown as {
+                setPersistenceController(controllerAid: string | null): void;
+            }
+        ).setPersistenceController('Econtroller');
+
+        await vi.waitFor(() => {
+            expect(store.getState().walletSelection.selectedAid).toBe('Ealice');
+        });
+
+        await runtime.destroy();
+    });
+
+    it('does not let selected-wallet rehydration overwrite a newer selection', async () => {
+        const store = createAppStore();
+        const walletSelectionStorage =
+            new MemoryWalletSelectionPersistenceStore();
+        await walletSelectionStorage.save('Econtroller', 'Eold');
+        const runtime = createAppRuntime({
+            store,
+            storage: null,
+            walletSelectionStorage,
+        });
+
+        (
+            runtime as unknown as {
+                setPersistenceController(controllerAid: string | null): void;
+            }
+        ).setPersistenceController('Econtroller');
+        store.dispatch(walletAidSelected({ aid: 'Enew' }));
+
+        await vi.waitFor(() => {
+            expect(store.getState().walletSelection.selectedAid).toBe('Enew');
+        });
+        await vi.waitFor(async () => {
+            expect(await walletSelectionStorage.load('Econtroller')).toMatchObject(
+                {
+                    selectedAid: 'Enew',
+                }
+            );
+        });
 
         await runtime.destroy();
     });

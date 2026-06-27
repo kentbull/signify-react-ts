@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
 import { Box, Button, Stack, Tooltip, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { StatusPill } from '../../app/Console';
 import { monoValueSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import { abbreviateMiddle } from '../../domain/contacts/contactHelpers';
-import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type {
+    CredentialSummaryRecord,
+    SchemaRecord,
+} from '../../domain/credentials/credentialTypes';
 import type { AidAliases } from './dashboardViewModels';
 import { credentialTypeLabel } from './dashboardDisplay';
 
@@ -130,12 +134,19 @@ export const FullAidValue = ({
  */
 export const CredentialTypeValue = ({
     credential,
+    schemasBySaid = new Map(),
 }: {
     credential: CredentialSummaryRecord;
+    schemasBySaid?: ReadonlyMap<string, SchemaRecord>;
 }) => (
     <Stack spacing={0.25} sx={{ minWidth: 0 }}>
         <Typography variant="body2" noWrap>
-            {credentialTypeLabel(credential)}
+            {credentialTypeLabel(
+                credential,
+                credential.schemaSaid === null
+                    ? null
+                    : (schemasBySaid.get(credential.schemaSaid) ?? null)
+            )}
         </Typography>
         {credential.schemaSaid !== null && (
             <CopyableAbbreviation
@@ -189,7 +200,7 @@ export const DashboardWarning = ({ message }: { message: string }) => (
             border: 1,
             borderColor: 'warning.main',
             borderRadius: 1,
-            bgcolor: 'rgba(255, 196, 87, 0.08)',
+            bgcolor: (theme) => alpha(theme.palette.warning.main, 0.08),
             px: 2,
             py: 1.25,
         }}

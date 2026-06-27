@@ -14,6 +14,7 @@ import { monoValueSx } from '../../app/consoleStyles';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
+    selectCredentialSchemas,
     selectHeldCredentials,
     selectIssueableCredentialTypeViews,
     selectIssuedCredentials,
@@ -49,6 +50,7 @@ export const CredentialAidOverviewRoute = () => {
     } = useCredentialsRouteContext();
     const navigate = useNavigate();
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
+    const schemas = useAppSelector(selectCredentialSchemas);
     const issuedCredentials = useAppSelector(selectIssuedCredentials);
     const heldCredentials = useAppSelector(selectHeldCredentials);
     const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
@@ -62,6 +64,9 @@ export const CredentialAidOverviewRoute = () => {
             credentialType.schemaSaid,
             credentialType,
         ])
+    );
+    const schemasBySaid = new Map(
+        schemas.map((schema) => [schema.said, schema])
     );
     const selectedAidHeldCredentials = heldCredentialsForAid(
         heldCredentials,
@@ -223,6 +228,7 @@ export const CredentialAidOverviewRoute = () => {
                         <WalletStackPreview
                             credentials={selectedAidHeldCredentials}
                             credentialTypesBySchema={credentialTypesBySchema}
+                            schemasBySaid={schemasBySaid}
                         />
                     </Stack>
                 </OverviewChoiceCard>

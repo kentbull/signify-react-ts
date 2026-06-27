@@ -67,6 +67,7 @@ export function* resolveCredentialSchemaOp(
             status: 'resolving',
             title: null,
             description: null,
+            credentialType: null,
             version: null,
             rules: null,
             error: null,
@@ -91,6 +92,7 @@ export function* resolveCredentialSchemaOp(
                 status: 'error',
                 title: null,
                 description: null,
+                credentialType: null,
                 version: null,
                 rules: null,
                 error: toErrorText(error),
@@ -223,12 +225,23 @@ export function* syncCredentialInventoryOp(): EffectionOperation<
     CredentialSummaryRecord[]
 > {
     const services = yield* AppServicesContext.expect();
-    const credentials = yield* listCredentialInventoryService({
+    const inventory = yield* listCredentialInventoryService({
         client: services.runtime.requireConnectedClient(),
         localAids: localIdentifierAids(services.store),
     });
 
-    services.store.dispatch(credentialInventoryLoaded({ credentials }));
+    for (const schema of inventory.schemas) {
+        services.store.dispatch(schemaRecorded(schema));
+    }
+
+    const credentials = inventory.credentials;
+    services.store.dispatch(
+        credentialInventoryLoaded({
+            credentials,
+            acdcs: inventory.acdcs,
+            chainGraphs: inventory.chainGraphs,
+        })
+    );
     return credentials;
 }
 

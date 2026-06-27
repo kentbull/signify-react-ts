@@ -47,6 +47,57 @@ export interface CredentialSummaryRecord {
     updatedAt: string;
 }
 
+/** Raw ACDC edge reference extracted from the credential `e` block. */
+export interface CredentialAcdcEdgeReference {
+    label: string;
+    said: string | null;
+    operator: string | null;
+    data: Record<string, unknown> | null;
+}
+
+/**
+ * Generic ACDC detail record for schemas without local typed projectors.
+ */
+export interface CredentialAcdcRecord {
+    said: string;
+    schemaSaid: string | null;
+    registryId: string | null;
+    issuerAid: string | null;
+    holderAid: string | null;
+    subject: Record<string, unknown> | null;
+    rules: unknown | null;
+    edges: CredentialAcdcEdgeReference[];
+    status: CredentialStatus | null;
+    updatedAt: string;
+}
+
+/** Node in the rendered ACDC source/dependency graph. */
+export interface CredentialChainGraphNodeRecord {
+    said: string;
+    schemaSaid: string | null;
+    issuerAid: string | null;
+    holderAid: string | null;
+    unresolved: boolean;
+    depth: number;
+}
+
+/** Directed source-to-dependent edge in an ACDC chain graph. */
+export interface CredentialChainGraphEdgeRecord {
+    id: string;
+    from: string;
+    to: string;
+    label: string;
+    operator: string | null;
+}
+
+/** Normalized chained ACDC DAG for one root credential. */
+export interface CredentialChainGraphRecord {
+    rootSaid: string;
+    nodes: CredentialChainGraphNodeRecord[];
+    edges: CredentialChainGraphEdgeRecord[];
+    updatedAt: string;
+}
+
 /** IPEX exchange activity linked to one credential. */
 export interface CredentialIpexActivityRecord {
     id: string;
@@ -78,10 +129,20 @@ export interface SchemaRecord {
     status: SchemaResolutionStatus;
     title: string | null;
     description: string | null;
+    credentialType: string | null;
     version: string | null;
+    properties?: Record<string, unknown> | null;
     rules?: Record<string, unknown> | null;
     error: string | null;
     updatedAt: string | null;
+}
+
+/** Credential inventory plus embedded schemas observed while loading credentials. */
+export interface CredentialInventorySnapshot {
+    credentials: CredentialSummaryRecord[];
+    acdcs: CredentialAcdcRecord[];
+    chainGraphs: CredentialChainGraphRecord[];
+    schemas: SchemaRecord[];
 }
 
 /** Lifecycle of a credential registry known to the local issuer role. */
