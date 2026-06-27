@@ -1,12 +1,12 @@
 # Container build
 
-The Docker image runs the wallet against a KERIA+Signify stack. It builds from
-this repository plus package/image inputs.
+The Docker image runs the wallet used by a KERIA+Signify W3C crosswalk stack.
+It builds from this repository plus package/image inputs.
 
 Default stack builds should consume published packages, immutable Git SHAs, or
-OCI images. Do not make the portable stack depend on a sibling `signify-ts`
-source checkout. Local tree overrides are acceptable only as explicit developer
-experiments outside the default build contract.
+OCI images. Do not make the portable W3C stack depend on a sibling
+`signify-ts` source checkout. Local tree overrides are acceptable only as
+explicit developer experiments outside the default build contract.
 
 ## Build and publish
 
@@ -49,6 +49,6 @@ context. It does not modify the working tree and does not regenerate
 the checked-in lockfile must already be compatible with the requested
 `SIGNIFY_TS_PACKAGE`.
 
-For cross-repo validation, prefer a pushed GitHub SHA from the intended
+For cross-repo W3C validation, prefer a pushed GitHub SHA from the intended
 `signify-ts` branch over a `file:` dependency. That keeps browser, Docker, and
 headless runs reproducible across machines.
