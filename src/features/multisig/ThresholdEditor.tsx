@@ -11,6 +11,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
@@ -71,7 +72,9 @@ interface SortableMemberProps {
 const makeItemId = (containerId: string, aid: string): string =>
     `${containerId}::${aid}`;
 
-const parseItemId = (id: string): { containerId: string; aid: string } | null => {
+const parseItemId = (
+    id: string
+): { containerId: string; aid: string } | null => {
     const separator = id.indexOf('::');
     return separator < 0
         ? null
@@ -138,11 +141,17 @@ const SortableMember = ({
     onWeightChange,
 }: SortableMemberProps) => {
     const id = makeItemId(containerId, aid);
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-        useSortable({
-            id,
-            data: { aid, containerId },
-        });
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id,
+        data: { aid, containerId },
+    });
 
     return (
         <Box
@@ -150,7 +159,9 @@ const SortableMember = ({
             sx={{
                 display: 'grid',
                 gridTemplateColumns:
-                    onWeightChange === undefined ? 'auto 1fr auto' : 'auto 1fr 88px auto',
+                    onWeightChange === undefined
+                        ? 'auto 1fr auto'
+                        : 'auto 1fr 88px auto',
                 gap: 1,
                 alignItems: 'center',
                 border: 1,
@@ -180,8 +191,15 @@ const SortableMember = ({
                 </Box>
             </Tooltip>
             <Box sx={{ minWidth: 0 }}>
-                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{ alignItems: 'center' }}
+                >
+                    <Typography
+                        variant="body2"
+                        sx={{ overflowWrap: 'anywhere' }}
+                    >
                         {option?.alias ?? 'Unknown member'}
                     </Typography>
                     {option?.isGroup === true && (
@@ -243,9 +261,7 @@ const DroppableLane = ({
                 border: 1,
                 borderColor: isOver ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                bgcolor: isOver
-                    ? 'rgba(39, 215, 255, 0.08)'
-                    : 'rgba(5, 9, 13, 0.32)',
+                bgcolor: isOver ? 'action.hover' : 'background.paper',
                 p: 1,
                 minHeight: 72,
             }}
@@ -269,7 +285,9 @@ export const ThresholdEditor = ({
     const [manualError, setManualError] = useState<string | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
     );
     const clauses = useMemo(
         () => specToClauses(spec, selectedAids),
@@ -301,7 +319,10 @@ export const ThresholdEditor = ({
         setManualError(null);
     };
 
-    const addMember = (aid: string, clauseId = clauses[0]?.id ?? 'clause-1') => {
+    const addMember = (
+        aid: string,
+        clauseId = clauses[0]?.id ?? 'clause-1'
+    ) => {
         if (selectedAids.includes(aid)) {
             return;
         }
@@ -312,7 +333,10 @@ export const ThresholdEditor = ({
                 clause.id === clauseId
                     ? normalizeClauseWeights({
                           ...clause,
-                          weights: [...clause.weights, { memberAid: aid, weight: '1' }],
+                          weights: [
+                              ...clause.weights,
+                              { memberAid: aid, weight: '1' },
+                          ],
                       })
                     : clause
             )
@@ -324,7 +348,9 @@ export const ThresholdEditor = ({
             clauses.map((clause) =>
                 normalizeClauseWeights({
                     ...clause,
-                    weights: clause.weights.filter((item) => item.memberAid !== aid),
+                    weights: clause.weights.filter(
+                        (item) => item.memberAid !== aid
+                    ),
                 })
             )
         );
@@ -346,7 +372,9 @@ export const ThresholdEditor = ({
                     ? {
                           ...clause,
                           weights: clause.weights.map((item) =>
-                              item.memberAid === aid ? { ...item, weight } : item
+                              item.memberAid === aid
+                                  ? { ...item, weight }
+                                  : item
                           ),
                       }
                     : clause
@@ -359,20 +387,26 @@ export const ThresholdEditor = ({
             return;
         }
 
-        const activeData =
-            active.data.current as { aid?: string; containerId?: string } | undefined;
-        const activeAid = activeData?.aid ?? parseItemId(String(active.id))?.aid;
+        const activeData = active.data.current as
+            | { aid?: string; containerId?: string }
+            | undefined;
+        const activeAid =
+            activeData?.aid ?? parseItemId(String(active.id))?.aid;
         const fromId =
-            activeData?.containerId ?? parseItemId(String(active.id))?.containerId;
-        const overData =
-            over.data.current as { aid?: string; containerId?: string } | undefined;
+            activeData?.containerId ??
+            parseItemId(String(active.id))?.containerId;
+        const overData = over.data.current as
+            | { aid?: string; containerId?: string }
+            | undefined;
         const overParsed = parseItemId(String(over.id));
         const toId =
-            overData?.containerId ??
-            overParsed?.containerId ??
-            String(over.id);
+            overData?.containerId ?? overParsed?.containerId ?? String(over.id);
 
-        if (activeAid === undefined || fromId === undefined || toId === 'available') {
+        if (
+            activeAid === undefined ||
+            fromId === undefined ||
+            toId === 'available'
+        ) {
             return;
         }
 
@@ -384,7 +418,11 @@ export const ThresholdEditor = ({
         if (fromId === toId) {
             const clause = clauses.find((candidate) => candidate.id === fromId);
             const overAid = overData?.aid ?? overParsed?.aid;
-            if (clause === undefined || overAid === undefined || activeAid === overAid) {
+            if (
+                clause === undefined ||
+                overAid === undefined ||
+                activeAid === overAid
+            ) {
                 return;
             }
             const oldIndex = clause.weights.findIndex(
@@ -443,7 +481,9 @@ export const ThresholdEditor = ({
     const applyManual = () => {
         const parsed = parseThresholdSpec(manualValue, selectedAids);
         if (parsed === null) {
-            setManualError('Enter a number, string, weighted array, or nested array.');
+            setManualError(
+                'Enter a number, string, weighted array, or nested array.'
+            );
             return;
         }
 
@@ -467,7 +507,10 @@ export const ThresholdEditor = ({
                 borderColor: validation === null ? 'divider' : 'warning.main',
                 borderRadius: 1,
                 p: 1.5,
-                bgcolor: 'rgba(5, 9, 13, 0.35)',
+                bgcolor: (theme) =>
+                    validation === null
+                        ? theme.palette.background.paper
+                        : alpha(theme.palette.warning.main, 0.08),
             }}
         >
             <Stack spacing={1.25}>
@@ -481,7 +524,9 @@ export const ThresholdEditor = ({
                 >
                     <Typography variant="subtitle1">{title}</Typography>
                     <StatusPill
-                        label={validation === null ? 'valid' : 'needs attention'}
+                        label={
+                            validation === null ? 'valid' : 'needs attention'
+                        }
                         tone={validation === null ? 'success' : 'warning'}
                     />
                 </Stack>
@@ -507,7 +552,10 @@ export const ThresholdEditor = ({
                         <Box
                             sx={{
                                 display: 'grid',
-                                gridTemplateColumns: { xs: '1fr', md: '0.9fr 1.2fr' },
+                                gridTemplateColumns: {
+                                    xs: '1fr',
+                                    md: '0.9fr 1.2fr',
+                                },
                                 gap: 1.5,
                             }}
                         >
@@ -527,7 +575,8 @@ export const ThresholdEditor = ({
                                                 variant="body2"
                                                 color="text.secondary"
                                             >
-                                                All selected members are in this threshold.
+                                                All selected members are in this
+                                                threshold.
                                             </Typography>
                                         ) : (
                                             availableAids.map((aid) => (
@@ -535,7 +584,9 @@ export const ThresholdEditor = ({
                                                     key={aid}
                                                     aid={aid}
                                                     containerId="available"
-                                                    option={optionByAid.get(aid)}
+                                                    option={optionByAid.get(
+                                                        aid
+                                                    )}
                                                 />
                                             ))
                                         )}
@@ -583,7 +634,9 @@ export const ThresholdEditor = ({
                                                     <IconButton
                                                         size="small"
                                                         onClick={() =>
-                                                            removeClause(clause.id)
+                                                            removeClause(
+                                                                clause.id
+                                                            )
                                                         }
                                                     >
                                                         <DeleteIcon fontSize="small" />
@@ -593,45 +646,61 @@ export const ThresholdEditor = ({
                                         </Stack>
                                         <DroppableLane id={clause.id}>
                                             <SortableContext
-                                                items={clause.weights.map((item) =>
-                                                    makeItemId(
-                                                        clause.id,
-                                                        item.memberAid
-                                                    )
+                                                items={clause.weights.map(
+                                                    (item) =>
+                                                        makeItemId(
+                                                            clause.id,
+                                                            item.memberAid
+                                                        )
                                                 )}
-                                                strategy={verticalListSortingStrategy}
+                                                strategy={
+                                                    verticalListSortingStrategy
+                                                }
                                             >
                                                 {clause.weights.length === 0 ? (
                                                     <Typography
                                                         variant="body2"
                                                         color="text.secondary"
                                                     >
-                                                        Drop members into this clause.
+                                                        Drop members into this
+                                                        clause.
                                                     </Typography>
                                                 ) : (
-                                                    clause.weights.map((item) => (
-                                                        <SortableMember
-                                                            key={item.memberAid}
-                                                            aid={item.memberAid}
-                                                            containerId={clause.id}
-                                                            option={optionByAid.get(
-                                                                item.memberAid
-                                                            )}
-                                                            weight={item.weight}
-                                                            onWeightChange={(weight) =>
-                                                                updateWeight(
-                                                                    clause.id,
-                                                                    item.memberAid,
-                                                                    weight
-                                                                )
-                                                            }
-                                                            onRemove={() =>
-                                                                removeMember(
+                                                    clause.weights.map(
+                                                        (item) => (
+                                                            <SortableMember
+                                                                key={
                                                                     item.memberAid
-                                                                )
-                                                            }
-                                                        />
-                                                    ))
+                                                                }
+                                                                aid={
+                                                                    item.memberAid
+                                                                }
+                                                                containerId={
+                                                                    clause.id
+                                                                }
+                                                                option={optionByAid.get(
+                                                                    item.memberAid
+                                                                )}
+                                                                weight={
+                                                                    item.weight
+                                                                }
+                                                                onWeightChange={(
+                                                                    weight
+                                                                ) =>
+                                                                    updateWeight(
+                                                                        clause.id,
+                                                                        item.memberAid,
+                                                                        weight
+                                                                    )
+                                                                }
+                                                                onRemove={() =>
+                                                                    removeMember(
+                                                                        item.memberAid
+                                                                    )
+                                                                }
+                                                            />
+                                                        )
+                                                    )
                                                 )}
                                             </SortableContext>
                                         </DroppableLane>
@@ -645,7 +714,9 @@ export const ThresholdEditor = ({
                         <TextField
                             label="Raw sith"
                             value={manualValue}
-                            onChange={(event) => setManualValue(event.target.value)}
+                            onChange={(event) =>
+                                setManualValue(event.target.value)
+                            }
                             multiline
                             minRows={3}
                             placeholder='[["1/2","1/2"],["1"]]'
@@ -668,7 +739,10 @@ export const ThresholdEditor = ({
                                 Member order used by raw weighted thresholds
                             </Typography>
                             {selectedAids.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
                                     Add members in visual mode first.
                                 </Typography>
                             ) : (
@@ -684,8 +758,9 @@ export const ThresholdEditor = ({
                                         }}
                                     >
                                         {index + 1}.{' '}
-                                        {optionByAid.get(aid)?.alias ?? 'Unknown'} /{' '}
-                                        {aid}
+                                        {optionByAid.get(aid)?.alias ??
+                                            'Unknown'}{' '}
+                                        / {aid}
                                     </Typography>
                                 ))
                             )}
