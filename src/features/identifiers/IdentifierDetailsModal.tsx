@@ -20,6 +20,8 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import type { GeneratedOobiRecord } from '../../state/contacts.slice';
+import type { DidWebsDidRecord } from '../../state/didwebs.slice';
+import { DidWebsPublicationDetails } from '../didwebs/DidWebsPublicationDetails';
 import type {
     IdentifierDelegationChainNode,
     IdentifierDelegationChainState,
@@ -47,6 +49,7 @@ export interface IdentifierDetailsModalProps {
     refreshMessage: string | null;
     oobiState: IdentifierOobiDetailState;
     delegationChain: IdentifierDelegationChainState;
+    didWebsDid: DidWebsDidRecord | null;
     actionRunning: boolean;
     onClose: () => void;
     onRotate: (name: string) => void;
@@ -235,6 +238,7 @@ export const IdentifierDetailsModal = ({
     refreshMessage,
     oobiState,
     delegationChain,
+    didWebsDid,
     actionRunning,
     onClose,
     onRotate,
@@ -259,6 +263,7 @@ export const IdentifierDetailsModal = ({
             aria-describedby="modal-modal-description"
             fullWidth
             maxWidth="md"
+            data-testid="identifier-details-modal"
             slotProps={{
                 paper: {
                     sx: {
@@ -414,6 +419,17 @@ export const IdentifierDetailsModal = ({
                         </AccordionSummary>
                         <AccordionDetails>
                             <IdentifierOobis state={oobiState} />
+                        </AccordionDetails>
+                    </Accordion>
+                    <Accordion disableGutters defaultExpanded>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography>did:webs DID</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <DidWebsPublicationDetails
+                                record={didWebsDid}
+                                testIdPrefix="identifier"
+                            />
                         </AccordionDetails>
                     </Accordion>
                     {identifier !== null && (

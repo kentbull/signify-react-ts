@@ -199,7 +199,7 @@ export const identifiersAction = async (
 
     if (runtime.getClient() === null) {
         return {
-            intent: intent === 'rotate' ? 'rotate' : 'create',
+            intent: intent === 'rotate' ? intent : 'create',
             ok: false,
             message: 'Connect to KERIA before changing identifiers.',
         };
@@ -209,7 +209,7 @@ export const identifiersAction = async (
         return runIdentifierIntentAction(context);
     } catch (error) {
         return {
-            intent: intent === 'rotate' ? 'rotate' : 'create',
+            intent: intent === 'rotate' ? intent : 'create',
             ok: false,
             message: toRouteError(error).message,
             requestId: formString(formData, 'requestId'),

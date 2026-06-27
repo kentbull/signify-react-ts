@@ -1,5 +1,6 @@
 import {
     Box,
+    Button,
     List,
     ListItem,
     ListItemText,
@@ -7,7 +8,13 @@ import {
     Typography,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    StatusPill,
+    TelemetryRow,
+} from '../../app/Console';
 import { clickablePanelSx } from '../../app/consoleStyles';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
@@ -248,7 +255,21 @@ export const DashboardOverview = ({
                     to="/contacts"
                 />
             </Box>
-            <ConsolePanel title="Agent information" eyebrow="KERIA" to="/client">
+            <ConsolePanel
+                title="Agent information"
+                eyebrow="KERIA"
+                actions={
+                    <Button
+                        component={RouterLink}
+                        to="/client"
+                        size="small"
+                        variant="outlined"
+                        data-ui-sound={UI_SOUND_HOVER_VALUE}
+                    >
+                        Client Console
+                    </Button>
+                }
+            >
                 <TelemetryRow
                     label="Controller AID"
                     value={session.controllerAid ?? 'Not connected'}

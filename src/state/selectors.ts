@@ -29,6 +29,13 @@ import {
 /** Select the serializable session connection summary. */
 export const selectSession = (state: RootState) => state.session;
 
+/** Select did:webs DID facts for one AID. */
+export const selectDidWebsDidByAid =
+    (aid: string | null | undefined) => (state: RootState) =>
+        aid === null || aid === undefined
+            ? null
+            : (state.didwebs.byAid[aid] ?? null);
+
 /** Select only the session status for shell rendering. */
 export const selectConnectionStatus = (state: RootState) =>
     state.session.status;

@@ -148,14 +148,14 @@ const startRotateIdentifier =
     (context: RuntimeCommandContext) =>
     (aid: string, options: RequestIdOptions = {}): BackgroundWorkflowStartResult => {
         const requestId = requestIdFrom(context, options);
-        const identifier = identifierForRotation(context.getState(), aid);
+        const identifier = identifierForAid(context.getState(), aid);
         return context.startBackgroundWorkflow(
             () => rotateIdentifierBackgroundOp(aid, requestId),
             rotateIdentifierOptions(aid, requestId, identifier)
         );
     };
 
-const identifierForRotation = (
+const identifierForAid = (
     state: RootState,
     aid: string
 ): IdentifierSummary | null =>

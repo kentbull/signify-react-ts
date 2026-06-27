@@ -10,11 +10,13 @@ import type { GeneratedOobiRecord } from '../../state/contacts.slice';
 import {
     deleteContactOp,
     generateOobiOp,
+    listIdentifierOobisOp,
     liveSessionInventoryOp,
     resolveContactOobiOp,
     syncSessionInventoryOp,
     updateContactAliasOp,
     type GenerateOobiInput,
+    type ListIdentifierOobisInput,
     type SessionInventorySnapshot,
     type UpdateContactAliasInput,
 } from '../../workflows/contacts.op';
@@ -29,7 +31,9 @@ import type {
 } from './types';
 
 export interface ContactRuntimeCommands {
-    syncInventory(options?: WorkflowRunOptions): Promise<SessionInventorySnapshot>;
+    syncInventory(
+        options?: WorkflowRunOptions
+    ): Promise<SessionInventorySnapshot>;
     getIdentifierOobi(
         input: GenerateOobiInput,
         options?: WorkflowRunOptions
@@ -99,27 +103,18 @@ const getIdentifierOobi =
 
 const listIdentifierOobis =
     (context: RuntimeCommandContext) =>
-    async (
+    (
         identifier: string,
         roles: readonly OobiRole[],
         options: WorkflowRunOptions = {}
     ): Promise<GeneratedOobiRecord[]> => {
-        const loadOobi = getIdentifierOobi(context);
-        const records: GeneratedOobiRecord[] = [];
-        for (const role of roles) {
-            records.push(
-                await loadOobi(
-                    { identifier, role },
-                    {
-                        ...options,
-                        label: options.label,
-                        track: options.track ?? false,
-                    }
-                )
-            );
-        }
-
-        return records;
+        const input: ListIdentifierOobisInput = { identifier, roles };
+        return context.runWorkflow(() => listIdentifierOobisOp(input), {
+            ...options,
+            label: options.label,
+            kind: options.kind ?? 'workflow',
+            track: options.track ?? false,
+        });
     };
 
 const startGenerateOobi =

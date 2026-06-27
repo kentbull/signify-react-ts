@@ -13,6 +13,7 @@ import {
     type WorkflowRunOptions,
 } from '../../src/app/runtimeCommands';
 import { defaultIdentifierCreateDraft } from '../../src/domain/identifiers/identifierHelpers';
+import type { IdentifierSummary } from '../../src/domain/identifiers/identifierTypes';
 import { identifierListLoaded } from '../../src/state/identifiers.slice';
 import type { DelegationRequestNotification } from '../../src/state/notifications.slice';
 import { createAppStore } from '../../src/state/store';

@@ -10,6 +10,7 @@ import type {
     ContactRuntimeCommands,
     CredentialRuntimeCommands,
     DelegationRuntimeCommands,
+    DidWebsRuntimeCommands,
     IdentifierRuntimeCommands,
     MultisigRuntimeCommands,
     NotificationRuntimeCommands,
@@ -292,4 +293,6 @@ export interface RouteDataRuntime {
     credentials: CredentialRuntimeCommands;
     /** Multisig route commands. */
     multisig: MultisigRuntimeCommands;
+    /** did:webs DID route commands. */
+    didwebs: DidWebsRuntimeCommands;
 }

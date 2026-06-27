@@ -54,6 +54,7 @@ import {
     createContactRuntimeCommands,
     createCredentialRuntimeCommands,
     createDelegationRuntimeCommands,
+    createDidWebsRuntimeCommands,
     createIdentifierRuntimeCommands,
     createMultisigRuntimeCommands,
     createNotificationRuntimeCommands,
@@ -63,6 +64,7 @@ import {
     type ContactRuntimeCommands,
     type CredentialRuntimeCommands,
     type DelegationRuntimeCommands,
+    type DidWebsRuntimeCommands,
     type IdentifierRuntimeCommands,
     type MultisigRuntimeCommands,
     type NotificationRuntimeCommands,
@@ -221,6 +223,9 @@ export class AppRuntime {
     /** Multisig group command adapter. */
     readonly multisig: MultisigRuntimeCommands;
 
+    /** did:webs DID command adapter. */
+    readonly didwebs: DidWebsRuntimeCommands;
+
     /** Foreground and background task handles keyed by route request id. */
     private readonly activeTasks = new Map<string, Task<unknown>>();
 
@@ -276,6 +281,7 @@ export class AppRuntime {
         this.delegations = createDelegationRuntimeCommands(commandContext);
         this.credentials = createCredentialRuntimeCommands(commandContext);
         this.multisig = createMultisigRuntimeCommands(commandContext);
+        this.didwebs = createDidWebsRuntimeCommands(commandContext);
 
         this.storage =
             options.storage === undefined ? undefined : options.storage;

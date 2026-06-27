@@ -15,6 +15,10 @@ export {
     type DelegationRuntimeCommands,
 } from './delegations';
 export {
+    createDidWebsRuntimeCommands,
+    type DidWebsRuntimeCommands,
+} from './didwebs';
+export {
     createIdentifierRuntimeCommands,
     type IdentifierRuntimeCommands,
 } from './identifiers';

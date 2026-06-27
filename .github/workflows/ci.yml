@@ -14,7 +14,7 @@ jobs:
   smoke:
     name: Lint, build, and KERIA smoke tests
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     env:
       KERIPY_BRANCH: v1.2.13
