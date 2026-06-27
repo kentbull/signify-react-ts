@@ -72,6 +72,9 @@ export interface ScenarioNotification {
 }
 
 let sequence = 0;
+const scenarioOperationTimeoutMs = Number(
+    process.env.SMOKE_OPERATION_TIMEOUT_MS ?? 120_000
+);
 
 /**
  * Return a configured passcode for long-lived demo roles when one is present.
@@ -145,6 +148,7 @@ export const waitForKeriaOperation = async (
     waitOperation(role.client, operation, {
         label: `${role.name}: ${label}`,
         ...appConfig.operations,
+        timeoutMs: scenarioOperationTimeoutMs,
     });
 
 /**

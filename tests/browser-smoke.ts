@@ -1,5 +1,11 @@
-import { spawn } from 'node:child_process';
-import puppeteer from 'puppeteer';
+import puppeteer, { type Page } from 'puppeteer';
+import {
+  chromeArgs,
+  dispatchClick,
+  routeUrl as appRouteUrl,
+  sleep,
+  startViteIfNeeded,
+} from './support/browserHarness';
 
 /**
  * Browser smoke for the React connection path.
@@ -11,57 +17,15 @@ import puppeteer from 'puppeteer';
 const appUrl = process.env.BROWSER_SMOKE_URL ?? 'http://127.0.0.1:5173';
 const uiPreferencesStorageKey = 'signify-react-ts:ui-preferences:v1';
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const canReachApp = async () => {
-  try {
-    const response = await fetch(appUrl);
-    return response.ok;
-  } catch {
-    return false;
-  }
-};
-
-const waitForApp = async () => {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    if (await canReachApp()) {
-      return;
-    }
-    await sleep(500);
-  }
-
-  throw new Error(`Vite app did not become reachable at ${appUrl}`);
-};
-
-const startViteIfNeeded = async () => {
-  if (await canReachApp()) {
-    return null;
-  }
-
-  const child = spawn('pnpm', ['exec', 'vite', '--host', '127.0.0.1'], {
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      BROWSER: 'none',
-    },
-  });
-
-  await waitForApp();
-  return child;
-};
-
-const textContent = (page, selector) =>
+const textContent = (page: Page, selector: string): Promise<string> =>
   page.$eval(selector, (element) => element.textContent ?? '');
 
-const routeUrl = (path) => new URL(path, appUrl).toString();
+const routeUrl = (path: string): string => appRouteUrl(appUrl, path);
 
-const passcodeValue = (page) =>
+const passcodeValue = (page: Page): Promise<string> =>
   page.$eval('#outlined-password-input', (element) => element.value ?? '');
 
-const chromeArgs =
-  process.env.CI === 'true' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [];
-
-const vite = await startViteIfNeeded();
+const vite = await startViteIfNeeded(appUrl);
 const browser = await puppeteer.launch({
   headless: 'new',
   args: chromeArgs,
@@ -97,7 +61,7 @@ try {
   if (defaultSoundMuted !== 'false') {
     throw new Error(`Expected sound enabled by default, got aria-pressed=${defaultSoundMuted}`);
   }
-  await page.click('[data-testid="ui-sound-toggle"]');
+  await dispatchClick(page, '[data-testid="ui-sound-toggle"]');
   await page.waitForFunction(
     () =>
       globalThis.document
@@ -133,9 +97,9 @@ try {
 
   await page.goto(appUrl, { waitUntil: 'networkidle0' });
 
-  await page.click('[data-testid="connect-open"]');
+  await dispatchClick(page, '[data-testid="connect-open"]');
   await page.waitForSelector('[data-testid="connect-dialog"]');
-  await page.click('[data-testid="generate-passcode"]');
+  await dispatchClick(page, '[data-testid="generate-passcode"]');
   await page.waitForFunction(
     () =>
       globalThis.document.querySelector(
@@ -155,7 +119,7 @@ try {
   if (generatedPasscode.length < 21) {
     throw new Error(`Expected generated passcode, got ${generatedPasscode}`);
   }
-  await page.click('[data-testid="connect-submit"]');
+  await dispatchClick(page, '[data-testid="connect-submit"]');
   await page.waitForSelector('[data-testid="app-loading-overlay"]', {
     timeout: 10000,
   });
@@ -174,11 +138,11 @@ try {
     throw new Error(`Expected post-connect /dashboard route, got ${page.url()}`);
   }
 
-  await page.click('[data-testid="nav-open"]');
+  await dispatchClick(page, '[data-testid="nav-open"]');
   await page.waitForSelector('[data-testid="nav-identifiers"]', {
     timeout: 10000,
   });
-  await page.click('[data-testid="nav-identifiers"]');
+  await dispatchClick(page, '[data-testid="nav-identifiers"]');
   await page.waitForSelector('[data-testid="identifier-table"]', {
     timeout: 10000,
   });
@@ -204,11 +168,11 @@ try {
   }
 
   await sleep(500);
-  await page.click('[data-testid="nav-open"]');
+  await dispatchClick(page, '[data-testid="nav-open"]');
   await page.waitForSelector('[data-testid="nav-client"]', {
     timeout: 10000,
   });
-  await page.click('[data-testid="nav-client"]');
+  await dispatchClick(page, '[data-testid="nav-client"]');
   await page.waitForSelector('[data-testid="client-summary"]', {
     timeout: 10000,
   });

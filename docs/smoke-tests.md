@@ -58,7 +58,7 @@ The smoke-test stack has one shared smoke module and two executable wrappers.
 | --------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | Shared smoke    | `tests/smoke/clientBoundarySmoke.ts` | Boots/connects through the Signify boundary, reads client state, and optionally creates a witnessed identifier.     |
 | CLI wrapper     | `scripts/keria-smoke.ts`             | Parses process args, calls the shared smoke module, and prints JSON.                                                |
-| Browser wrapper | `tests/browser-smoke.mjs`            | Starts or reuses Vite, drives the React UI with Puppeteer, and verifies the client summary.                         |
+| Browser wrapper | `tests/browser-smoke.ts`             | Starts or reuses Vite, drives the React UI with Puppeteer, and verifies the client summary.                         |
 | Contact OOBI smoke | `tests/contact-oobi-smoke.ts` | Resolves harness and witness OOBIs through the React Contacts UI and verifies operation/notification payload links. |
 | Contact challenge smoke | `tests/contact-challenge-smoke.ts` | Exercises browser challenge generation, harness response, synthetic challenge notifications, detail response, and bell response. |
 | App runtime     | `src/app/runtime.ts`                 | Shares connected Signify state between React Router loaders/actions and shell UI.                                   |

@@ -163,6 +163,7 @@ export const IdentifierCreateDialog = ({
                         fullWidth
                         margin="normal"
                         variant="outlined"
+                        data-testid="identifier-create-name"
                     />
                     <FormControl fullWidth margin="normal">
                         <InputLabel id="identifier-create-algo-label">
@@ -360,6 +361,7 @@ export const IdentifierCreateDialog = ({
                     onClick={handleComplete}
                     sx={{ width: { xs: '100%', sm: 'auto' } }}
                     data-ui-sound={UI_SOUND_HOVER_VALUE}
+                    data-testid="identifier-create-submit"
                 >
                     {actionRunning ? 'Working...' : 'Create'}
                 </Button>
