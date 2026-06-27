@@ -224,6 +224,27 @@ describe('AppRuntime workflow bridge', () => {
             });
         });
         expect(store.getState().appNotifications.ids).toHaveLength(1);
+        const notificationId = store.getState().appNotifications.ids[0];
+        expect(notificationId).toBeDefined();
+        expect(
+            store.getState().appNotifications.byId[notificationId].links
+        ).toEqual([
+            {
+                rel: 'operation',
+                label: 'View operation',
+                path: '/operations/background-success',
+            },
+            {
+                rel: 'notification',
+                label: 'View notification',
+                path: `/notifications/${notificationId}`,
+            },
+            {
+                rel: 'result',
+                label: 'Contacts',
+                path: '/credentials',
+            },
+        ]);
 
         await runtime.destroy();
     });
