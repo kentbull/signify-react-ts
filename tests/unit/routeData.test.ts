@@ -71,6 +71,7 @@ type RuntimeOverrides = Partial<
     delegations?: Partial<RouteDataRuntime['delegations']>;
     credentials?: Partial<RouteDataRuntime['credentials']>;
     multisig?: Partial<RouteDataRuntime['multisig']>;
+    didwebs?: Partial<RouteDataRuntime['didwebs']>;
 };
 
 const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
@@ -237,7 +238,8 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
             startAcceptInteraction: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'accept-interaction-multisig-request-1',
-                operationRoute: '/operations/accept-interaction-multisig-request-1',
+                operationRoute:
+                    '/operations/accept-interaction-multisig-request-1',
             })),
             startRotateGroup: vi.fn(() => ({
                 status: 'accepted',
@@ -247,13 +249,17 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
             startAcceptRotation: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'accept-rotation-multisig-request-1',
-                operationRoute: '/operations/accept-rotation-multisig-request-1',
+                operationRoute:
+                    '/operations/accept-rotation-multisig-request-1',
             })),
             startJoinRotation: vi.fn(() => ({
                 status: 'accepted',
                 requestId: 'join-rotation-multisig-request-1',
                 operationRoute: '/operations/join-rotation-multisig-request-1',
             })),
+        },
+        didwebs: {
+            refreshIdentifierDid: vi.fn(async () => null),
         },
     };
 
@@ -287,6 +293,10 @@ const makeRuntime = (overrides: RuntimeOverrides = {}): RouteDataRuntime => {
         multisig: {
             ...runtime.multisig,
             ...overrides.multisig,
+        },
+        didwebs: {
+            ...runtime.didwebs,
+            ...overrides.didwebs,
         },
     };
 };
@@ -359,6 +369,7 @@ describe('route loaders', () => {
             summary,
         });
         expect(runtime.refreshState).toHaveBeenCalledOnce();
+        expect(runtime.didwebs.refreshIdentifierDid).not.toHaveBeenCalled();
     });
 
     it('loads dashboard, session, and credential inventory through the runtime boundary', async () => {
@@ -367,12 +378,26 @@ describe('route loaders', () => {
         await expect(loadDashboard(runtime)).resolves.toEqual({
             status: 'ready',
         });
+        expect(runtime.refreshState).toHaveBeenCalledOnce();
         expect(runtime.identifiers.list).toHaveBeenCalledOnce();
+        expect(runtime.didwebs.refreshIdentifierDid).not.toHaveBeenCalled();
         expect(runtime.contacts.syncInventory).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncKnownSchemas).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncRegistries).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncInventory).toHaveBeenCalledOnce();
         expect(runtime.credentials.syncIpexActivity).toHaveBeenCalledOnce();
+    });
+
+    it('keeps dashboard ready when state refresh fails', async () => {
+        const runtime = makeRuntime({
+            refreshState: vi.fn(async () => {
+                throw new Error('agent state unavailable');
+            }),
+        });
+
+        await expect(loadDashboard(runtime)).resolves.toEqual({
+            status: 'ready',
+        });
     });
 
     it('loads contact inventory through the runtime boundary', async () => {
@@ -408,10 +433,7 @@ describe('route loaders', () => {
                     multisigGroupDetailsFromIdentifier({
                         identifier,
                         membersResponse: {
-                            signing: [
-                                { prefix: 'Ealice' },
-                                { prefix: 'Ebob' },
-                            ],
+                            signing: [{ prefix: 'Ealice' }, { prefix: 'Ebob' }],
                             rotation: [
                                 { prefix: 'Ealice' },
                                 { prefix: 'Ebob' },

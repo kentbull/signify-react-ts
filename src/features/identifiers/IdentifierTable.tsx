@@ -248,7 +248,9 @@ export const IdentifierTable = ({
                         >
                             <OobiCopyButton
                                 identifier={identifier}
-                                copyStatus={agentOobiCopyStatus[identifier.name]}
+                                copyStatus={
+                                    agentOobiCopyStatus[identifier.name]
+                                }
                                 onCopy={copyAgentOobi}
                             />
                             <Tooltip title="Rotate identifier">
@@ -319,7 +321,10 @@ export const IdentifierTable = ({
                             >
                                 OOBI
                             </TableCell>
-                            <TableCell align="right" sx={stickyActionHeadCellSx}>
+                            <TableCell
+                                align="right"
+                                sx={stickyActionHeadCellSx}
+                            >
                                 Actions
                             </TableCell>
                         </TableRow>
@@ -427,7 +432,10 @@ export const IdentifierTable = ({
                                                         identifier
                                                     )}
                                                     onClick={(event) =>
-                                                        rotate(event, identifier)
+                                                        rotate(
+                                                            event,
+                                                            identifier
+                                                        )
                                                     }
                                                 >
                                                     <RotateRightIcon fontSize="small" />

@@ -1,8 +1,4 @@
-import type {
-    Contact,
-    Operation as KeriaOperation,
-    SignifyClient,
-} from 'signify-ts';
+import type { Contact, SignifyClient } from 'signify-ts';
 import type { Operation as EffectionOperation } from 'effection';
 import { callPromise } from '../effects/promise';
 import {
@@ -19,6 +15,7 @@ import type {
 import type { ChallengeRecord } from '../domain/challenges/challengeTypes';
 import type { OperationLogger } from '../signify/client';
 import { waitOperationService } from './signify.service';
+import { ensureAgentEndRoleService } from './identifiers.service';
 
 /**
  * OOBI role variants the UI can ask KERIA to generate for an identifier.
@@ -66,32 +63,6 @@ const completedOperationAid = (operation: unknown): string | null => {
     return stringValue(operation.response.i);
 };
 
-const hasEndRole = (raw: unknown, role: string, eid: string): boolean =>
-    Array.isArray(raw) &&
-    raw.some(
-        (item) =>
-            isRecord(item) &&
-            item.role === role &&
-            stringValue(item.eid) === eid
-    );
-
-const listIdentifierEndRoles = ({
-    client,
-    identifier,
-    role,
-}: {
-    client: SignifyClient;
-    identifier: string;
-    role: string;
-}): Promise<unknown> =>
-    client
-        .fetch(
-            `/identifiers/${encodeURIComponent(identifier)}/endroles/${encodeURIComponent(role)}`,
-            'GET',
-            null
-        )
-        .then((response) => response.json());
-
 /**
  * Load contacts and contact-derived challenge facts from KERIA.
  */
@@ -112,47 +83,6 @@ export function* listContactsService({
         challenges: challengeRecordsFromKeriaContacts(contacts, loadedAt),
         loadedAt,
     };
-}
-
-/**
- * Ensure the local identifier has authorized this KERIA agent as its `agent`
- * endpoint role before generating an agent OOBI.
- */
-export function* ensureAgentEndRoleService({
-    client,
-    identifier,
-    logger,
-}: {
-    client: SignifyClient;
-    identifier: string;
-    logger?: OperationLogger;
-}): EffectionOperation<void> {
-    const agentPre = client.agent?.pre;
-    if (agentPre === undefined) {
-        throw new Error('Connected Signify client is missing its agent AID.');
-    }
-
-    const existing = yield* callPromise(() =>
-        listIdentifierEndRoles({
-            client,
-            identifier,
-            role: 'agent',
-        })
-    );
-    if (hasEndRole(existing, 'agent', agentPre)) {
-        return;
-    }
-
-    const result = yield* callPromise(() =>
-        client.identifiers().addEndRole(identifier, 'agent', agentPre)
-    );
-    const operation = (yield* callPromise(() => result.op())) as KeriaOperation;
-    yield* waitOperationService({
-        client,
-        operation,
-        label: `authorizing ${identifier} agent endpoint`,
-        logger,
-    });
 }
 
 /**
@@ -180,6 +110,39 @@ export function* generateIdentifierOobiService({
     const oobis = result.oobis.filter((oobi) => oobi.trim().length > 0);
     if (oobis.length === 0) {
         throw new Error(`KERIA returned no ${role} OOBIs for ${identifier}.`);
+    }
+
+    return {
+        id: `${identifier}:${role}`,
+        identifier,
+        role,
+        oobis,
+        generatedAt: new Date().toISOString(),
+    };
+}
+
+/**
+ * Read any currently available OOBIs for a local identifier role.
+ *
+ * Unlike `generateIdentifierOobiService`, this is intentionally read-only: it
+ * never creates endpoint-role authorizations and treats missing OOBIs as normal
+ * unavailable state.
+ */
+export function* readIdentifierOobiService({
+    client,
+    identifier,
+    role,
+}: {
+    client: SignifyClient;
+    identifier: string;
+    role: OobiRole;
+}): EffectionOperation<GeneratedOobiRecord | null> {
+    const result = yield* callPromise(() =>
+        client.oobis().get(identifier, role)
+    );
+    const oobis = result.oobis.filter((oobi) => oobi.trim().length > 0);
+    if (oobis.length === 0) {
+        return null;
     }
 
     return {
