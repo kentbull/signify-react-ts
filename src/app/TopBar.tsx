@@ -16,7 +16,10 @@ import type { CredentialGrantNotification } from '../domain/credentials/credenti
 import type { OperationRecord } from '../state/operations.slice';
 import type { IdentifierSummary } from '../domain/identifiers/identifierTypes';
 import { allAppNotificationsRead } from '../state/appNotifications.slice';
-import { hoverSoundMutedToggled } from '../state/uiPreferences.slice';
+import {
+    hoverSoundMutedToggled,
+    themeModeToggled,
+} from '../state/uiPreferences.slice';
 import {
     walletAidCleared,
     walletAidSelected,
@@ -29,8 +32,12 @@ import {
     selectReadyCredentialRegistriesForSelectedAid,
     selectSelectedWalletIdentifier,
     selectSelectedWalletRegistry,
+    selectThemeMode,
 } from '../state/selectors';
-import { multisigRequestIntent, multisigRequestLocalMembers } from '../features/multisig/multisigRequestUi';
+import {
+    multisigRequestIntent,
+    multisigRequestLocalMembers,
+} from '../features/multisig/multisigRequestUi';
 import { TopBarToolbar } from './TopBarToolbar';
 import { TopBarOperationsPopover } from './TopBarOperationsPopover';
 import { TopBarNotificationsPopover } from './TopBarNotificationsPopover';
@@ -97,6 +104,7 @@ export const TopBar = ({
     const location = useLocation();
     const dispatch = useAppDispatch();
     const hoverSoundMuted = useAppSelector(selectHoverSoundMuted);
+    const themeMode = useAppSelector(selectThemeMode);
     const selectedIdentifier = useAppSelector(selectSelectedWalletIdentifier);
     const readyRegistries = useAppSelector(
         selectReadyCredentialRegistriesForSelectedAid
@@ -164,6 +172,10 @@ export const TopBar = ({
 
     const toggleHoverSoundMuted = () => {
         dispatch(hoverSoundMutedToggled());
+    };
+
+    const toggleThemeMode = () => {
+        dispatch(themeModeToggled());
     };
 
     const navigateCredentialSelection = (aid: string | null) => {
@@ -285,6 +297,7 @@ export const TopBar = ({
             <TopBarToolbar
                 isConnected={isConnected}
                 hoverSoundMuted={hoverSoundMuted}
+                themeMode={themeMode}
                 selectedIdentifier={selectedIdentifier}
                 selectedRegistry={selectedRegistry}
                 identifiers={identifiers}
@@ -295,6 +308,7 @@ export const TopBar = ({
                 onSelectedAidChange={handleSelectedAidChange}
                 onSelectedRegistryChange={handleSelectedRegistryChange}
                 onToggleHoverSoundMuted={toggleHoverSoundMuted}
+                onToggleThemeMode={toggleThemeMode}
                 onOpenOperations={openOperations}
                 onOpenNotifications={openNotifications}
                 onConnectClick={onConnectClick}

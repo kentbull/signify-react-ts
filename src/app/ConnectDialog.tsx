@@ -14,6 +14,7 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -133,7 +134,11 @@ export const ConnectDialog = ({
                                 ? 'primary.main'
                                 : 'divider',
                             borderRadius: 1,
-                            bgcolor: 'rgba(5, 9, 13, 0.62)',
+                            bgcolor: (theme) =>
+                                alpha(
+                                    theme.palette.background.default,
+                                    theme.palette.mode === 'dark' ? 0.62 : 0.74
+                                ),
                             p: { xs: 1.5, sm: 2 },
                         }}
                     >

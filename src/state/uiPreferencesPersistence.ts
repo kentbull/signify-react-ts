@@ -1,16 +1,16 @@
 import {
     defaultUiPreferencesState,
+    type ThemeMode,
     type UiPreferencesState,
 } from './uiPreferences.slice';
 import type { AppStateStorage } from './persistence';
 
-const UI_PREFERENCES_VERSION = 1;
+const UI_PREFERENCES_VERSION = 2;
 
 /**
  * Global UI-preference storage bucket, intentionally not controller-scoped.
  */
-export const UI_PREFERENCES_STORAGE_KEY =
-    'signify-react-ts:ui-preferences:v1';
+export const UI_PREFERENCES_STORAGE_KEY = 'signify-react-ts:ui-preferences:v1';
 
 /**
  * Versioned UI preferences persisted outside Signify controller state.
@@ -18,6 +18,7 @@ export const UI_PREFERENCES_STORAGE_KEY =
 export interface PersistedUiPreferences {
     version: typeof UI_PREFERENCES_VERSION;
     hoverSoundMuted: boolean;
+    themeMode: ThemeMode;
 }
 
 interface UiPreferencesStore {
@@ -45,6 +46,9 @@ const defaultUiPreferences = (): UiPreferencesState => ({
     ...defaultUiPreferencesState,
 });
 
+const isThemeMode = (value: unknown): value is ThemeMode =>
+    value === 'dark' || value === 'light';
+
 /**
  * Project Redux UI preferences into the persisted JSON shape.
  */
@@ -53,6 +57,7 @@ export const persistedUiPreferencesFromState = (
 ): PersistedUiPreferences => ({
     version: UI_PREFERENCES_VERSION,
     hoverSoundMuted: state.hoverSoundMuted,
+    themeMode: state.themeMode,
 });
 
 /**
@@ -72,16 +77,27 @@ export const loadPersistedUiPreferences = (
 
     try {
         const parsed: unknown = JSON.parse(text);
+        if (!isRecord(parsed) || typeof parsed.hoverSoundMuted !== 'boolean') {
+            return defaultUiPreferences();
+        }
+
+        if (parsed.version === 1) {
+            return {
+                hoverSoundMuted: parsed.hoverSoundMuted,
+                themeMode: defaultUiPreferencesState.themeMode,
+            };
+        }
+
         if (
-            !isRecord(parsed) ||
             parsed.version !== UI_PREFERENCES_VERSION ||
-            typeof parsed.hoverSoundMuted !== 'boolean'
+            !isThemeMode(parsed.themeMode)
         ) {
             return defaultUiPreferences();
         }
 
         return {
             hoverSoundMuted: parsed.hoverSoundMuted,
+            themeMode: parsed.themeMode,
         };
     } catch {
         return defaultUiPreferences();
