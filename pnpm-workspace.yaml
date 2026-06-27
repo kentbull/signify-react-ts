@@ -1,5 +1,10 @@
 allowBuilds:
   esbuild: true
   puppeteer: true
+  signify-did-webs: true
+  signify-did-webs@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f: true
+  signify-did-webs@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f#path:/packages/signify-did-webs: true
   signify-ts: true
   signify-ts@https://codeload.github.com/kentbull/signify-ts/tar.gz/8bdeb48516b4a9d8d7e6818e0bc37e4b26908ec3: true
+  signify-w3c: true
+  signify-w3c@https://codeload.github.com/GLEIF-IT/w3c-crosswalk/tar.gz/2d057b19cb8475b8113b55990f09828f9b030b2f: true
