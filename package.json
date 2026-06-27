@@ -14,6 +14,7 @@
         "contact:challenge-smoke": "tsx tests/contact-challenge-smoke.ts",
         "identifier:agent-oobi-smoke": "tsx tests/identifier-agent-oobi-smoke.ts",
         "browser:smoke": "node tests/browser-smoke.mjs",
+        "w3c:holder-presentation:smoke": "node tests/w3c-holder-presentation-smoke.mjs",
         "responsive:smoke": "node tests/responsive-smoke.mjs",
         "unit:test": "vitest run tests/unit",
         "multisig:test": "vitest run tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts",
