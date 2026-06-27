@@ -1,8 +1,9 @@
 # Smoke Tests
 
-The smoke tests are fast confidence checks for the Signify client boundary and
-the React connection/contact paths. They are not full issuer/holder/verifier
-tests and they intentionally do not depend on a schema server.
+Most smoke tests are fast confidence checks for the Signify client boundary and
+the React connection/contact paths. The W3C holder presentation smoke is the
+exception: it attaches to a pre-seeded live issuer/holder/verifier stack and
+validates the browser path against live services.
 
 Use them before and after changes that touch:
 
@@ -27,6 +28,12 @@ pnpm keria:smoke
 pnpm browser:smoke
 pnpm contact:ui-smoke
 pnpm contact:challenge-smoke
+```
+
+Holder W3C presentation smoke against a live pre-seeded stack:
+
+```bash
+pnpm w3c:holder-presentation:smoke
 ```
 
 Run `pnpm keria:smoke -- --mode connect` first when debugging. It proves the
@@ -61,6 +68,7 @@ The smoke-test stack has one shared smoke module and two executable wrappers.
 | Browser wrapper | `tests/browser-smoke.ts`             | Starts or reuses Vite, drives the React UI with Puppeteer, and verifies the client summary.                         |
 | Contact OOBI smoke | `tests/contact-oobi-smoke.ts` | Resolves harness and witness OOBIs through the React Contacts UI and verifies operation/notification payload links. |
 | Contact challenge smoke | `tests/contact-challenge-smoke.ts` | Exercises browser challenge generation, harness response, synthetic challenge notifications, detail response, and bell response. |
+| W3C holder presentation smoke | `tests/w3c-holder-presentation-smoke.mjs` | Attaches Puppeteer to the React app, drives holder VRD presentation, and waits for live KERIA plus verifier-service evidence. |
 | App runtime     | `src/app/runtime.ts`                 | Shares connected Signify state between React Router loaders/actions and shell UI.                                   |
 | Boundary        | `src/signify/client.ts`              | Owns `ready()`, `randomPasscode()`, `SignifyClient` construction, boot/connect, state reads, and operation waiting. |
 | Config          | `src/config.ts`                      | Supplies shared defaults and environment overrides for browser and Node execution.                                  |
@@ -230,6 +238,45 @@ This is intentionally longer than the basic browser smoke because it depends on
 OOBI exchange, EXN indexing, contact inventory polling, and KERIA challenge
 operation completion.
 
+## W3C Holder Presentation Smoke
+
+```bash
+pnpm w3c:holder-presentation:smoke
+```
+
+This check attaches to an already-running W3C stack. It does not create or mock
+the issuer/holder/verifier services. The stack must provide:
+
+1. live KERIA with W3C enabled,
+2. a seeded holder wallet passcode and alias,
+3. a seeded native VRD credential that can be issued as an edge-built W3C
+   credential and materialized as an admitted holder credential,
+4. live Python, Node, and Go verifier services exposing `/verify/vp` and
+   `/operations`,
+5. a React app build using the intended `signify-ts` package or pinned Git SHA.
+
+Common environment variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `W3C_HOLDER_SMOKE_URL` | Running React app URL. |
+| `W3C_HOLDER_SMOKE_MANIFEST` | Seed/headless manifest with wallet and credential facts. |
+| `W3C_HOLDER_PASSCODE` | Holder wallet passcode for the browser flow. |
+| `W3C_HOLDER_ALIAS` | Holder identifier alias. |
+| `W3C_CREDENTIAL_SAID` | Native VRD credential SAID selected for presentation. |
+| `W3C_VERIFIER_REQUEST_JSON` | Single verifier request descriptor JSON. |
+| `W3C_VERIFIER_REQUESTS_JSON` | Multiple verifier request descriptors keyed by service. |
+| `W3C_PYTHON_VERIFIER_URL` | Python verifier host URL for evidence polling. |
+| `W3C_NODE_VERIFIER_URL` | Node verifier host URL for evidence polling. |
+| `W3C_GO_VERIFIER_URL` | Go verifier host URL for evidence polling. |
+
+The smoke succeeds only when the issuer browser action builds and submits the
+VC-JWT, KERIA validates and forwards the W3C credential to the holder, the
+holder browser action builds and submits the VP-JWT, KERIA validates and
+forwards the presentation to live verifier services, and verifier operations
+reach terminal accepted state. Verifier test doubles, direct library calls, or
+CLI-only commands are not acceptance evidence for this browser path.
+
 ## Configuration
 
 The smoke tests use the same config as the app:
@@ -246,6 +293,7 @@ The smoke tests use the same config as the app:
 | `BROWSER_SMOKE_URL`           | `http://127.0.0.1:5173`   | Browser smoke only.            |
 | `CONTACT_OOBI_SMOKE_URL`      | `http://127.0.0.1:5176`   | Contact OOBI browser smoke.    |
 | `CONTACT_CHALLENGE_SMOKE_URL` | `http://127.0.0.1:5177`   | Contact challenge browser smoke. |
+| `W3C_HOLDER_SMOKE_URL`        | unset                     | W3C holder presentation smoke. |
 
 Browser smoke calls local KERIA directly and requires KERIA CORS support to be
 enabled, for example `KERI_AGENT_CORS=true`. Without that, browser preflight for
