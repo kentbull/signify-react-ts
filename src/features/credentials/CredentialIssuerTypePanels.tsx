@@ -25,7 +25,10 @@ import {
     SEDI_VOTER_ISSUE_TEXT_FIELDS,
     type SediVoterIssueFormDraft,
 } from '../../domain/credentials/sediVoterId';
-import type { CredentialSummaryRecord } from '../../domain/credentials/credentialTypes';
+import type {
+    CredentialSummaryRecord,
+    SchemaRecord,
+} from '../../domain/credentials/credentialTypes';
 import type { IssueableCredentialTypeView } from '../../domain/credentials/credentialCatalog';
 import type { ContactRecord } from '../../state/contacts.slice';
 import type { CredentialRegistryTile } from './credentialViewModels';
@@ -331,11 +334,13 @@ export const IssuedCredentialsForTypePanel = ({
     credentials,
     actionRunning,
     credentialTypesBySchema,
+    schemasBySaid,
     onGrant,
 }: {
     credentials: readonly CredentialSummaryRecord[];
     actionRunning: boolean;
     credentialTypesBySchema: ReadonlyMap<string, IssueableCredentialTypeView>;
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     onGrant: (credential: CredentialSummaryRecord) => void;
 }) => (
     <ConsolePanel
@@ -398,6 +403,7 @@ export const IssuedCredentialsForTypePanel = ({
                                 credentialTypesBySchema={
                                     credentialTypesBySchema
                                 }
+                                schemasBySaid={schemasBySaid}
                             />
                         </Stack>
                     </Box>

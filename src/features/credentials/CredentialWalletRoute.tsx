@@ -1,12 +1,12 @@
-import { useState } from 'react';
 import { Box, Button, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../state/hooks';
 import {
     selectCredentialGrantNotifications,
     selectHeldCredentials,
     selectIssueableCredentialTypeViews,
+    selectCredentialSchemas,
 } from '../../state/selectors';
 import {
     grantsForAid,
@@ -26,9 +26,10 @@ import {
  * Wallet route for one selected local AID.
  *
  * This route owns holder-side schema readiness, inbound grant admission, and
- * held credential expansion state.
+ * held credential navigation.
  */
 export const CredentialWalletRoute = () => {
+    const navigate = useNavigate();
     const {
         actionRunning,
         selectedIdentifier,
@@ -36,9 +37,9 @@ export const CredentialWalletRoute = () => {
         submitCredentialForm,
     } = useCredentialsRouteContext();
     const credentialTypes = useAppSelector(selectIssueableCredentialTypeViews);
+    const schemas = useAppSelector(selectCredentialSchemas);
     const heldCredentials = useAppSelector(selectHeldCredentials);
     const grantNotifications = useAppSelector(selectCredentialGrantNotifications);
-    const [expandedCredentialSaid, setExpandedCredentialSaid] = useState('');
 
     if (selectedIdentifier === null) {
         return null;
@@ -49,6 +50,9 @@ export const CredentialWalletRoute = () => {
             credentialType.schemaSaid,
             credentialType,
         ])
+    );
+    const schemasBySaid = new Map(
+        schemas.map((schema) => [schema.said, schema])
     );
     const selectedAidHeldCredentials = heldCredentialsForAid(
         heldCredentials,
@@ -76,10 +80,8 @@ export const CredentialWalletRoute = () => {
         submitCredentialForm(formData);
     };
 
-    const toggleHeldCredential = (credentialSaid: string) => {
-        setExpandedCredentialSaid((current) =>
-            current === credentialSaid ? '' : credentialSaid
-        );
+    const openHeldCredential = (credentialSaid: string) => {
+        navigate(`/dashboard/credentials/${encodeURIComponent(credentialSaid)}`);
     };
 
     return (
@@ -109,13 +111,14 @@ export const CredentialWalletRoute = () => {
                 grants={selectedAidGrants}
                 actionRunning={actionRunning}
                 credentialTypesBySchema={credentialTypesBySchema}
+                schemasBySaid={schemasBySaid}
                 onAdmit={submitAdmit}
             />
             <HeldCredentialsPanel
                 credentials={selectedAidHeldCredentials}
-                expandedCredentialSaid={expandedCredentialSaid}
                 credentialTypesBySchema={credentialTypesBySchema}
-                onToggleCredential={toggleHeldCredential}
+                schemasBySaid={schemasBySaid}
+                onOpenCredential={openHeldCredential}
             />
         </Stack>
     );

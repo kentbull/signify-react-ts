@@ -1,10 +1,6 @@
-import type { ReactNode } from 'react';
 import {
     Box,
     Button,
-    List,
-    ListItem,
-    ListItemText,
     Stack,
     Table,
     TableBody,
@@ -15,17 +11,19 @@ import {
     Typography,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import { ConsolePanel, EmptyState, PageHeader, StatusPill, TelemetryRow } from '../../app/Console';
-import { monoValueSx } from '../../app/consoleStyles';
+import {
+    ConsolePanel,
+    EmptyState,
+    PageHeader,
+    TelemetryRow,
+} from '../../app/Console';
 import { UI_SOUND_HOVER_VALUE } from '../../app/uiSound';
 import type { DashboardLoaderData } from '../../app/routeData';
 import type {
     CredentialSummaryRecord,
-    RegistryRecord,
     SchemaRecord,
 } from '../../domain/credentials/credentialTypes';
-import { schemaRuleViews } from './schemaRules';
-import type { AidAliases, CredentialActivityEntry } from './dashboardViewModels';
+import type { AidAliases } from './dashboardViewModels';
 import {
     AidValue,
     BackToDashboard,
@@ -33,21 +31,9 @@ import {
     CredentialTypeValue,
     DashboardWarning,
     DetailValue,
-    FullAidValue,
-    FullMonoValue,
 } from './DashboardShared';
-import {
-    credentialLedgerStatus,
-    credentialTypeLabel,
-    displayText,
-    registryDisplay,
-    schemaTitle,
-    timestampText,
-} from './dashboardDisplay';
+import { displayText, timestampText } from './dashboardDisplay';
 
-/**
- * Detail page for resolved credential schemas on the dashboard.
- */
 export const ResolvedSchemasDetail = ({
     loaderData,
     schemas,
@@ -106,28 +92,26 @@ export const ResolvedSchemasDetail = ({
                                     {schemas.map((schema) => (
                                         <TableRow key={schema.said}>
                                             <TableCell>
-                                                <Typography variant="body2">
-                                                    {schemaTitle(schema)}
+                                                <Typography
+                                                    sx={{ fontWeight: 800 }}
+                                                >
+                                                    {displayText(schema.title)}
                                                 </Typography>
-                                                {schema.description !== null && (
-                                                    <Typography
-                                                        variant="caption"
-                                                        color="text.secondary"
-                                                    >
-                                                        {schema.description}
-                                                    </Typography>
-                                                )}
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                >
+                                                    {displayText(
+                                                        schema.credentialType
+                                                    )}
+                                                </Typography>
                                             </TableCell>
+                                            <TableCell>{schema.status}</TableCell>
                                             <TableCell>
-                                                <StatusPill
-                                                    label={schema.status}
-                                                    tone="success"
+                                                <CopyableAbbreviation
+                                                    value={schema.said}
+                                                    label="schema SAID"
                                                 />
-                                            </TableCell>
-                                            <TableCell>
-                                                <DetailValue mono>
-                                                    {schema.said}
-                                                </DetailValue>
                                             </TableCell>
                                             <TableCell>
                                                 <DetailValue mono>
@@ -138,7 +122,9 @@ export const ResolvedSchemasDetail = ({
                                                 {displayText(schema.version)}
                                             </TableCell>
                                             <TableCell>
-                                                {timestampText(schema.updatedAt)}
+                                                {timestampText(
+                                                    schema.updatedAt
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -163,33 +149,26 @@ export const ResolvedSchemasDetail = ({
                                     },
                                 }}
                             >
-                                <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    sx={{
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: 1,
-                                        mb: 1,
-                                    }}
-                                >
-                                    <Typography variant="subtitle1">
-                                        {schemaTitle(schema)}
-                                    </Typography>
-                                    <StatusPill
-                                        label={schema.status}
-                                        tone="success"
-                                    />
-                                </Stack>
+                                <Typography sx={{ fontWeight: 800 }}>
+                                    {displayText(schema.title)}
+                                </Typography>
+                                <TelemetryRow label="Status" value={schema.status} />
                                 <TelemetryRow
                                     label="SAID"
-                                    value={schema.said}
-                                    mono
+                                    value={
+                                        <CopyableAbbreviation
+                                            value={schema.said}
+                                            label="schema SAID"
+                                        />
+                                    }
                                 />
                                 <TelemetryRow
-                                    label="OOBI URL"
-                                    value={displayText(schema.oobi)}
-                                    mono
+                                    label="OOBI"
+                                    value={
+                                        <DetailValue mono>
+                                            {displayText(schema.oobi)}
+                                        </DetailValue>
+                                    }
                                 />
                                 <TelemetryRow
                                     label="Version"
@@ -208,17 +187,16 @@ export const ResolvedSchemasDetail = ({
     </Box>
 );
 
-/**
- * Mobile credential rows for issued/held dashboard detail lists.
- */
 const CredentialDetailMobileRows = ({
     credentials,
+    schemasBySaid,
     aidAliases,
     onOpenCredential,
 }: {
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
-    onOpenCredential: (said: string) => void;
+    onOpenCredential: (credential: CredentialSummaryRecord) => void;
 }) => (
     <Stack spacing={1.5} sx={{ display: { xs: 'flex', md: 'none' } }}>
         {credentials.map((credential) => (
@@ -227,11 +205,11 @@ const CredentialDetailMobileRows = ({
                 role="button"
                 tabIndex={0}
                 data-ui-sound={UI_SOUND_HOVER_VALUE}
-                onClick={() => onOpenCredential(credential.said)}
+                onClick={() => onOpenCredential(credential)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        onOpenCredential(credential.said);
+                        onOpenCredential(credential);
                     }
                 }}
                 sx={{
@@ -255,7 +233,10 @@ const CredentialDetailMobileRows = ({
                         mb: 1,
                     }}
                 >
-                    <CredentialTypeValue credential={credential} />
+                    <CredentialTypeValue
+                        credential={credential}
+                        schemasBySaid={schemasBySaid}
+                    />
                 </Stack>
                 <TelemetryRow
                     label="Credential SAID"
@@ -290,19 +271,18 @@ const CredentialDetailMobileRows = ({
     </Stack>
 );
 
-/**
- * Desktop credential table for issued/held dashboard detail lists.
- */
 const CredentialDetailTable = ({
     credentials,
+    schemasBySaid,
     aidAliases,
     kind,
     onOpenCredential,
 }: {
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
     kind: 'issued' | 'held';
-    onOpenCredential: (said: string) => void;
+    onOpenCredential: (credential: CredentialSummaryRecord) => void;
 }) => (
     <Box sx={{ display: { xs: 'none', md: 'block' } }}>
         <TableContainer>
@@ -326,17 +306,23 @@ const CredentialDetailTable = ({
                             role="button"
                             tabIndex={0}
                             data-ui-sound={UI_SOUND_HOVER_VALUE}
-                            onClick={() => onOpenCredential(credential.said)}
+                            onClick={() => onOpenCredential(credential)}
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
+                                if (
+                                    event.key === 'Enter' ||
+                                    event.key === ' '
+                                ) {
                                     event.preventDefault();
-                                    onOpenCredential(credential.said);
+                                    onOpenCredential(credential);
                                 }
                             }}
                             sx={{ cursor: 'pointer' }}
                         >
                             <TableCell>
-                                <CredentialTypeValue credential={credential} />
+                                <CredentialTypeValue
+                                    credential={credential}
+                                    schemasBySaid={schemasBySaid}
+                                />
                             </TableCell>
                             <TableCell>
                                 <AidValue
@@ -365,21 +351,20 @@ const CredentialDetailTable = ({
     </Box>
 );
 
-/**
- * Dashboard detail page for issued or held credential inventories.
- */
 export const CredentialsDetail = ({
     loaderData,
     credentials,
+    schemasBySaid,
     aidAliases,
     kind,
     onOpenCredential,
 }: {
     loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
     credentials: readonly CredentialSummaryRecord[];
+    schemasBySaid: ReadonlyMap<string, SchemaRecord>;
     aidAliases: AidAliases;
     kind: 'issued' | 'held';
-    onOpenCredential: (said: string) => void;
+    onOpenCredential: (credential: CredentialSummaryRecord) => void;
 }) => {
     const issued = kind === 'issued';
     const title = issued ? 'Issued Credentials' : 'Held Credentials';
@@ -426,382 +411,18 @@ export const CredentialsDetail = ({
                     <>
                         <CredentialDetailTable
                             credentials={credentials}
+                            schemasBySaid={schemasBySaid}
                             aidAliases={aidAliases}
                             kind={kind}
                             onOpenCredential={onOpenCredential}
                         />
                         <CredentialDetailMobileRows
                             credentials={credentials}
+                            schemasBySaid={schemasBySaid}
                             aidAliases={aidAliases}
                             onOpenCredential={onOpenCredential}
                         />
                     </>
-                )}
-            </ConsolePanel>
-        </Box>
-    );
-};
-
-/**
- * Tone-coded grant/admit activity marker for credential detail timelines.
- */
-const CredentialActivityPill = ({
-    entry,
-}: {
-    entry: CredentialActivityEntry;
-}) => {
-    const direction =
-        entry.direction === 'sent'
-            ? 'sent'
-            : entry.direction === 'received'
-              ? 'received'
-              : 'observed';
-    const kind = entry.kind === 'grant' ? 'grant' : 'admit';
-    return (
-        <StatusPill
-            label={`${direction} ${kind}`}
-            tone={entry.kind === 'admit' ? 'success' : 'info'}
-        />
-    );
-};
-
-/**
- * Domain data rows displayed only when the credential carries known attributes.
- */
-const credentialDataRows = (
-    credential: CredentialSummaryRecord
-): Array<{ label: string; value: ReactNode }> => {
-    if (credential.attributes === null) {
-        return [];
-    }
-
-    return [
-        { label: 'Subject AID', value: credential.attributes.i },
-        { label: 'Full name', value: credential.attributes.fullName },
-        { label: 'Voter ID', value: credential.attributes.voterId },
-        { label: 'Precinct ID', value: credential.attributes.precinctId },
-        { label: 'County', value: credential.attributes.county },
-        { label: 'Jurisdiction', value: credential.attributes.jurisdiction },
-        { label: 'Election ID', value: credential.attributes.electionId },
-        { label: 'Eligible', value: credential.attributes.eligible ? 'Yes' : 'No' },
-        { label: 'Expires', value: credential.attributes.expires },
-    ];
-};
-
-/**
- * Dashboard detail page for one credential, including registry and IPEX activity.
- */
-export const CredentialRecordDetail = ({
-    loaderData,
-    credential,
-    schema,
-    registriesById,
-    aidAliases,
-    activity,
-}: {
-    loaderData: Exclude<DashboardLoaderData, { status: 'blocked' }>;
-    credential: CredentialSummaryRecord | null;
-    schema: SchemaRecord | null;
-    registriesById: ReadonlyMap<string, RegistryRecord>;
-    aidAliases: AidAliases;
-    activity: readonly CredentialActivityEntry[];
-}) => {
-    if (credential === null) {
-        return (
-            <Box
-                sx={{ display: 'grid', gap: 2.5 }}
-                data-testid="dashboard-credential-detail"
-            >
-                <PageHeader
-                    eyebrow="Dashboard"
-                    title="Credential not found"
-                    actions={<BackToDashboard />}
-                />
-                {loaderData.status === 'error' && (
-                    <DashboardWarning message={loaderData.message} />
-                )}
-                <EmptyState
-                    title="No credential record"
-                    message="The credential is not present in this connected wallet's local inventory."
-                    action={
-                        <Button
-                            component={RouterLink}
-                            to="/dashboard/credentials/held"
-                            variant="contained"
-                            data-ui-sound={UI_SOUND_HOVER_VALUE}
-                        >
-                            Open Held Credentials
-                        </Button>
-                    }
-                />
-            </Box>
-        );
-    }
-
-    const ledgerStatus = credentialLedgerStatus(credential);
-    const dataRows = credentialDataRows(credential);
-    const schemaRules = schema?.rules ?? null;
-    const schemaRulesRows = schemaRuleViews(schemaRules);
-    const backPath =
-        credential.direction === 'issued'
-            ? '/dashboard/credentials/issued'
-            : '/dashboard/credentials/held';
-
-    return (
-        <Box
-            sx={{ display: 'grid', gap: 2.5 }}
-            data-testid="dashboard-credential-detail"
-        >
-            <PageHeader
-                eyebrow="Credential"
-                title={credentialTypeLabel(credential)}
-                summary={credential.said}
-                actions={
-                    <Button
-                        component={RouterLink}
-                        to={backPath}
-                        variant="outlined"
-                        data-ui-sound={UI_SOUND_HOVER_VALUE}
-                    >
-                        Back to {credential.direction === 'issued' ? 'Issued' : 'Held'}
-                    </Button>
-                }
-            />
-            {loaderData.status === 'error' && (
-                <DashboardWarning message={loaderData.message} />
-            )}
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-                    gap: 2,
-                }}
-            >
-                <ConsolePanel
-                    title="Credential"
-                    eyebrow="Inventory"
-                    actions={
-                        <StatusPill
-                            label={ledgerStatus.label}
-                            tone={ledgerStatus.tone}
-                        />
-                    }
-                >
-                    <Stack spacing={0.5}>
-                        <TelemetryRow
-                            label="Type"
-                            value={credentialTypeLabel(credential)}
-                        />
-                        <TelemetryRow
-                            label="Credential SAID"
-                            value={<FullMonoValue value={credential.said} />}
-                        />
-                        <TelemetryRow
-                            label="Schema SAID"
-                            value={
-                                credential.schemaSaid === null ? (
-                                    'Not available'
-                                ) : (
-                                    <FullMonoValue value={credential.schemaSaid} />
-                                )
-                            }
-                        />
-                        <TelemetryRow
-                            label="Issuer AID"
-                            value={
-                                <FullAidValue
-                                    aid={credential.issuerAid}
-                                    aliases={aidAliases}
-                                />
-                            }
-                        />
-                        <TelemetryRow
-                            label="Holder AID"
-                            value={
-                                <FullAidValue
-                                    aid={credential.holderAid}
-                                    aliases={aidAliases}
-                                />
-                            }
-                        />
-                        <TelemetryRow
-                            label="Registry"
-                            value={registryDisplay(credential, registriesById)}
-                            mono
-                        />
-                        <TelemetryRow
-                            label="Issued"
-                            value={timestampText(credential.issuedAt)}
-                        />
-                        {credential.revokedAt !== null && (
-                            <TelemetryRow
-                                label="Revoked"
-                                value={timestampText(credential.revokedAt)}
-                            />
-                        )}
-                        {credential.error !== null && (
-                            <TelemetryRow
-                                label="Error"
-                                value={credential.error}
-                            />
-                        )}
-                    </Stack>
-                </ConsolePanel>
-                <ConsolePanel title="Credential data" eyebrow="Subject">
-                    {dataRows.length === 0 ? (
-                        <EmptyState
-                            title="No decoded credential data"
-                            message="This credential does not match a supported local data mapper."
-                        />
-                    ) : (
-                        <Stack spacing={0.5}>
-                            {dataRows.map((row) => (
-                                <TelemetryRow
-                                    key={row.label}
-                                    label={row.label}
-                                    value={row.value}
-                                />
-                            ))}
-                        </Stack>
-                    )}
-                </ConsolePanel>
-            </Box>
-            <ConsolePanel title="Schema rules" eyebrow="ACDC">
-                {schemaRulesRows.length === 0 ? (
-                    <EmptyState
-                        title="No schema rules"
-                        message="The resolved schema does not include a top-level rules section."
-                    />
-                ) : (
-                    <TableContainer>
-                        <Table size="small" aria-label="Schema rules">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Value</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {schemaRulesRows.map((rule) => (
-                                    <TableRow
-                                        key={rule.name}
-                                        data-testid={`schema-rule-${rule.name}`}
-                                    >
-                                        <TableCell
-                                            sx={{
-                                                width: { xs: '42%', md: '30%' },
-                                                verticalAlign: 'top',
-                                                ...monoValueSx,
-                                                overflowWrap: 'anywhere',
-                                            }}
-                                        >
-                                            {rule.name}
-                                        </TableCell>
-                                        <TableCell
-                                            sx={{
-                                                verticalAlign: 'top',
-                                                overflowWrap: 'anywhere',
-                                                whiteSpace: 'pre-wrap',
-                                            }}
-                                        >
-                                            {rule.value}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </ConsolePanel>
-            <ConsolePanel title="Activity log" eyebrow="IPEX">
-                {activity.length === 0 ? (
-                    <EmptyState
-                        title="No credential activity"
-                        message="Grant and admit exchange activity will appear here when available."
-                    />
-                ) : (
-                    <List disablePadding>
-                        {activity.map((entry) => (
-                            <ListItem
-                                key={entry.id}
-                                disableGutters
-                                sx={{
-                                    alignItems: 'flex-start',
-                                    borderBottom: 1,
-                                    borderColor: 'divider',
-                                    py: 1.25,
-                                    '&:last-child': {
-                                        borderBottom: 0,
-                                    },
-                                }}
-                            >
-                                <ListItemText
-                                    primary={
-                                        <Stack
-                                            direction={{ xs: 'column', sm: 'row' }}
-                                            spacing={1}
-                                            sx={{
-                                                alignItems: {
-                                                    xs: 'flex-start',
-                                                    sm: 'center',
-                                                },
-                                                justifyContent: 'space-between',
-                                                gap: 1,
-                                            }}
-                                        >
-                                            <Stack
-                                                direction="row"
-                                                spacing={1}
-                                                sx={{
-                                                    alignItems: 'center',
-                                                    flexWrap: 'wrap',
-                                                }}
-                                            >
-                                                <Typography component="span">
-                                                    {entry.title}
-                                                </Typography>
-                                                <CredentialActivityPill
-                                                    entry={entry}
-                                                />
-                                            </Stack>
-                                            <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                            >
-                                                {timestampText(entry.timestamp)}
-                                            </Typography>
-                                        </Stack>
-                                    }
-                                    secondary={
-                                        <Stack spacing={0.5} sx={{ mt: 0.75 }}>
-                                            <TelemetryRow
-                                                label="Exchange SAID"
-                                                value={<FullMonoValue value={entry.said} />}
-                                            />
-                                            <TelemetryRow
-                                                label="Sender"
-                                                value={
-                                                    <FullAidValue
-                                                        aid={entry.primaryAid}
-                                                        aliases={aidAliases}
-                                                    />
-                                                }
-                                            />
-                                            <TelemetryRow
-                                                label="Recipient"
-                                                value={
-                                                    <FullAidValue
-                                                        aid={entry.secondaryAid}
-                                                        aliases={aidAliases}
-                                                    />
-                                                }
-                                            />
-                                        </Stack>
-                                    }
-                                />
-                            </ListItem>
-                        ))}
-                    </List>
                 )}
             </ConsolePanel>
         </Box>
