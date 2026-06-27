@@ -1,4 +1,5 @@
 import type { Operation as EffectionOperation } from 'effection';
+import { getDidWebsSetup } from 'signify-did-webs';
 import { callPromise, toErrorText } from '../effects/promise';
 import { AppServicesContext } from '../effects/contexts';
 import {
@@ -28,14 +29,17 @@ export function* refreshIdentifierDidWebsOp({
     );
 
     try {
-        const dws = yield* callPromise(() =>
-            services.runtime.requireConnectedClient().identifiers().dws(name)
+        const setup = yield* callPromise(() =>
+            getDidWebsSetup({
+                client: services.runtime.requireConnectedClient(),
+                name,
+            })
         );
         const payload: DidWebsDidPayload = {
             aid,
-            did: dws.dws,
-            didJsonUrl: dws.didJsonUrl,
-            keriCesrUrl: dws.keriCesrUrl,
+            did: setup.dws,
+            didJsonUrl: setup.didJsonUrl,
+            keriCesrUrl: setup.keriCesrUrl,
             updatedAt: new Date().toISOString(),
         };
         services.store.dispatch(didWebsDidLoaded(payload));
