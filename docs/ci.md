@@ -1,13 +1,27 @@
 # CI
 
-The repository uses GitHub Actions to run the Signify boundary smoke tests
-and scenario tests against a real local KERIA stack.
+The repository uses GitHub Actions to run fast static app checks separately
+from the Signify boundary smoke tests that need a real local KERIA stack.
 
 Workflow: `.github/workflows/ci.yml`
 
-## What CI Runs
+## Required Jobs
 
-The main CI job:
+### Static app checks
+
+The static app job is Node-only and runs:
+
+```bash
+pnpm ci:static
+```
+
+That script runs lint, production build, and the unit suite. Unit tests use
+`vitest.unit.config.ts` so pure unit files can run in parallel without changing
+the serial policy used by live KERIA scenarios.
+
+### Live KERIA smoke
+
+The live KERIA job:
 
 1. installs system dependencies needed by KERIpy, currently `libsodium-dev`,
 2. sets up Python 3.12.8,
@@ -17,27 +31,48 @@ The main CI job:
 6. installs pinned KERIpy and KERIA from GitHub commits,
 7. starts local KERI demo witnesses,
 8. starts local KERIA,
-9. runs `pnpm test:ci`,
+9. runs `pnpm ci:live`,
 10. uploads KERIA/witness logs on success or failure.
 
-`pnpm test:ci` currently runs:
+`pnpm ci:live` currently runs:
 
 ```bash
-pnpm lint
-pnpm build
 pnpm keria:smoke -- --mode connect
 pnpm keria:smoke
-pnpm scenario:test
-pnpm browser:smoke
+pnpm scenario:ci
+pnpm browser:ci-smoke
 ```
 
-Future tests that require the same local KERIA stack should be added to
-`test:ci` or called from that script.
+`pnpm test:ci` remains as a local parity wrapper for developers who want the
+same static and live checks in one command:
 
-`pnpm scenario:test` runs only the top-level scenario test files. Optional
-schema and external-fixture scenarios live under `tests/scenarios/optional` and
-are available through `pnpm scenario:test:all`, where they skip unless their
-required config is present.
+```bash
+pnpm ci:static && pnpm ci:live
+```
+
+Future required checks that need the same local KERIA stack should be added to
+`ci:live` or a script it calls. Do not append broad/manual suites to required
+CI unless they protect an active change.
+
+`pnpm scenario:ci` is the required live scenario subset. It keeps one
+two-member multisig canary for invitation, acceptance, interaction, and
+rotation, but leaves the full multisig matrix in `pnpm multisig:test`.
+
+`pnpm scenario:test` runs the broader top-level scenario files for manual or
+pre-merge confidence. Optional schema and external-fixture scenarios live under
+`tests/scenarios/optional` and are available through `pnpm scenario:test:all`,
+where they skip unless their required config is present.
+
+The W3C holder presentation smoke is intentionally not part of required PR CI.
+It attaches to a pre-seeded live W3C stack with W3C-enabled KERIA and live
+verifier services:
+
+```bash
+pnpm w3c:holder-presentation:smoke
+```
+
+If this smoke becomes automated, pin KERIA and any cross-repo stack inputs by
+immutable SHAs, not floating branches.
 
 ## Pinned Python Stack
 

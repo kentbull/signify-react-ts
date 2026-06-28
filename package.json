@@ -7,24 +7,28 @@
     "scripts": {
         "dev": "vite",
         "build": "npx tsc && vite build",
-        "lint": "eslint src tests scripts eslint.config.mjs vite.config.ts vitest.config.ts --max-warnings 0",
+        "lint": "eslint src tests scripts eslint.config.mjs vite.config.ts vitest.config.ts vitest.unit.config.ts --max-warnings 0",
         "preview": "vite preview",
         "keria:smoke": "tsx scripts/keria-smoke.ts",
         "contact:ui-smoke": "tsx tests/contact-oobi-smoke.ts",
         "contact:challenge-smoke": "tsx tests/contact-challenge-smoke.ts",
         "identifier-agent-oobi:smoke": "tsx tests/identifier-agent-oobi-smoke.ts",
         "browser:smoke": "tsx tests/browser-smoke.ts",
+        "browser:ci-smoke": "tsx tests/browser-ci-smoke.ts",
         "w3c:holder-presentation:smoke": "node tests/w3c-holder-presentation-smoke.mjs",
         "responsive:smoke": "tsx tests/responsive-smoke.ts",
-        "unit:test": "vitest run tests/unit",
+        "unit:test": "vitest run --config vitest.unit.config.ts tests/unit",
         "multisig:test": "vitest run tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts",
+        "scenario:ci": "vitest run tests/scenarios/challenge.test.ts tests/scenarios/credentials.test.ts tests/scenarios/multisig-ci.test.ts",
         "scenario:test": "vitest run tests/scenarios/salty.test.ts tests/scenarios/randy.test.ts tests/scenarios/witnessed.test.ts tests/scenarios/challenge.test.ts tests/scenarios/controller-rotation.test.ts tests/scenarios/oobi-contacts.test.ts tests/scenarios/credentials.test.ts tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts",
         "delegation:test": "vitest run tests/scenarios/optional/delegation.test.ts",
         "scenario:test:all": "vitest run tests/scenarios",
         "portable:wallet-api": "vitest run tests/scenarios/challenge.test.ts tests/scenarios/credentials.test.ts tests/scenarios/multisig.test.ts tests/scenarios/multisig-interaction.test.ts tests/scenarios/optional/delegation.test.ts",
         "portable:wallet-browser": "pnpm browser:smoke && pnpm responsive:smoke && tsx tests/contact-challenge-smoke.ts",
         "portable:e2e": "pnpm portable:wallet-api && pnpm portable:wallet-browser",
-        "test:ci": "pnpm lint && pnpm build && pnpm unit:test && pnpm responsive:smoke && pnpm keria:smoke -- --mode connect && pnpm keria:smoke && pnpm scenario:test && pnpm contact:ui-smoke && pnpm browser:smoke"
+        "ci:static": "pnpm lint && pnpm build && pnpm unit:test",
+        "ci:live": "pnpm keria:smoke -- --mode connect && pnpm keria:smoke && pnpm scenario:ci && pnpm browser:ci-smoke",
+        "test:ci": "pnpm ci:static && pnpm ci:live"
     },
     "engines": {
         "node": ">=20.19.0"

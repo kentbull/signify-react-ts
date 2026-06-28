@@ -10,4 +10,5 @@ dist/
 coverage/*
 
 .cache/
+.ci/
 .smoke-artifacts/
