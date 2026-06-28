@@ -99,7 +99,7 @@ socket_wait 127.0.0.1 3903 "KERIA boot API"
 echo "Starting vLEI schema server"
 (
   cd "$ROOT_DIR"
-  exec vLEI-server \
+  exec python -m vlei.server \
     --http 7723 \
     --schema-dir "$SCHEMA_DIR" \
     --cred-dir "$CREDENTIAL_DIR" \
